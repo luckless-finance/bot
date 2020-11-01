@@ -1,44 +1,21 @@
-mod strategy;
-
-use serde::{Serialize, Deserialize};
-use std::borrow::Borrow;
-use std::fmt;
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Point {
-    x: f64,
-    y: f64,
-}
-// To use the `{}` marker, the trait `fmt::Display` must be implemented
-// manually for the type.
-impl fmt::Display for Point {
-    // This trait requires `fmt` with this exact signature.
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Write strictly the first element into the supplied output
-        // stream: `f`. Returns `fmt::Result` which indicates whether the
-        // operation succeeded or failed. Note that `write!` uses syntax which
-        // is very similar to `println!`.
-        write!(f, "x:{} y:{}", self.x, self.y)
-    }
-}
-
-
-
-fn foo() -> Result<(), serde_yaml::Error> {
-    let point = Point { x: 1.0, y: 2.0 };
-
-    let s = serde_yaml::to_string(&point)?;
-    println!("{}", s);
-    assert_eq!(s, "---\nx: 1.0\ny: 2.0");
-
-    let deserialized_point: Point = serde_yaml::from_str(&s)?;
-    assert_eq!(point, deserialized_point);
-    println!("{}", point);
-    Ok(())
-}
-
+mod dto;
 
 fn main() {
-    foo();
-    println!("Hello, world!");
+    let expected_strategy_yaml = String::from(r#"---
+name: foo
+score:
+  calculation: bar
+calculations:
+  - name: calc
+    operation: add
+    operands:
+      - name: operand"#);
+
+    let actual_strategy: dto::Strategy = serde_yaml::from_str(&expected_strategy_yaml)
+        .expect("unable to parse yaml");
+    let actual_strategy_yaml = serde_yaml::to_string(&actual_strategy)
+        .expect("unable to parse yaml");
+
+    println!("{}", expected_strategy_yaml);
+    println!("{}", actual_strategy_yaml);
 }

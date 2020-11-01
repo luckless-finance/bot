@@ -1,32 +1,57 @@
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Score {
+pub struct Score {
     calculation: String
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Operand {
-    name: String
+impl Score {
+    pub fn new(calculation: String) -> Self {
+        Score { calculation }
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Calculation {
+pub struct Operand {
+    name: String
+}
+
+impl Operand {
+    pub fn new(name: String) -> Self {
+        Operand { name }
+    }
+}
+
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Calculation {
     name: String,
     operation: String,
     operands: Vec<Operand>,
 }
 
+impl Calculation {
+    pub fn new(name: String, operation: String, operands: Vec<Operand>) -> Self {
+        Calculation { name, operation, operands }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Strategy {
+pub struct Strategy {
     name: String,
     score: Score,
     calculations: Vec<Calculation>,
 }
 
+impl Strategy {
+    pub fn new(name: String, score: Score, calculations: Vec<Calculation>) -> Self {
+        Strategy { name, score, calculations }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::strategy::{Strategy, Score, Operand, Calculation};
+    use crate::dto::{Strategy, Score, Operand, Calculation};
 
     fn get_strategy() -> Strategy {
         Strategy {
@@ -86,5 +111,22 @@ calculations:
         let actual_strategy_yaml: String = serde_yaml::to_string(&actual_strategy)?;
         assert_eq!(actual_strategy_yaml, expected_strategy_yaml);
         Ok(())
+    }
+
+    #[test]
+    fn constructors() {
+        let strategy = Strategy::new(
+            String::from("foo"),
+            Score::new(String::from("bar")),
+            vec![
+                Calculation::new(
+                    String::from("calc"),
+                    String::from("add"),
+                    vec![
+                        Operand::new(String::from("operand")),
+                    ]),
+            ],
+        );
+        assert_eq!(strategy, get_strategy());
     }
 }
