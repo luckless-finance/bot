@@ -1,0 +1,9 @@
+---
+name: foo
+score:
+  calculation: bar
+calculations:
+  - name: calc
+    operation: add
+    operands:
+      - name: operand

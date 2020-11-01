@@ -1,4 +1,8 @@
 use serde::{Serialize, Deserialize};
+use std::path::Path;
+use std::fs::File;
+use std::io::Read;
+use std::borrow::BorrowMut;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Score {
@@ -49,9 +53,19 @@ impl Strategy {
     }
 }
 
+pub fn from_path(file_path: &Path) -> Result<Strategy, serde_yaml::Error> {
+    let mut strategy_file: File = File::open(file_path)
+        .expect("unable to open file");
+    let mut strategy_yaml = String::new();
+    strategy_file.read_to_string(strategy_yaml.borrow_mut());
+    serde_yaml::from_str(&strategy_yaml)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::dto::{Strategy, Score, Operand, Calculation};
+    use crate::dto::{Strategy, Score, Operand, Calculation, from_path};
+    use std::env::current_dir;
+    use std::path::Path;
 
     fn get_strategy() -> Strategy {
         Strategy {
@@ -127,6 +141,15 @@ calculations:
                     ]),
             ],
         );
+        assert_eq!(strategy, get_strategy());
+    }
+
+    #[test]
+    fn test_from_file() {
+        let mut strategy_path = current_dir()
+            .expect("unable to get working directory")
+            .join(Path::new("strategy.yaml"));
+        let strategy = from_path(strategy_path.as_path()).expect("unable to load strategy from path");
         assert_eq!(strategy, get_strategy());
     }
 }
