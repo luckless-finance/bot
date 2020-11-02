@@ -148,6 +148,17 @@ mod tests {
                         },
                     ],
                 },
+                Calculation {
+                    name: String::from("close"),
+                    operation: String::from("query"),
+                    operands: vec![
+                        Operand {
+                            name: String::from("tbd"),
+                            _type: String::from("tbd"),
+                            value: String::from("tbd"),
+                        },
+                    ],
+                },
             ],
         }
     }
@@ -194,7 +205,13 @@ calculations:
         value: 200
       - name: sequence
         _type: query
-        value: close"#,
+        value: close
+  - name: close
+    operation: query
+    operands:
+      - name: tbd
+        _type: tbd
+        value: tbd"#,
         )
     }
 

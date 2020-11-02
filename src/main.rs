@@ -23,5 +23,5 @@ fn main() {
             .expect("unable to convert to str")
     );
 
-    load_strategy();
+    to_dag(load_strategy())
 }

@@ -39,3 +39,9 @@ calculations:
       - name: sequence
         _type: query
         value: close
+  - name: close
+    operation: query
+    operands:
+      - name: tbd
+        _type: tbd
+        value: tbd
