@@ -1,12 +1,12 @@
-use serde::{Serialize, Deserialize};
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+use std::borrow::BorrowMut;
 use std::fs::File;
 use std::io::Read;
-use std::borrow::BorrowMut;
+use std::path::Path;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Score {
-    calculation: String
+    calculation: String,
 }
 
 impl Score {
@@ -17,7 +17,7 @@ impl Score {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Operand {
-    name: String
+    name: String,
 }
 
 impl Operand {
@@ -25,7 +25,6 @@ impl Operand {
         Operand { name }
     }
 }
-
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Calculation {
@@ -36,7 +35,11 @@ pub struct Calculation {
 
 impl Calculation {
     pub fn new(name: String, operation: String, operands: Vec<Operand>) -> Self {
-        Calculation { name, operation, operands }
+        Calculation {
+            name,
+            operation,
+            operands,
+        }
     }
 }
 
@@ -49,21 +52,26 @@ pub struct Strategy {
 
 impl Strategy {
     pub fn new(name: String, score: Score, calculations: Vec<Calculation>) -> Self {
-        Strategy { name, score, calculations }
+        Strategy {
+            name,
+            score,
+            calculations,
+        }
     }
 }
 
 pub fn from_path(file_path: &Path) -> Result<Strategy, serde_yaml::Error> {
-    let mut strategy_file: File = File::open(file_path)
-        .expect("unable to open file");
+    let mut strategy_file: File = File::open(file_path).expect("unable to open file");
     let mut strategy_yaml = String::new();
-    strategy_file.read_to_string(strategy_yaml.borrow_mut());
+    strategy_file
+        .read_to_string(strategy_yaml.borrow_mut())
+        .expect("unable to read strategy file");
     serde_yaml::from_str(&strategy_yaml)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::dto::{Strategy, Score, Operand, Calculation, from_path};
+    use crate::dto::{from_path, Calculation, Operand, Score, Strategy};
     use std::env::current_dir;
     use std::path::Path;
 
@@ -71,24 +79,21 @@ mod tests {
         Strategy {
             name: String::from("foo"),
             score: Score {
-                calculation: String::from("bar")
+                calculation: String::from("bar"),
             },
-            calculations: vec![
-                Calculation {
-                    name: String::from("calc"),
-                    operation: String::from("add"),
-                    operands: vec![
-                        Operand {
-                            name: String::from("operand")
-                        }
-                    ],
-                }
-            ],
+            calculations: vec![Calculation {
+                name: String::from("calc"),
+                operation: String::from("add"),
+                operands: vec![Operand {
+                    name: String::from("operand"),
+                }],
+            }],
         }
     }
 
     fn get_strategy_yaml() -> String {
-        String::from(r#"---
+        String::from(
+            r#"---
 name: foo
 score:
   calculation: bar
@@ -96,7 +101,8 @@ calculations:
   - name: calc
     operation: add
     operands:
-      - name: operand"#)
+      - name: operand"#,
+        )
     }
 
     #[test]
@@ -132,14 +138,11 @@ calculations:
         let strategy = Strategy::new(
             String::from("foo"),
             Score::new(String::from("bar")),
-            vec![
-                Calculation::new(
-                    String::from("calc"),
-                    String::from("add"),
-                    vec![
-                        Operand::new(String::from("operand")),
-                    ]),
-            ],
+            vec![Calculation::new(
+                String::from("calc"),
+                String::from("add"),
+                vec![Operand::new(String::from("operand"))],
+            )],
         );
         assert_eq!(strategy, get_strategy());
     }
@@ -149,7 +152,8 @@ calculations:
         let mut strategy_path = current_dir()
             .expect("unable to get working directory")
             .join(Path::new("strategy.yaml"));
-        let strategy = from_path(strategy_path.as_path()).expect("unable to load strategy from path");
+        let strategy =
+            from_path(strategy_path.as_path()).expect("unable to load strategy from path");
         assert_eq!(strategy, get_strategy());
     }
 }
