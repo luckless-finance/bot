@@ -1,4 +1,4 @@
-use crate::dag::to_dag;
+use crate::dag::{to_dag, demo_dot};
 use crate::dto::{from_path, Strategy};
 use std::env::current_dir;
 use std::path::Path;
@@ -23,5 +23,6 @@ fn main() {
             .expect("unable to convert to str")
     );
 
-    to_dag(load_strategy())
+    let dag = to_dag(load_strategy());
+    println!("{:?}", dag)
 }

@@ -23,6 +23,18 @@ pub struct Operand {
 }
 
 impl Operand {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn _type(&self) -> &str {
+        &self._type
+    }
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
+impl Operand {
     pub fn new(name: String, _type: String, value: String) -> Self {
         Operand { name, _type, value }
     }
@@ -33,6 +45,18 @@ pub struct Calculation {
     name: String,
     operation: String,
     operands: Vec<Operand>,
+}
+
+impl Calculation {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn operation(&self) -> &str {
+        &self.operation
+    }
+    pub fn operands(&self) -> &Vec<Operand> {
+        &self.operands
+    }
 }
 
 impl Calculation {
@@ -50,6 +74,18 @@ pub struct Strategy {
     name: String,
     score: Score,
     calculations: Vec<Calculation>,
+}
+
+impl Strategy {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn score(&self) -> &Score {
+        &self.score
+    }
+    pub fn calculations(&self) -> &Vec<Calculation> {
+        &self.calculations
+    }
 }
 
 impl Strategy {
