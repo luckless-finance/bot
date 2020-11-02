@@ -1,9 +1,41 @@
 ---
-name: foo
+name: Example Strategy Document
 score:
-  calculation: bar
+  calculation: sma_gap
 calculations:
-  - name: calc
-    operation: add
+  - name: sma_gap
+    operation: div
     operands:
-      - name: operand
+      - name: numerator
+        _type: ref
+        value: sma_diff
+      - name: denominator
+        _type: ref
+        value: sma50
+  - name: sma_diff
+    operation: sub
+    operands:
+      - name: left
+        _type: ref
+        value: sma50
+      - name: right
+        _type: ref
+        value: sma200
+  - name: sma50
+    operation: sma
+    operands:
+      - name: window_size
+        _type: i32
+        value: 50
+      - name: sequence
+        _type: query
+        value: close
+  - name: sma200
+    operation: sma
+    operands:
+      - name: window_size
+        _type: i32
+        value: 200
+      - name: sequence
+        _type: query
+        value: close
