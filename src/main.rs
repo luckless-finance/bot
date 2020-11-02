@@ -23,6 +23,6 @@ fn main() {
             .expect("unable to convert to str")
     );
 
-    let dag = to_dag(load_strategy());
+    let dag = to_dag(&load_strategy());
     println!("{:?}", dag)
 }

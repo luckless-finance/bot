@@ -29,7 +29,7 @@ pub fn to_dot_file(g: &Graph<String, String, petgraph::Directed>) {
         .expect("unable to write file");
 }
 
-pub fn to_dag(strategy: Strategy) -> DiGraph<String, String> {
+pub fn to_dag(strategy: &Strategy) -> DiGraph<String, String> {
     let strategy_yaml = serde_yaml::to_string(&strategy).expect("unable to string");
     println!("{}", strategy_yaml);
     let mut dag: DiGraph<String, String> = Graph::new();
@@ -61,8 +61,11 @@ pub fn to_dag(strategy: Strategy) -> DiGraph<String, String> {
 mod tests {
     use petgraph::prelude::DiGraph;
     use petgraph::Graph;
-    use crate::dag::to_dot_file;
+    use crate::dag::{to_dot_file, to_dag};
+    use crate::dto::from_path;
     use std::fs::read_to_string;
+    use std::path::Path;
+    use std::borrow::Borrow;
 
     #[test]
     fn to_dot_file_test() {
@@ -81,5 +84,19 @@ mod tests {
         let output = read_to_string("output.dot")
             .expect("output.dot not found.");
         assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn to_dag_test() {
+        let strategy = from_path(Path::new("strategy.yaml"))
+            .expect("unable to load strategy");
+        let dag = to_dag(&strategy);
+        assert_eq!(dag.node_count(), 5);
+        assert_eq!(dag.edge_count(), 6);
+        let nodes = dag.node_indices()
+            .map(|i| dag.node_weight(i).expect("node not found"))
+            .find(|d| d.as_str().eq("sma200"))
+            .expect("sma200 not found");
+        print!("{}", nodes);
     }
 }
