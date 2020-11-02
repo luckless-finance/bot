@@ -1,4 +1,4 @@
-use crate::dag::{to_dag, demo_dot};
+use crate::dag::{to_dag};
 use crate::dto::{from_path, Strategy};
 use std::env::current_dir;
 use std::path::Path;

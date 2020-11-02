@@ -56,3 +56,30 @@ pub fn to_dag(strategy: Strategy) -> DiGraph<String, String> {
     to_dot_file(&dag);
     dag
 }
+
+#[cfg(test)]
+mod tests {
+    use petgraph::prelude::DiGraph;
+    use petgraph::Graph;
+    use crate::dag::to_dot_file;
+    use std::fs::read_to_string;
+
+    #[test]
+    fn to_dot_file_test() {
+        let mut dag: DiGraph<String, String> = Graph::new();
+        let node_index_A = dag.add_node(String::from("A"));
+        let node_index_B = dag.add_node(String::from("B"));
+        let node_index_C = dag.add_node(String::from("C"));
+        let node_index_D = dag.add_node(String::from("D"));
+        dag.add_edge(node_index_A, node_index_B, String::from(""));
+        dag.add_edge(node_index_A, node_index_C, String::from(""));
+        dag.add_edge(node_index_B, node_index_D, String::from(""));
+        dag.add_edge(node_index_C, node_index_D, String::from(""));
+        to_dot_file(&dag);
+        let expected_output = read_to_string("expected_output.dot")
+            .expect("expected_output.dot not found.");
+        let output = read_to_string("output.dot")
+            .expect("output.dot not found.");
+        assert_eq!(output, expected_output);
+    }
+}
