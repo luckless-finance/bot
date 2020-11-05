@@ -26,7 +26,7 @@ calculations:
     operands:
       - name: window_size
         _type: i32
-        value: 50
+        value: "50"
       - name: sequence
         _type: query
         value: close
@@ -35,7 +35,7 @@ calculations:
     operands:
       - name: window_size
         _type: i32
-        value: 200
+        value: "200"
       - name: sequence
         _type: query
         value: close

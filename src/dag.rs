@@ -3,16 +3,13 @@ use std::env::current_dir;
 use std::fs::File;
 use std::io::Write;
 
-use petgraph::Graph;
-use petgraph::algo::{
-    connected_components, is_cyclic_directed,
-};
+use petgraph::algo::{connected_components, is_cyclic_directed};
 use petgraph::dot::{Config, Dot};
 use petgraph::graph::DiGraph;
+use petgraph::Graph;
 
 use crate::dto::Strategy;
 
-// type Dag = Graph<String, String, petgraph::Directed>;
 pub type Dag = DiGraph<String, String>;
 
 pub fn to_dot_text(g: &Dag) -> String {
@@ -24,7 +21,8 @@ pub fn to_dot_file(g: &Dag) {
         current_dir()
             .expect("unable to find current_dir")
             .join("output.dot"),
-    ).expect("unable to open output file");
+    )
+    .expect("unable to open output file");
     let dot_text = to_dot_text(g);
     output_file
         .write_all(dot_text.as_bytes())
@@ -65,18 +63,18 @@ mod tests {
     use std::fs::read_to_string;
     use std::path::Path;
 
-    use petgraph::algo::{ toposort};
+    use petgraph::algo::toposort;
     use petgraph::prelude::DiGraph;
 
     use crate::dag::{to_dag, to_dot_file};
     use crate::dto::from_path;
-    type Dag = DiGraph<String, String>;
 
+    type Dag = DiGraph<String, String>;
 
     #[test]
     fn get_queries() {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
-        let mut dag = to_dag(&strategy).expect("unable to convert to dag");
+        let dag = to_dag(&strategy).expect("unable to convert to dag");
         // let A = dag.add_node(String::from("A"));
         // let B = dag.add_node(String::from("B"));
         // let C = dag.add_node(String::from("C"));
@@ -91,7 +89,7 @@ mod tests {
             .map(|node_id| dag.node_weight(node_id).unwrap().as_str())
             .collect();
 
-        println!("{:?}", nodes);
+        // println!("{:?}", nodes);
 
         let topo_node_ids = toposort(&dag, None).expect("unable to toposort");
         let root_node_id = topo_node_ids.get(0).expect("unable to get root");
@@ -129,6 +127,7 @@ mod tests {
             .map(|i| dag.node_weight(i).expect("node not found"))
             .find(|d| d.as_str().eq("sma200"))
             .expect("sma200 not found");
+        assert_eq!(nodes, "sma200")
         // print!("{}", nodes);
     }
 }

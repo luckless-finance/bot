@@ -1,8 +1,9 @@
-use serde::{Deserialize, Serialize};
 use std::borrow::BorrowMut;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Score {
@@ -109,9 +110,10 @@ pub fn from_path(file_path: &Path) -> Result<Strategy, serde_yaml::Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::dto::{from_path, Calculation, Operand, Score, Strategy};
     use std::env::current_dir;
     use std::path::Path;
+
+    use crate::dto::{from_path, Calculation, Operand, Score, Strategy};
 
     fn get_strategy() -> Strategy {
         Strategy {
@@ -227,7 +229,7 @@ calculations:
     operands:
       - name: window_size
         _type: i32
-        value: 50
+        value: "50"
       - name: sequence
         _type: query
         value: close
@@ -236,7 +238,7 @@ calculations:
     operands:
       - name: window_size
         _type: i32
-        value: 200
+        value: "200"
       - name: sequence
         _type: query
         value: close
@@ -274,14 +276,14 @@ calculations:
         // println!("{}", expected_strategy_yaml);
         let actual_strategy: Strategy =
             serde_yaml::from_str(&expected_strategy_yaml).expect("unable to parse yaml");
-        // let actual_strategy_yaml: String = serde_yaml::to_string(&actual_strategy)?;
-        // assert_eq!(actual_strategy_yaml, expected_strategy_yaml);
+        let actual_strategy_yaml: String = serde_yaml::to_string(&actual_strategy)?;
+        assert_eq!(actual_strategy_yaml, expected_strategy_yaml);
         Ok(())
     }
 
     #[test]
     fn test_from_file() {
-        let mut strategy_path = current_dir()
+        let strategy_path = current_dir()
             .expect("unable to get working directory")
             .join(Path::new("strategy.yaml"));
         let strategy =
