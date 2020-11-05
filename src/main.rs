@@ -5,6 +5,7 @@ use std::path::Path;
 
 mod dag;
 mod dto;
+mod engine;
 
 fn load_strategy() -> Strategy {
     let strategy_path = current_dir()
@@ -23,6 +24,6 @@ fn main() {
             .expect("unable to convert to str")
     );
 
-    let dag = to_dag(&load_strategy());
+    let dag = to_dag(&load_strategy()).expect("unable to convert to dag");
     println!("{:?}", dag)
 }

@@ -271,7 +271,7 @@ calculations:
     #[test]
     fn yaml_to_strategy() -> Result<(), serde_yaml::Error> {
         let expected_strategy_yaml = get_strategy_yaml();
-        println!("{}", expected_strategy_yaml);
+        // println!("{}", expected_strategy_yaml);
         let actual_strategy: Strategy =
             serde_yaml::from_str(&expected_strategy_yaml).expect("unable to parse yaml");
         // let actual_strategy_yaml: String = serde_yaml::to_string(&actual_strategy)?;

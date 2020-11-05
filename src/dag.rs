@@ -1,43 +1,38 @@
-use crate::dto::Strategy;
-use petgraph::algo::{dijkstra, min_spanning_tree};
-use petgraph::data::FromElements;
-use petgraph::dot::{Config, Dot};
-use petgraph::graph::DiGraph;
-use petgraph::graph::{NodeIndex, UnGraph};
-use petgraph::visit::{GraphBase, GraphRef};
-use petgraph::{Directed, Graph};
-use serde_yaml::to_string;
-use std::borrow::Borrow;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::env::current_dir;
-use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
 
-pub fn to_dot_file(g: &Graph<String, String, petgraph::Directed>) {
+use petgraph::Graph;
+use petgraph::algo::{
+    connected_components, is_cyclic_directed,
+};
+use petgraph::dot::{Config, Dot};
+use petgraph::graph::DiGraph;
+
+use crate::dto::Strategy;
+
+// type Dag = Graph<String, String, petgraph::Directed>;
+pub type Dag = DiGraph<String, String>;
+
+pub fn to_dot_text(g: &Dag) -> String {
+    format!("{:?}", Dot::with_config(g, &[Config::EdgeNoLabel]))
+}
+
+pub fn to_dot_file(g: &Dag) {
     let mut output_file = File::create(
         current_dir()
             .expect("unable to find current_dir")
             .join("output.dot"),
-    )
-    .expect("unable to open output file");
-    // let mut dot_text = String::new();
-    let dot_text = format!("{:?}", Dot::with_config(g, &[Config::EdgeNoLabel]));
+    ).expect("unable to open output file");
+    let dot_text = to_dot_text(g);
     output_file
         .write_all(dot_text.as_bytes())
         .expect("unable to write file");
 }
 
-pub fn to_dag(strategy: &Strategy) -> DiGraph<String, String> {
-    let strategy_yaml = serde_yaml::to_string(&strategy).expect("unable to string");
-    println!("{}", strategy_yaml);
-    let mut dag: DiGraph<String, String> = Graph::new();
-
-    strategy
-        .calculations()
-        .iter()
-        .for_each(|c| println!("{}", c.name()));
+pub fn to_dag(strategy: &Strategy) -> Result<Dag, &str> {
+    let mut dag: Dag = Graph::new();
     let mut node_lookup = HashMap::new();
 
     // add nodes
@@ -55,32 +50,67 @@ pub fn to_dag(strategy: &Strategy) -> DiGraph<String, String> {
             }
         }
     }
-
-    to_dot_file(&dag);
-    dag
+    match is_cyclic_directed(&dag) {
+        true => Err("cyclic"),
+        false => match connected_components(&dag) {
+            0 => Err("zero connected components found"),
+            1 => Ok(dag),
+            _ => Err("more than 1 connected component found"),
+        },
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::dag::{to_dag, to_dot_file};
-    use crate::dto::from_path;
-    use petgraph::prelude::DiGraph;
-    use petgraph::Graph;
-    use std::borrow::Borrow;
     use std::fs::read_to_string;
     use std::path::Path;
 
+    use petgraph::algo::{ toposort};
+    use petgraph::prelude::DiGraph;
+
+    use crate::dag::{to_dag, to_dot_file};
+    use crate::dto::from_path;
+    type Dag = DiGraph<String, String>;
+
+
+    #[test]
+    fn get_queries() {
+        let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
+        let mut dag = to_dag(&strategy).expect("unable to convert to dag");
+        // let A = dag.add_node(String::from("A"));
+        // let B = dag.add_node(String::from("B"));
+        // let C = dag.add_node(String::from("C"));
+        // dag.add_edge(A, B, String::new());
+        // dag.add_edge(C, B, String::new());
+        to_dot_file(&dag);
+        // println!("is a dag? {}", !is_cyclic_directed(&dag));
+
+        let nodes: Vec<_> = toposort(&dag, None)
+            .unwrap()
+            .into_iter()
+            .map(|node_id| dag.node_weight(node_id).unwrap().as_str())
+            .collect();
+
+        println!("{:?}", nodes);
+
+        let topo_node_ids = toposort(&dag, None).expect("unable to toposort");
+        let root_node_id = topo_node_ids.get(0).expect("unable to get root");
+        let root_node = dag.node_weight(*root_node_id).expect("unable to find node");
+
+        assert_eq!(root_node, "close")
+    }
+
     #[test]
     fn to_dot_file_test() {
-        let mut dag: DiGraph<String, String> = Graph::new();
-        let node_index_A = dag.add_node(String::from("A"));
-        let node_index_B = dag.add_node(String::from("B"));
-        let node_index_C = dag.add_node(String::from("C"));
-        let node_index_D = dag.add_node(String::from("D"));
-        dag.add_edge(node_index_A, node_index_B, String::from(""));
-        dag.add_edge(node_index_A, node_index_C, String::from(""));
-        dag.add_edge(node_index_B, node_index_D, String::from(""));
-        dag.add_edge(node_index_C, node_index_D, String::from(""));
+        let mut dag: Dag = DiGraph::new();
+        let node_index_a = dag.add_node(String::from("A"));
+        let node_index_b = dag.add_node(String::from("B"));
+        let node_index_c = dag.add_node(String::from("C"));
+        let node_index_d = dag.add_node(String::from("D"));
+        dag.add_edge(node_index_a, node_index_b, String::from(""));
+        dag.add_edge(node_index_a, node_index_c, String::from(""));
+        dag.add_edge(node_index_b, node_index_d, String::from(""));
+        dag.add_edge(node_index_c, node_index_d, String::from(""));
         to_dot_file(&dag);
         let expected_output =
             read_to_string("expected_output.dot").expect("expected_output.dot not found.");
@@ -91,7 +121,7 @@ mod tests {
     #[test]
     fn to_dag_test() {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
-        let dag = to_dag(&strategy);
+        let dag = to_dag(&strategy).expect("unable to convert to dag");
         assert_eq!(dag.node_count(), 5);
         assert_eq!(dag.edge_count(), 6);
         let nodes = dag
@@ -99,6 +129,6 @@ mod tests {
             .map(|i| dag.node_weight(i).expect("node not found"))
             .find(|d| d.as_str().eq("sma200"))
             .expect("sma200 not found");
-        print!("{}", nodes);
+        // print!("{}", nodes);
     }
 }
