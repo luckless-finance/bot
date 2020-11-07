@@ -90,28 +90,32 @@ impl TS for TimeSeries {
                 }
                 Ordering::Greater => r_i = r_i + 1,
             };
-            // println!("{:?}", both_li);
-            // println!("{:?}", both_ri);
-            // println!("{:?}", both_l);
-            // println!("{:?}", both_r);
         }
         (TimeSeries::new(both_ri, both_l), TimeSeries::new(both_li, both_r))
     }
 
     fn scalar_mul(&self, rhs: f64) -> Self {
-        unimplemented!()
+        let mut product_idx: Vec<i64> = self.index.clone();
+        let mut product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
+        TimeSeries::new(product_idx, product_values)
     }
 
     fn mul(&self, rhs: TimeSeries) -> Self {
-        unimplemented!()
+        let (lhs, rhs) = self.align(rhs);
+        let product_values = self.values.iter().zip(rhs.values).map(|(l, r)| l * r).collect();
+        TimeSeries::new(lhs.index, product_values)
     }
 
     fn scalar_sub(&self, rhs: f64) -> Self {
-        unimplemented!()
+        let mut product_idx: Vec<i64> = self.index.clone();
+        let mut product_values: Vec<DataPointValue> = self.values.iter().map(|x| x - rhs).collect();
+        TimeSeries::new(product_idx, product_values)
     }
 
     fn sub(&self, rhs: TimeSeries) -> Self {
-        unimplemented!()
+        let (lhs, rhs) = self.align(rhs);
+        let product_values = self.values.iter().zip(rhs.values).map(|(l, r)| l - r).collect();
+        TimeSeries::new(lhs.index, product_values)
     }
 
     fn len(&self) -> usize {
@@ -122,13 +126,6 @@ impl TS for TimeSeries {
 #[cfg(test)]
 mod tests {
     use crate::data::{DataPointValue, query, sma, TimeSeries, TS};
-
-    fn get_timeseries() -> TimeSeries {
-        let values = (1..=100).map(|x| x as DataPointValue).collect();
-        let ts: TimeSeries = TimeSeries::from_values(values);
-        println!("{:?}", ts);
-        ts
-    }
 
     #[test]
     fn sma2() {
@@ -156,12 +153,5 @@ mod tests {
         assert_eq!(l_out.index, &[2, 4, 7]);
         assert_eq!(l_out.values, &[1., 2., 4.]);
         assert_eq!(r_out.values, &[2., 3., 8.]);
-    }
-
-
-    #[test]
-    fn foo() {
-        let ts = query(1000);
-        sma(ts, 3);
     }
 }
