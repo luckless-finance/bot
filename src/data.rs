@@ -31,12 +31,12 @@ trait TS {
     fn align(&self, rhs: Self) -> (Self, Self) where Self: std::marker::Sized;
     fn scalar_mul(&self, rhs: DataPointValue) -> Self;
     fn mul(&self, rhs: Self) -> Self;
-    fn scalar_sub(&self, rhs: DataPointValue) -> Self;
-    fn sub(&self, rhs: Self) -> Self;
+    fn scalar_add(&self, rhs: DataPointValue) -> Self;
+    fn add(&self, rhs: Self) -> Self;
     fn len(&self) -> usize;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct TimeSeries {
     index: Vec<i64>,
     values: Vec<DataPointValue>,
@@ -47,6 +47,7 @@ impl TimeSeries {
         TimeSeries { index: (0..values.len()).map(|x| x as i64).collect(), values }
     }
     pub fn new(index: Vec<i64>, values: Vec<DataPointValue>) -> Self {
+        assert_eq!(index.len(), values.len(), "TimeSeries index ({}) and values ({}) must have equal len()", index.len(), values.len());
         TimeSeries { index, values }
     }
 }
@@ -66,11 +67,11 @@ impl TS for TimeSeries {
 
     fn align(&self, rhs: TimeSeries) -> (Self, Self) {
         let mut l_i = 0;
-        let mut lhs_i = &self.index;
-        let mut lhs_v = &self.values;
+        let lhs_i = &self.index;
+        let lhs_v = &self.values;
         let mut r_i = 0;
-        let mut rhs_i = &rhs.index;
-        let mut rhs_v = &rhs.values;
+        let rhs_i = &rhs.index;
+        let rhs_v = &rhs.values;
 
         let mut both_ri: Vec<i64> = Vec::new();
         let mut both_li: Vec<i64> = Vec::new();
@@ -95,27 +96,37 @@ impl TS for TimeSeries {
     }
 
     fn scalar_mul(&self, rhs: f64) -> Self {
-        let mut product_idx: Vec<i64> = self.index.clone();
-        let mut product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
+        let product_idx: Vec<i64> = self.index.clone();
+        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
         TimeSeries::new(product_idx, product_values)
     }
 
+    // taken from https://stackoverflow.com/a/53825685
+    // generic solution https://stackoverflow.com/a/41207820
     fn mul(&self, rhs: TimeSeries) -> Self {
-        let (lhs, rhs) = self.align(rhs);
-        let product_values = self.values.iter().zip(rhs.values).map(|(l, r)| l * r).collect();
-        TimeSeries::new(lhs.index, product_values)
+        let (mut lhs, rhs) = self.align(rhs);
+        println!("{:?}", lhs);
+        println!("{:?}", rhs);
+        for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
+            *l *= *r;
+        }
+        TimeSeries::new(lhs.index, lhs.values)
     }
 
-    fn scalar_sub(&self, rhs: f64) -> Self {
-        let mut product_idx: Vec<i64> = self.index.clone();
-        let mut product_values: Vec<DataPointValue> = self.values.iter().map(|x| x - rhs).collect();
+    fn scalar_add(&self, rhs: f64) -> Self {
+        let product_idx: Vec<i64> = self.index.clone();
+        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x + rhs).collect();
         TimeSeries::new(product_idx, product_values)
     }
 
-    fn sub(&self, rhs: TimeSeries) -> Self {
-        let (lhs, rhs) = self.align(rhs);
-        let product_values = self.values.iter().zip(rhs.values).map(|(l, r)| l - r).collect();
-        TimeSeries::new(lhs.index, product_values)
+    // taken from https://stackoverflow.com/a/53825685
+    // generic solution https://stackoverflow.com/a/41207820
+    fn add(&self, rhs: TimeSeries) -> Self {
+        let (mut lhs, rhs) = self.align(rhs);
+        for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
+            *l += *r;
+        }
+        TimeSeries::new(lhs.index, lhs.values)
     }
 
     fn len(&self) -> usize {
@@ -125,16 +136,16 @@ impl TS for TimeSeries {
 
 #[cfg(test)]
 mod tests {
-    use crate::data::{DataPointValue, query, sma, TimeSeries, TS};
+    use crate::data::{TimeSeries, TS};
 
     #[test]
     fn sma2() {
         let ts = TimeSeries { index: vec![2, 4, 5, 6, 7, 9], values: vec![1., 2., 3., 4., 5., 8.] };
         let sma = ts.sma(2);
 
+        assert_eq!(sma.len(), 5);
         assert_eq!(sma.values, &[1.5, 2.5, 3.5, 4.5, 6.5]);
         assert_eq!(sma.index, &[2, 4, 5, 6, 7]);
-        assert_eq!(sma.len(), 5);
     }
 
     #[test]
@@ -153,5 +164,47 @@ mod tests {
         assert_eq!(l_out.index, &[2, 4, 7]);
         assert_eq!(l_out.values, &[1., 2., 4.]);
         assert_eq!(r_out.values, &[2., 3., 8.]);
+    }
+
+    #[test]
+    fn scalar_mul() {
+        let ts = TimeSeries { index: vec![2, 4, 5, 6, 7, 9], values: vec![1., 2., 3., 4., 5., 8.] };
+        let expected = TimeSeries { index: vec![2, 4, 5, 6, 7, 9], values: vec![2., 4., 6., 8., 10., 16.] };
+        let actual = ts.scalar_mul(2.);
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn mul() {
+        let lhs = TimeSeries { index: vec![2, 4, 5, 6, 7, 9], values: vec![1., 2., 3., 4., 5., 8.] };
+        let rhs = TimeSeries { index: vec![1, 4, 5, 7, 9], values: vec![1., 2., 3., 4., 5.] };
+        let expected = TimeSeries { index: vec![4, 5, 7, 9], values: vec![4., 9., 20., 40.] };
+        let actual = lhs.mul(rhs);
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn scalar_add() {
+        let ts = TimeSeries { index: vec![2, 4, 5, 6, 7, 9], values: vec![1., 2., 3., 4., 5., 8.] };
+        let expected = TimeSeries { index: vec![2, 4, 5, 6, 7, 9], values: vec![-1., 0., 1., 2., 3., 6.] };
+        let actual = ts.scalar_add(-2.);
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn add() {
+        let lhs = TimeSeries { index: vec![2, 4, 5, 6, 7, 9], values: vec![1., 2., 3., 4., 5., 8.] };
+        let rhs = TimeSeries { index: vec![1, 4, 5, 7, 9], values: vec![1., 2., 3., 4., 5.] };
+        let expected = TimeSeries { index: vec![4, 5, 7, 9], values: vec![4., 6., 9., 13.] };
+        let actual = lhs.add(rhs.clone());
+        let actual2 = rhs.add(lhs);
+        assert_eq!(actual, actual2);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn len() {
+        let ts = TimeSeries { index: vec![2, 4, 5, 6, 7, 9], values: vec![1., 2., 3., 4., 5., 8.] };
+        assert_eq!(ts.len(), 6);
     }
 }

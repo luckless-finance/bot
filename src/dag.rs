@@ -83,7 +83,7 @@ mod tests {
         to_dot_file(&dag);
         // println!("is a dag? {}", !is_cyclic_directed(&dag));
 
-        let nodes: Vec<_> = toposort(&dag, None)
+        let _nodes: Vec<_> = toposort(&dag, None)
             .unwrap()
             .into_iter()
             .map(|node_id| dag.node_weight(node_id).unwrap().as_str())
