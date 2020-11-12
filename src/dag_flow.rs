@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 type DataValue = f64;
 
 trait Data {
@@ -25,9 +27,24 @@ impl StaticNumberData {
     }
 }
 
+
 impl Data for StaticNumberData {
     fn value(&self) -> DataValue {
         self.value
+    }
+}
+
+struct TimeSeriesData {}
+
+impl TimeSeriesData {
+    pub fn new() -> Box<Self> {
+        Box::from(TimeSeriesData {})
+    }
+}
+
+impl Data for TimeSeriesData {
+    fn value(&self) -> DataValue {
+        666.
     }
 }
 
@@ -94,18 +111,78 @@ impl DagNode for AdditionNode {
     }
 }
 
+struct SummationNode {
+    summands: Vec<Box<dyn DagNode>>
+}
+
+impl SummationNode {
+    pub fn new(summands: Vec<Box<dyn DagNode>>) -> Self {
+        SummationNode { summands }
+    }
+}
+
+impl DagNode for SummationNode {
+    fn dependencies(&self) -> Vec<&dyn DagNode> {
+        self.summands.iter().map(|x| x.borrow()).collect()
+    }
+
+    fn execute(&self) -> Box<dyn Data> {
+        StaticNumberData::new(
+            self.dependencies().iter()
+                .map(|x| x.execute().value())
+                .sum()
+        )
+    }
+}
+
+struct QueryNode {}
+
+impl QueryNode {
+    pub fn new() -> Box<Self> {
+        Box::from(QueryNode {})
+    }
+}
+
+impl DagNode for QueryNode {
+    fn dependencies(&self) -> Vec<&dyn DagNode> {
+        vec![]
+    }
+
+    fn execute(&self) -> Box<dyn Data> {
+        TimeSeriesData::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Borrow;
 
-    use crate::dag_flow::{AdditionNode, DagNode, StaticNumberNode};
+    use crate::dag_flow::{AdditionNode, DagNode, QueryNode, StaticNumberNode, SummationNode};
 
     #[test]
     fn test_static_number_node() {
-        assert_eq!(5.0, StaticNumberNode::new(5.0).execute().value());
+        assert_eq!(5.0,
+                   StaticNumberNode::new(5.0).execute().value());
     }
-    // #[test]
-    // fn test_static_number_node() {
-    //     assert_eq!(5.0, AdditionNode::new(StaticNumberNode::new(5.0), ) .execute().value());
-    // }
+
+    #[test]
+    fn test_add_node() {
+        assert_eq!(10.0,
+                   AdditionNode::new(StaticNumberNode::new(5.0),
+                                     StaticNumberNode::new(5.0)).execute().value());
+    }
+
+    #[test]
+    fn test_sum_node() {
+        assert_eq!(18.0, SummationNode::new(vec![
+            StaticNumberNode::new(5.0),
+            StaticNumberNode::new(6.0),
+            StaticNumberNode::new(7.0)]).execute().value());
+    }
+
+
+    #[test]
+    fn test_query_node() {
+        assert_eq!(QueryNode::new().execute().value(), 666.)
+    }
 }
