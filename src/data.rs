@@ -3,8 +3,16 @@ use std::ops::Div;
 
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
+use crate::dto::Calculation;
 
 pub type DataPointValue = f64;
+
+
+pub trait Query {}
+
+// pub trait DataSource {
+//     fn query(&self, query: dyn Query) -> dyn TS;
+// }
 
 pub fn query(limit: i32) -> Vec<DataPointValue> {
     let mut x: DataPointValue = 100.0;
@@ -12,6 +20,18 @@ pub fn query(limit: i32) -> Vec<DataPointValue> {
     let mut ran = thread_rng();
     let log_normal = Normal::new(0.0, 1.0).unwrap();
     for _i in 0..limit {
+        x = log_normal.sample(&mut ran) + x;
+        values.push(x);
+    }
+    values
+}
+
+pub fn resolve_query(calc: &Calculation) -> Vec<DataPointValue> {
+    let mut x: DataPointValue = 100.0;
+    let mut values: Vec<DataPointValue> = Vec::new();
+    let mut ran = thread_rng();
+    let log_normal = Normal::new(0.0, 1.0).unwrap();
+    for _i in 0..100 {
         x = log_normal.sample(&mut ran) + x;
         values.push(x);
     }
@@ -26,7 +46,7 @@ pub fn sma(ts: Vec<DataPointValue>, window_size: usize) -> Vec<DataPointValue> {
         .collect()
 }
 
-trait TS {
+pub trait TS {
     fn sma(&self, window_size: usize) -> Self;
     fn align(&self, rhs: Self) -> (Self, Self) where Self: std::marker::Sized;
     fn scalar_mul(&self, rhs: DataPointValue) -> Self;

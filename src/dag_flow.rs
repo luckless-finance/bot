@@ -14,7 +14,11 @@ trait Dag {
 
 trait DagNode {
     fn dependencies(&self) -> Vec<&dyn DagNode>;
-    fn execute(&self) -> Box<dyn Data>;
+    fn execute(&mut self) -> Box<dyn Data>;
+}
+
+trait ScoreNode {
+    fn score(&self) -> DataValue;
 }
 
 struct StaticNumberData {
@@ -79,14 +83,21 @@ impl DagNode for StaticNumberNode {
         vec![]
     }
 
-    fn execute(&self) -> Box<dyn Data> {
+    fn execute(&mut self) -> Box<dyn Data> {
         StaticNumberData::new(self.number)
+    }
+}
+
+impl ScoreNode for StaticNumberNode {
+    fn score(&self) -> f64 {
+        self.number
     }
 }
 
 struct AdditionNode {
     lhs: Box<dyn DagNode>,
     rhs: Box<dyn DagNode>,
+    result: Option<DataValue>,
 }
 
 impl AdditionNode {
@@ -95,6 +106,7 @@ impl AdditionNode {
         Box::from(AdditionNode {
             lhs: Box::from(lhs),
             rhs: Box::from(rhs),
+            result: None,
         })
     }
 }
@@ -104,10 +116,20 @@ impl DagNode for AdditionNode {
         vec![]
     }
 
-    fn execute(&self) -> Box<dyn Data> {
+    fn execute(&mut self) -> Box<dyn Data> {
+        self.result = match self.result {
+            None => { Some(&self.lhs.execute().value() + &self.lhs.execute().value()) }
+            _ => self.result
+        };
         StaticNumberData::new(
-            &self.lhs.execute().value() +
-                &self.lhs.execute().value())
+            self.result.unwrap()
+        )
+    }
+}
+
+impl ScoreNode for AdditionNode {
+    fn score(&self) -> f64 {
+        3.0
     }
 }
 
@@ -126,10 +148,11 @@ impl DagNode for SummationNode {
         self.summands.iter().map(|x| x.borrow()).collect()
     }
 
-    fn execute(&self) -> Box<dyn Data> {
+    fn execute(&mut self) -> Box<dyn Data> {
         StaticNumberData::new(
-            self.dependencies().iter()
-                .map(|x| x.execute().value())
+            self.dependencies().iter_mut()
+                .map(|x| x.execute())
+                .map(|x|x.borrow().value())
                 .sum()
         )
     }
@@ -148,7 +171,7 @@ impl DagNode for QueryNode {
         vec![]
     }
 
-    fn execute(&self) -> Box<dyn Data> {
+    fn execute(&mut self) -> Box<dyn Data> {
         TimeSeriesData::new()
     }
 }
