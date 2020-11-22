@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
+use std::fmt;
+use std::fmt::{Display, Formatter};
+
 use gnuplot::Coordinate::Graph;
 use gnuplot::PlotOption::Caption;
 use gnuplot::{AxesCommon, Figure};
@@ -8,16 +12,54 @@ use rand_distr::{Distribution, Normal};
 
 use crate::time_series::{DataPointValue, TimeSeries, TimeSeries1D, TimeStamp};
 
-pub struct Asset {}
+static DATA_SIZE: usize = 10_000;
+pub static TODAY: usize = DATA_SIZE;
 
-pub struct MockDataClient {}
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub struct Asset {
+    symbol: String,
+}
+
+impl Asset {
+    pub fn new(symbol: String) -> Self {
+        Asset { symbol }
+    }
+}
+
+impl Display for Asset {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.symbol)
+    }
+}
+
+#[derive(Debug)]
+pub struct MockDataClient {
+    assets: HashMap<String, Asset>,
+}
 
 impl MockDataClient {
     pub fn new() -> Self {
-        MockDataClient {}
+        MockDataClient {
+            assets: vec![
+                (String::from("A"), Asset::new(String::from("A"))),
+                (String::from("B"), Asset::new(String::from("B"))),
+                (String::from("C"), Asset::new(String::from("C"))),
+            ]
+            .into_iter()
+            .collect(),
+        }
     }
-    pub fn query(_asset: &Asset, _timestamp: &TimeStamp) -> TimeSeries1D {
-        TimeSeries1D::from_values(simulate(100))
+    pub fn assets(&self) -> &HashMap<String, Asset> {
+        &self.assets
+    }
+    pub fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> TimeSeries1D {
+        assert!(
+            self.assets.contains_key(&asset.symbol),
+            "query for {} at {} failed",
+            asset,
+            timestamp
+        );
+        TimeSeries1D::from_values(simulate(DATA_SIZE))
     }
 }
 
@@ -50,8 +92,34 @@ pub fn plot(time_series: TimeSeries1D) {
 
 #[cfg(test)]
 mod tests {
-    use crate::data::{plot, simulate};
-    use crate::time_series::TimeSeries1D;
+    use std::collections::HashSet;
+
+    use crate::data::{plot, simulate, MockDataClient, DATA_SIZE};
+    use crate::time_series::{TimeSeries, TimeSeries1D};
+
+    #[test]
+    fn mock_data_client_assets() {
+        let client = MockDataClient::new();
+        println!("{:?}", client);
+        let symbols: HashSet<&String> = client.assets().keys().collect();
+        println!("{:?}", symbols);
+        assert_eq!(
+            symbols,
+            vec![String::from("A"), String::from("B"), String::from("C")]
+                .iter()
+                .collect()
+        )
+    }
+
+    #[test]
+    fn mock_data_client_query() {
+        let client = MockDataClient::new();
+        println!("{:?}", client);
+        let asset = client.assets.get("A").unwrap();
+        let ts = client.query(asset, &DATA_SIZE);
+        // println!("{:?}", ts);
+        assert_eq!(ts.len(), DATA_SIZE);
+    }
 
     // #[test]
     fn demo_with_gnuplot() {

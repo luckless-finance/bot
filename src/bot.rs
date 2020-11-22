@@ -42,10 +42,13 @@ impl Bot {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::path::Path;
 
     use crate::bot::Bot;
+    use crate::data::TODAY;
     use crate::strategy::from_path;
+    use crate::time_series::TimeSeries1D;
 
     fn bot_fixture() -> Box<Bot> {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
@@ -64,5 +67,24 @@ mod tests {
     }
 
     #[test]
-    fn bot() {}
+    fn bot() {
+        let bot = bot_fixture();
+        let symbol = "B";
+        let dag_node_output_lookup: HashMap<String, TimeSeries1D> = bot
+            .queries()
+            .iter()
+            .map(|c| {
+                (
+                    c.name().to_string(),
+                    bot.data_client.query(
+                        bot.data_client
+                            .assets()
+                            .get(symbol)
+                            .expect(&*format!("Query Failed. Asset not found for: {:?}", c)),
+                        &TODAY,
+                    ),
+                )
+            })
+            .collect();
+    }
 }
