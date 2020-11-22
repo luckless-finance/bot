@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::borrow::BorrowMut;
 use std::fs::File;
 use std::io::Read;
@@ -71,13 +73,13 @@ impl Calculation {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Strategy {
+pub struct StrategyDTO {
     name: String,
     score: Score,
     calculations: Vec<Calculation>,
 }
 
-impl Strategy {
+impl StrategyDTO {
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -89,9 +91,9 @@ impl Strategy {
     }
 }
 
-impl Strategy {
+impl StrategyDTO {
     pub fn new(name: String, score: Score, calculations: Vec<Calculation>) -> Self {
-        Strategy {
+        StrategyDTO {
             name,
             score,
             calculations,
@@ -99,7 +101,7 @@ impl Strategy {
     }
 }
 
-pub fn from_path(file_path: &Path) -> Result<Strategy, serde_yaml::Error> {
+pub fn from_path(file_path: &Path) -> Result<StrategyDTO, serde_yaml::Error> {
     let mut strategy_file: File = File::open(file_path).expect("unable to open file");
     let mut strategy_yaml = String::new();
     strategy_file
@@ -113,10 +115,10 @@ mod tests {
     use std::env::current_dir;
     use std::path::Path;
 
-    use crate::dto::{from_path, Calculation, Operand, Score, Strategy};
+    use crate::strategy::{from_path, Calculation, Operand, Score, StrategyDTO};
 
-    fn get_strategy() -> Strategy {
-        Strategy {
+    fn get_strategy() -> StrategyDTO {
+        StrategyDTO {
             name: String::from("Example Strategy Document"),
             score: Score {
                 calculation: String::from("sma_gap"),
@@ -265,7 +267,7 @@ calculations:
     fn strategy_to_yaml() -> Result<(), serde_yaml::Error> {
         let expected_strategy = get_strategy();
         let actual_strategy_yaml = serde_yaml::to_string(&expected_strategy)?;
-        let actual_strategy: Strategy = serde_yaml::from_str(&actual_strategy_yaml)?;
+        let actual_strategy: StrategyDTO = serde_yaml::from_str(&actual_strategy_yaml)?;
         assert_eq!(actual_strategy, expected_strategy);
         Ok(())
     }
@@ -274,7 +276,7 @@ calculations:
     fn yaml_to_strategy() -> Result<(), serde_yaml::Error> {
         let expected_strategy_yaml = get_strategy_yaml();
         // println!("{}", expected_strategy_yaml);
-        let actual_strategy: Strategy =
+        let actual_strategy: StrategyDTO =
             serde_yaml::from_str(&expected_strategy_yaml).expect("unable to parse yaml");
         let actual_strategy_yaml: String = serde_yaml::to_string(&actual_strategy)?;
         assert_eq!(actual_strategy_yaml, expected_strategy_yaml);

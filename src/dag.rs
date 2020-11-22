@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::collections::HashMap;
 use std::env::current_dir;
 use std::fs::File;
@@ -8,7 +9,7 @@ use petgraph::dot::{Config, Dot};
 use petgraph::graph::DiGraph;
 use petgraph::Graph;
 
-use crate::dto::Strategy;
+use crate::strategy::StrategyDTO;
 
 pub type Dag = DiGraph<String, String>;
 
@@ -29,7 +30,7 @@ pub fn to_dot_file(g: &Dag) {
         .expect("unable to write file");
 }
 
-pub fn to_dag(strategy: &Strategy) -> Result<Dag, &str> {
+pub fn to_dag(strategy: &StrategyDTO) -> Result<Dag, &str> {
     let mut dag: Dag = Graph::new();
     let mut node_lookup = HashMap::new();
 
@@ -67,21 +68,21 @@ mod tests {
     use petgraph::prelude::DiGraph;
 
     use crate::dag::{to_dag, to_dot_file};
-    use crate::dto::from_path;
+    use crate::strategy::from_path;
 
     type Dag = DiGraph<String, String>;
 
     #[test]
     fn get_queries() {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
-        let dag = to_dag(&strategy).expect("unable to convert to dag");
-        // let A = dag.add_node(String::from("A"));
-        // let B = dag.add_node(String::from("B"));
-        // let C = dag.add_node(String::from("C"));
-        // dag.add_edge(A, B, String::new());
-        // dag.add_edge(C, B, String::new());
+        let dag = to_dag(&strategy).expect("unable to convert to bot");
+        // let A = bot.add_node(String::from("A"));
+        // let B = bot.add_node(String::from("B"));
+        // let C = bot.add_node(String::from("C"));
+        // bot.add_edge(A, B, String::new());
+        // bot.add_edge(C, B, String::new());
         to_dot_file(&dag);
-        // println!("is a dag? {}", !is_cyclic_directed(&dag));
+        // println!("is a bot? {}", !is_cyclic_directed(&bot));
 
         let _nodes: Vec<_> = toposort(&dag, None)
             .unwrap()
@@ -119,7 +120,7 @@ mod tests {
     #[test]
     fn to_dag_test() {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
-        let dag = to_dag(&strategy).expect("unable to convert to dag");
+        let dag = to_dag(&strategy).expect("unable to convert to bot");
         assert_eq!(dag.node_count(), 5);
         assert_eq!(dag.edge_count(), 6);
         let nodes = dag
