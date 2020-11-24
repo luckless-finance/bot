@@ -7,19 +7,6 @@ pub type DataPointValue = f64;
 pub type TimeStamp = usize;
 pub type Index = Vec<TimeStamp>;
 
-pub trait TimeSeries {
-    fn index(&self) -> &Index;
-    fn sma(&self, window_size: usize) -> Self;
-    fn align(&self, rhs: Self) -> (Self, Self)
-    where
-        Self: std::marker::Sized;
-    fn scalar_mul(&self, rhs: DataPointValue) -> Self;
-    fn mul(&self, rhs: Self) -> Self;
-    fn scalar_add(&self, rhs: DataPointValue) -> Self;
-    fn add(&self, rhs: Self) -> Self;
-    fn len(&self) -> usize;
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct TimeSeries1D {
     index: Index,
@@ -43,13 +30,9 @@ impl TimeSeries1D {
     pub fn values(&self) -> &Vec<DataPointValue> {
         &self.values
     }
-}
-
-impl TimeSeries for TimeSeries1D {
-    fn index(&self) -> &Index {
+    pub(crate) fn index(&self) -> &Index {
         &self.index
     }
-
     fn sma(&self, window_size: usize) -> Self {
         let mut index = self.index.clone();
         index.truncate(self.len() - window_size + 1);
@@ -63,7 +46,6 @@ impl TimeSeries for TimeSeries1D {
         println!("values={:?}", values);
         TimeSeries1D::new(index, values)
     }
-
     fn align(&self, rhs: TimeSeries1D) -> (Self, Self) {
         let mut l_i = 0;
         let lhs_i = &self.index;
@@ -96,13 +78,11 @@ impl TimeSeries for TimeSeries1D {
             TimeSeries1D::new(both_li, both_r),
         )
     }
-
     fn scalar_mul(&self, rhs: DataPointValue) -> Self {
         let product_idx: Index = self.index.clone();
         let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
         TimeSeries1D::new(product_idx, product_values)
     }
-
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     fn mul(&self, rhs: TimeSeries1D) -> Self {
@@ -114,13 +94,11 @@ impl TimeSeries for TimeSeries1D {
         }
         TimeSeries1D::new(lhs.index, lhs.values)
     }
-
     fn scalar_add(&self, rhs: DataPointValue) -> Self {
         let product_idx: Index = self.index.clone();
         let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x + rhs).collect();
         TimeSeries1D::new(product_idx, product_values)
     }
-
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     fn add(&self, rhs: TimeSeries1D) -> Self {
@@ -130,15 +108,14 @@ impl TimeSeries for TimeSeries1D {
         }
         TimeSeries1D::new(lhs.index, lhs.values)
     }
-
-    fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.index.len()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::time_series::{TimeSeries, TimeSeries1D};
+    use crate::time_series::TimeSeries1D;
 
     #[test]
     fn new() {

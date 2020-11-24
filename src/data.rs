@@ -10,10 +10,15 @@ use gnuplot::{AxesCommon, Figure};
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 
-use crate::time_series::{DataPointValue, TimeSeries, TimeSeries1D, TimeStamp};
+use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
 static DATA_SIZE: usize = 10_000;
 pub static TODAY: usize = DATA_SIZE;
+
+trait DataClient {
+    fn asset(&self, symbol: String) -> Result<Asset, &str>;
+    fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> Result<TimeSeries1D, &str>;
+}
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub struct Asset {
@@ -95,7 +100,7 @@ mod tests {
     use std::collections::HashSet;
 
     use crate::data::{plot, simulate, MockDataClient, DATA_SIZE};
-    use crate::time_series::{TimeSeries, TimeSeries1D};
+    use crate::time_series::TimeSeries1D;
 
     #[test]
     fn mock_data_client_assets() {

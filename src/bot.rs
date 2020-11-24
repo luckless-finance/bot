@@ -70,7 +70,7 @@ mod tests {
     fn bot() {
         let bot = bot_fixture();
         let symbol = "B";
-        let dag_node_output_lookup: HashMap<String, TimeSeries1D> = bot
+        let _dag_node_output_lookup: HashMap<String, TimeSeries1D> = bot
             .queries()
             .iter()
             .map(|c| {
