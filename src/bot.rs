@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 
-use crate::dag::{to_dag, Dag};
+use crate::dag::{to_dag, DagDTO};
 use crate::data::{Asset, MockDataClient};
 use crate::dto::{CalculationDTO, StrategyDTO};
 use crate::time_series::{DataPointValue, TimeStamp};
 
 pub struct Bot {
     strategy: StrategyDTO,
-    dag: Dag,
+    dag: DagDTO,
     data_client: MockDataClient,
 }
 
@@ -25,7 +25,7 @@ impl Bot {
             data_client,
         })
     }
-    fn dag(&self) -> &Dag {
+    fn dag(&self) -> &DagDTO {
         &self.dag
     }
     fn strategy(&self) -> &StrategyDTO {

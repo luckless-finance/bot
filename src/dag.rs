@@ -11,13 +11,13 @@ use petgraph::Graph;
 
 use crate::dto::StrategyDTO;
 
-pub type Dag = DiGraph<String, String>;
+pub type DagDTO = DiGraph<String, String>;
 
-pub fn to_dot_text(g: &Dag) -> String {
+pub fn to_dot_text(g: &DagDTO) -> String {
     format!("{:?}", Dot::with_config(g, &[Config::EdgeNoLabel]))
 }
 
-pub fn to_dot_file(g: &Dag) {
+pub fn to_dot_file(g: &DagDTO) {
     let mut output_file = File::create(
         current_dir()
             .expect("unable to find current_dir")
@@ -30,8 +30,8 @@ pub fn to_dot_file(g: &Dag) {
         .expect("unable to write file");
 }
 
-pub fn to_dag(strategy: &StrategyDTO) -> Result<Dag, &str> {
-    let mut dag: Dag = Graph::new();
+pub fn to_dag(strategy: &StrategyDTO) -> Result<DagDTO, &str> {
+    let mut dag: DagDTO = Graph::new();
     let mut node_lookup = HashMap::new();
 
     // add nodes
