@@ -8,24 +8,24 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Score {
+pub struct ScoreDTO {
     calculation: String,
 }
 
-impl Score {
+impl ScoreDTO {
     pub fn new(calculation: String) -> Self {
-        Score { calculation }
+        ScoreDTO { calculation }
     }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Operand {
+pub struct OperandDTO {
     name: String,
     _type: String,
     value: String,
 }
 
-impl Operand {
+impl OperandDTO {
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -37,34 +37,34 @@ impl Operand {
     }
 }
 
-impl Operand {
+impl OperandDTO {
     pub fn new(name: String, _type: String, value: String) -> Self {
-        Operand { name, _type, value }
+        OperandDTO { name, _type, value }
     }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Calculation {
+pub struct CalculationDTO {
     name: String,
     operation: String,
-    operands: Vec<Operand>,
+    operands: Vec<OperandDTO>,
 }
 
-impl Calculation {
+impl CalculationDTO {
     pub fn name(&self) -> &str {
         &self.name
     }
     pub fn operation(&self) -> &str {
         &self.operation
     }
-    pub fn operands(&self) -> &Vec<Operand> {
+    pub fn operands(&self) -> &Vec<OperandDTO> {
         &self.operands
     }
 }
 
-impl Calculation {
-    pub fn new(name: String, operation: String, operands: Vec<Operand>) -> Self {
-        Calculation {
+impl CalculationDTO {
+    pub fn new(name: String, operation: String, operands: Vec<OperandDTO>) -> Self {
+        CalculationDTO {
             name,
             operation,
             operands,
@@ -75,24 +75,24 @@ impl Calculation {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct StrategyDTO {
     name: String,
-    score: Score,
-    calculations: Vec<Calculation>,
+    score: ScoreDTO,
+    calculations: Vec<CalculationDTO>,
 }
 
 impl StrategyDTO {
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn score(&self) -> &Score {
+    pub fn score(&self) -> &ScoreDTO {
         &self.score
     }
-    pub fn calculations(&self) -> &Vec<Calculation> {
+    pub fn calculations(&self) -> &Vec<CalculationDTO> {
         &self.calculations
     }
 }
 
 impl StrategyDTO {
-    pub fn new(name: String, score: Score, calculations: Vec<Calculation>) -> Self {
+    pub fn new(name: String, score: ScoreDTO, calculations: Vec<CalculationDTO>) -> Self {
         StrategyDTO {
             name,
             score,
@@ -115,83 +115,83 @@ mod tests {
     use std::env::current_dir;
     use std::path::Path;
 
-    use crate::strategy::{from_path, Calculation, Operand, Score, StrategyDTO};
+    use crate::dto::{from_path, CalculationDTO, OperandDTO, ScoreDTO, StrategyDTO};
 
     fn get_strategy() -> StrategyDTO {
         StrategyDTO {
             name: String::from("Example Strategy Document"),
-            score: Score {
+            score: ScoreDTO {
                 calculation: String::from("sma_gap"),
             },
             calculations: vec![
-                Calculation {
+                CalculationDTO {
                     name: String::from("sma_gap"),
                     operation: String::from("div"),
                     operands: vec![
-                        Operand {
+                        OperandDTO {
                             name: String::from("numerator"),
                             _type: String::from("ref"),
                             value: String::from("sma_diff"),
                         },
-                        Operand {
+                        OperandDTO {
                             name: String::from("denominator"),
                             _type: String::from("ref"),
                             value: String::from("sma50"),
                         },
                     ],
                 },
-                Calculation {
+                CalculationDTO {
                     name: String::from("sma_diff"),
                     operation: String::from("sub"),
                     operands: vec![
-                        Operand {
+                        OperandDTO {
                             name: String::from("left"),
                             _type: String::from("ref"),
                             value: String::from("sma50"),
                         },
-                        Operand {
+                        OperandDTO {
                             name: String::from("right"),
                             _type: String::from("ref"),
                             value: String::from("sma200"),
                         },
                     ],
                 },
-                Calculation {
+                CalculationDTO {
                     name: String::from("sma50"),
                     operation: String::from("sma"),
                     operands: vec![
-                        Operand {
+                        OperandDTO {
                             name: String::from("window_size"),
                             _type: String::from("i32"),
                             value: String::from("50"),
                         },
-                        Operand {
+                        OperandDTO {
                             name: String::from("sequence"),
                             _type: String::from("query"),
                             value: String::from("close"),
                         },
                     ],
                 },
-                Calculation {
+                CalculationDTO {
                     name: String::from("sma200"),
                     operation: String::from("sma"),
                     operands: vec![
-                        Operand {
+                        OperandDTO {
                             name: String::from("window_size"),
                             _type: String::from("i32"),
                             value: String::from("200"),
                         },
-                        Operand {
+                        OperandDTO {
                             name: String::from("sequence"),
                             _type: String::from("query"),
                             value: String::from("close"),
                         },
                     ],
                 },
-                Calculation {
+                CalculationDTO {
                     name: String::from("close"),
                     operation: String::from("query"),
-                    operands: vec![Operand {
+                    operands: vec![OperandDTO {
                         name: String::from("tbd"),
                         _type: String::from("tbd"),
                         value: String::from("tbd"),

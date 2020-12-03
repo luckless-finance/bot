@@ -2,7 +2,7 @@
 
 use crate::dag::{to_dag, Dag};
 use crate::data::{Asset, MockDataClient};
-use crate::strategy::{Calculation, StrategyDTO};
+use crate::dto::{CalculationDTO, StrategyDTO};
 use crate::time_series::{DataPointValue, TimeStamp};
 
 pub struct Bot {
@@ -31,7 +31,7 @@ impl Bot {
     fn strategy(&self) -> &StrategyDTO {
         &self.strategy
     }
-    pub fn queries(&self) -> Vec<&Calculation> {
+    pub fn queries(&self) -> Vec<&CalculationDTO> {
         self.strategy
             .calculations()
             .iter()
@@ -47,7 +47,7 @@ mod tests {
 
     use crate::bot::Bot;
     use crate::data::TODAY;
-    use crate::strategy::from_path;
+    use crate::dto::from_path;
     use crate::time_series::TimeSeries1D;
 
     fn bot_fixture() -> Box<Bot> {

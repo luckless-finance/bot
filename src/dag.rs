@@ -9,7 +9,7 @@ use petgraph::dot::{Config, Dot};
 use petgraph::graph::DiGraph;
 use petgraph::Graph;
 
-use crate::strategy::StrategyDTO;
+use crate::dto::StrategyDTO;
 
 pub type Dag = DiGraph<String, String>;
 
@@ -68,7 +68,7 @@ mod tests {
     use petgraph::prelude::DiGraph;
 
     use crate::dag::{to_dag, to_dot_file};
-    use crate::strategy::from_path;
+    use crate::dto::from_path;
 
     type Dag = DiGraph<String, String>;
 
@@ -129,6 +129,5 @@ mod tests {
             .find(|d| d.as_str().eq("sma200"))
             .expect("sma200 not found");
         assert_eq!(nodes, "sma200")
-        // print!("{}", nodes);
     }
 }
