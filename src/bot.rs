@@ -1,13 +1,14 @@
 #![allow(dead_code)]
 
 use crate::dag::{to_dag, DagDTO};
-use crate::data::{Asset, MockDataClient};
+use crate::data::{Asset, MockDataClient, DataClient};
 use crate::dto::{CalculationDTO, StrategyDTO};
 use crate::time_series::{DataPointValue, TimeStamp};
 
 pub struct Bot {
     strategy: StrategyDTO,
     dag: DagDTO,
+    // TODO replace type with trait DataClient
     data_client: MockDataClient,
 }
 

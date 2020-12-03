@@ -11,12 +11,13 @@ use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
+use std::ops::Index;
 
 static DATA_SIZE: usize = 10_000;
 pub static TODAY: usize = DATA_SIZE;
 
-trait DataClient {
-    fn asset(&self, symbol: String) -> Result<Asset, &str>;
+pub trait DataClient {
+    fn asset(&self, symbol: String) -> Result<&Asset, &str>;
     fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> Result<TimeSeries1D, &str>;
 }
 
@@ -42,6 +43,22 @@ pub struct MockDataClient {
     assets: HashMap<String, Asset>,
 }
 
+impl DataClient for MockDataClient {
+    fn asset(&self, symbol: String) -> Result<&Asset, &str> {
+        Ok(self.assets.index(symbol.as_str()))
+    }
+
+    fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, &str> {
+        assert!(
+            self.assets.contains_key(&asset.symbol),
+            "query for {} at {} failed",
+            asset,
+            timestamp
+        );
+        Ok(TimeSeries1D::from_values(simulate(DATA_SIZE)))
+    }
+}
+
 impl MockDataClient {
     pub fn new() -> Self {
         MockDataClient {
@@ -50,10 +67,11 @@ impl MockDataClient {
                 (String::from("B"), Asset::new(String::from("B"))),
                 (String::from("C"), Asset::new(String::from("C"))),
             ]
-            .into_iter()
+                .into_iter()
             .collect(),
         }
     }
+    // TODO make this private
     pub fn assets(&self) -> &HashMap<String, Asset> {
         &self.assets
     }
