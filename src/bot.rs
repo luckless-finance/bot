@@ -70,21 +70,16 @@ mod tests {
     fn bot() {
         let bot = bot_fixture();
         let symbol = "B";
+        let asset = bot
+            .data_client
+            .assets()
+            .get(symbol)
+            .expect(&*format!("Query Failed. Asset not found {:?}", symbol));
+
         let _dag_node_output_lookup: HashMap<String, TimeSeries1D> = bot
             .queries()
             .iter()
-            .map(|c| {
-                (
-                    c.name().to_string(),
-                    bot.data_client.query(
-                        bot.data_client
-                            .assets()
-                            .get(symbol)
-                            .expect(&*format!("Query Failed. Asset not found for: {:?}", c)),
-                        &TODAY,
-                    ),
-                )
-            })
+            .map(|c| (c.name().to_string(), bot.data_client.query(asset, &TODAY)))
             .collect();
     }
 }
