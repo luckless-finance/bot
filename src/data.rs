@@ -117,7 +117,7 @@ pub fn plot(time_series: TimeSeries1D) {
 mod tests {
     use std::collections::HashSet;
 
-    use crate::data::{plot, simulate, MockDataClient, DATA_SIZE};
+    use crate::data::{plot, simulate, MockDataClient, DATA_SIZE, TODAY};
     use crate::time_series::TimeSeries1D;
 
     #[test]
@@ -139,7 +139,7 @@ mod tests {
         let client = MockDataClient::new();
         println!("{:?}", client);
         let asset = client.assets.get("A").unwrap();
-        let ts = client.query(asset, &DATA_SIZE);
+        let ts = client.query(asset, &TODAY);
         // println!("{:?}", ts);
         assert_eq!(ts.len(), DATA_SIZE);
     }
