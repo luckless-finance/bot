@@ -74,7 +74,7 @@ mod tests {
     type Dag = DiGraph<String, String>;
 
     #[test]
-    fn get_queries() {
+    fn get_qu() {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
         let dag = to_dag(&strategy).expect("unable to convert to bot");
         to_dot_file(&dag);
@@ -96,7 +96,7 @@ mod tests {
     }
 
     #[test]
-    fn toposort() {
+    fn topo() {
         // dag = C -> B <- A
         let mut dag: DagDTO = DiGraph::new();
         let b = dag.add_node(String::from("B"));
@@ -164,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn to_dot_file_test() {
+    fn dag_to_dot_file() {
         let mut dag: Dag = DiGraph::new();
         let node_index_a = dag.add_node(String::from("A"));
         let node_index_b = dag.add_node(String::from("B"));
@@ -182,7 +182,7 @@ mod tests {
     }
 
     #[test]
-    fn to_dag_test() {
+    fn strategy_to_dag() {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
         let dag = to_dag(&strategy).expect("unable to convert to bot");
         assert_eq!(dag.node_count(), 5);

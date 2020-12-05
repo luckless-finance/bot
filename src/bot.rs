@@ -1,19 +1,16 @@
 #![allow(dead_code)]
 
 use crate::dag::{to_dag, DagDTO};
-use crate::data::{Asset, MockDataClient, DataClient};
+use crate::data::{Asset, MockDataClient};
 use crate::dto::{CalculationDTO, StrategyDTO};
-use crate::time_series::{DataPointValue, TimeStamp};
+use crate::time_series::{TimeSeries1D, TimeStamp};
+use std::collections::HashMap;
 
 pub struct Bot {
     strategy: StrategyDTO,
     dag: DagDTO,
     // TODO replace type with trait DataClient
     data_client: MockDataClient,
-}
-
-trait ExecutableBot {
-    fn execute(&self, asset: &Asset, timestamp: &TimeStamp) -> DataPointValue;
 }
 
 impl Bot {
@@ -38,6 +35,20 @@ impl Bot {
             .iter()
             .filter(|c| (c.operation()) == "query")
             .collect()
+    }
+
+    fn execute(&self, asset: &Asset, timestamp: &TimeStamp) -> () {
+        let _dag_node_output_lookup: HashMap<String, TimeSeries1D> = self
+            .queries()
+            .iter()
+            .map(|c| {
+                (
+                    c.name().to_string(),
+                    self.data_client.query(asset, timestamp),
+                )
+            })
+            .collect();
+        let _score_calc = self.strategy.score().calculation();
     }
 }
 
