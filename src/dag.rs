@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::env::current_dir;
 use std::fs::File;
@@ -6,10 +7,7 @@ use std::io::Write;
 
 use petgraph::algo::{connected_components, is_cyclic_directed};
 use petgraph::dot::{Config, Dot};
-use petgraph::graph::node_index;
 use petgraph::graph::DiGraph;
-use petgraph::visit::DfsPostOrder;
-use petgraph::Graph;
 
 use crate::dto::StrategyDTO;
 
@@ -66,15 +64,12 @@ mod tests {
     use std::fs::read_to_string;
     use std::path::Path;
 
-    use petgraph::algo::toposort;
+    use petgraph::algo::{is_cyclic_directed, toposort};
     use petgraph::prelude::DiGraph;
+    use petgraph::visit::{Bfs, DfsPostOrder};
 
     use crate::dag::{to_dag, to_dot_file, DagDTO};
     use crate::dto::from_path;
-    use petgraph::csr::NodeIdentifiers;
-    use petgraph::graph::{node_index, NodeIndex};
-    use petgraph::visit::{Bfs, DfsPostOrder};
-    use petgraph::Graph;
 
     type Dag = DiGraph<String, String>;
 
@@ -82,21 +77,14 @@ mod tests {
     fn get_queries() {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
         let dag = to_dag(&strategy).expect("unable to convert to bot");
-        // let A = bot.add_node(String::from("A"));
-        // let B = bot.add_node(String::from("B"));
-        // let C = bot.add_node(String::from("C"));
-        // bot.add_edge(A, B, String::new());
-        // bot.add_edge(C, B, String::new());
         to_dot_file(&dag);
-        // println!("is a bot? {}", !is_cyclic_directed(&bot));
+        println!("is a dag? {}", !is_cyclic_directed(&dag));
 
         let _nodes: Vec<_> = toposort(&dag, None)
             .unwrap()
             .into_iter()
             .map(|node_id| dag.node_weight(node_id).unwrap().as_str())
             .collect();
-
-        // println!("{:?}", nodes);
 
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
         let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
@@ -108,16 +96,39 @@ mod tests {
     }
 
     #[test]
+    fn toposort() {
+        // dag = C -> B <- A
+        let mut dag: DagDTO = DiGraph::new();
+        let b = dag.add_node(String::from("B"));
+        let c = dag.add_node(String::from("C"));
+        let a = dag.add_node(String::from("A"));
+        dag.add_edge(a, b, String::new());
+        dag.add_edge(c, b, String::new());
+
+        let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
+
+        let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
+        let node = dag.node_weight(*leaf_node_idx).unwrap();
+        println!("{:?}", node);
+        assert_eq!(node, "A");
+
+        let leaf_node_idx = sorted_node_ids.get(1).expect("unable to get leaf");
+        let node = dag.node_weight(*leaf_node_idx).unwrap();
+        println!("{:?}", node);
+        assert_eq!(node, "C");
+    }
+
+    #[test]
     fn dfs_post_order() {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
         let dag: DagDTO = to_dag(&strategy).expect("unable to convert to bot");
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
-        let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
 
-        // dag.node
+        let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
         let leaf_node = dag
             .node_weight(*leaf_node_idx)
             .expect("unable to find node");
+        assert_eq!(leaf_node, "close");
 
         let mut dfs_post_order = DfsPostOrder::new(&dag, *leaf_node_idx);
         let root_node_id = dfs_post_order.next(&dag).unwrap();
@@ -131,11 +142,12 @@ mod tests {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
         let dag: DagDTO = to_dag(&strategy).expect("unable to convert to bot");
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
-        let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
 
+        let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
         let leaf_node = dag
             .node_weight(*leaf_node_idx)
             .expect("unable to find node");
+        assert_eq!(leaf_node, "close");
 
         let mut bfs = Bfs::new(&dag, *leaf_node_idx);
 
