@@ -67,7 +67,7 @@ impl MockDataClient {
                 (String::from("B"), Asset::new(String::from("B"))),
                 (String::from("C"), Asset::new(String::from("C"))),
             ]
-                .into_iter()
+            .into_iter()
             .collect(),
         }
     }

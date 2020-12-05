@@ -6,7 +6,9 @@ use std::io::Write;
 
 use petgraph::algo::{connected_components, is_cyclic_directed};
 use petgraph::dot::{Config, Dot};
+use petgraph::graph::node_index;
 use petgraph::graph::DiGraph;
+use petgraph::visit::DfsPostOrder;
 use petgraph::Graph;
 
 use crate::dto::StrategyDTO;
@@ -31,7 +33,7 @@ pub fn to_dot_file(g: &DagDTO) {
 }
 
 pub fn to_dag(strategy: &StrategyDTO) -> Result<DagDTO, &str> {
-    let mut dag: DagDTO = Graph::new();
+    let mut dag: DagDTO = DiGraph::new();
     let mut node_lookup = HashMap::new();
 
     // add nodes
@@ -67,8 +69,12 @@ mod tests {
     use petgraph::algo::toposort;
     use petgraph::prelude::DiGraph;
 
-    use crate::dag::{to_dag, to_dot_file};
+    use crate::dag::{to_dag, to_dot_file, DagDTO};
     use crate::dto::from_path;
+    use petgraph::csr::NodeIdentifiers;
+    use petgraph::graph::{node_index, NodeIndex};
+    use petgraph::visit::{Bfs, DfsPostOrder};
+    use petgraph::Graph;
 
     type Dag = DiGraph<String, String>;
 
@@ -92,11 +98,57 @@ mod tests {
 
         // println!("{:?}", nodes);
 
-        let topo_node_ids = toposort(&dag, None).expect("unable to toposort");
-        let root_node_id = topo_node_ids.get(0).expect("unable to get root");
-        let root_node = dag.node_weight(*root_node_id).expect("unable to find node");
+        let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
+        let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
+        let leaf_node = dag
+            .node_weight(*leaf_node_idx)
+            .expect("unable to find node");
 
-        assert_eq!(root_node, "close")
+        assert_eq!(leaf_node, "close")
+    }
+
+    #[test]
+    fn dfs_post_order() {
+        let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
+        let dag: DagDTO = to_dag(&strategy).expect("unable to convert to bot");
+        let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
+        let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
+
+        // dag.node
+        let leaf_node = dag
+            .node_weight(*leaf_node_idx)
+            .expect("unable to find node");
+
+        let mut dfs_post_order = DfsPostOrder::new(&dag, *leaf_node_idx);
+        let root_node_id = dfs_post_order.next(&dag).unwrap();
+        let root_node: &String = dag.node_weight(root_node_id).expect("unable to find root");
+        println!("{:?}", root_node);
+        assert_eq!(root_node, strategy.score().calculation());
+    }
+
+    #[test]
+    fn bfs() {
+        let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
+        let dag: DagDTO = to_dag(&strategy).expect("unable to convert to bot");
+        let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
+        let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
+
+        let leaf_node = dag
+            .node_weight(*leaf_node_idx)
+            .expect("unable to find node");
+
+        let mut bfs = Bfs::new(&dag, *leaf_node_idx);
+
+        let mut node: &String;
+        loop {
+            let node_id = bfs.next(&dag).unwrap();
+            node = dag.node_weight(node_id).expect("unable to find root");
+            println!("{:?}", node);
+            if node == strategy.score().calculation() {
+                break;
+            }
+        }
+        assert_eq!(node, strategy.score().calculation());
     }
 
     #[test]

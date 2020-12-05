@@ -16,6 +16,9 @@ impl ScoreDTO {
     pub fn new(calculation: String) -> Self {
         ScoreDTO { calculation }
     }
+    pub fn calculation(&self) -> &str {
+        &self.calculation
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
