@@ -61,20 +61,53 @@ pub fn to_dag(strategy: &StrategyDTO) -> Result<DagDTO, &str> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::fs::read_to_string;
     use std::path::Path;
 
     use petgraph::algo::{is_cyclic_directed, toposort};
-    use petgraph::prelude::DiGraph;
+    use petgraph::prelude::*;
     use petgraph::visit::{Bfs, DfsPostOrder};
 
     use crate::dag::{to_dag, to_dot_file, DagDTO};
-    use crate::dto::from_path;
+    use crate::dto::{from_path, StrategyDTO};
 
     type Dag = DiGraph<String, String>;
 
     #[test]
-    fn get_qu() {
+    fn traverse_dag_order() {
+        let strategy: StrategyDTO =
+            from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
+        let dag: DagDTO = to_dag(&strategy).expect("unable to convert to bot");
+        // topological sort is dag order !
+        let sorted_node_ids: Vec<NodeIndex> = toposort(&dag, None).expect("unable to toposort");
+        let mut node_order: HashMap<String, usize> = HashMap::new();
+        let mut position = 0usize;
+        for sorted_node_id in sorted_node_ids {
+            println!("{:?}", dag.node_weight(sorted_node_id));
+            node_order.insert(dag.node_weight(sorted_node_id).unwrap().clone(), position);
+            position += 1;
+        }
+        let order_constraints = &[
+            &["close", "sma50", "sma_diff", "sma_gap"],
+            &["close", "sma200", "sma_diff", "sma_gap"],
+        ];
+        for outer_idx in 0..order_constraints.len() {
+            let expected_order = order_constraints[outer_idx];
+            for inner_idx in 0..(expected_order.len() - 1) {
+                let a = expected_order[inner_idx];
+                let a_position = node_order.get(a).unwrap();
+                let b = expected_order[inner_idx + 1];
+                let b_position = node_order.get(b).unwrap();
+                println!("{:?}", (a, b));
+                println!("{:?}", (a_position, b_position));
+                assert!(a_position < b_position);
+            }
+        }
+    }
+
+    #[test]
+    fn get_queries() {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
         let dag = to_dag(&strategy).expect("unable to convert to bot");
         to_dot_file(&dag);
@@ -166,7 +199,7 @@ mod tests {
     #[test]
     fn dag_to_dot_file() {
         let mut dag: Dag = DiGraph::new();
-        let node_index_a = dag.add_node(String::from("A"));
+        let node_index_a: NodeIndex = dag.add_node(String::from("A"));
         let node_index_b = dag.add_node(String::from("B"));
         let node_index_c = dag.add_node(String::from("C"));
         let node_index_d = dag.add_node(String::from("D"));
