@@ -1,23 +1,21 @@
 #![allow(dead_code)]
-// #![allow(unused)]
 
 use std::collections::HashMap;
 
-use crate::dag::{to_dag, DagDTO};
+use crate::dag::{DagDTO, to_dag};
 use crate::data::MockDataClient;
 use crate::dto::{CalculationDTO, StrategyDTO};
 
 pub struct Bot {
     strategy: StrategyDTO,
     dag: DagDTO,
-    // TODO add calc_lkup
-    // calc_lkup: HashMap<String, CalculationDTO>,
+    calc_lkup: HashMap<String, CalculationDTO>,
 }
 
 pub struct ExecutableBot {
     // TODO replace type with trait DataClient
     data_client: MockDataClient,
-    calculation_status_lkup: HashMap<String, CalculationStatus>,
+    calc_status_lkup: HashMap<String, CalculationStatus>,
 }
 
 pub enum CalculationStatus {
@@ -28,15 +26,15 @@ pub enum CalculationStatus {
 impl Bot {
     pub fn new(strategy: StrategyDTO) -> Box<Self> {
         let dag = to_dag(&strategy).expect("unable to build bot");
-        // let calc_lkup: HashMap<String, CalculationDTO> = strategy
-        //     .calculations()
-        //     .iter()
-        //     .map(|calc| (calc.name().to_string(), calc.clone()))
-        //     .collect();
+        let calc_lkup: HashMap<String, CalculationDTO> = strategy
+            .calcs()
+            .iter()
+            .map(|calc| (calc.name().to_string(), calc.clone()))
+            .collect();
         Box::from(Bot {
             strategy,
             dag,
-            // calc_lkup,
+            calc_lkup,
         })
     }
     fn dag(&self) -> &DagDTO {
@@ -48,14 +46,14 @@ impl Bot {
     pub fn calc(&self, name: &str) -> Result<&CalculationDTO, &str> {
         let _calc = self
             .strategy
-            .calculations()
+            .calcs()
             .iter()
             .find(|calc| calc.name() == name);
         _calc.ok_or("not found")
     }
     pub fn queries(&self) -> Vec<&CalculationDTO> {
         self.strategy
-            .calculations()
+            .calcs()
             .iter()
             .filter(|c| (c.operation()) == "query")
             .collect()
@@ -74,7 +72,7 @@ impl Bot {
     //             )
     //         })
     //         .collect();
-    //     let _score_calc = self.strategy.score().calculation();
+    //     let _score_calc = self.strategy.score().calc();
     // }
 }
 
@@ -83,6 +81,7 @@ mod tests {
     use std::path::Path;
 
     use crate::bot::Bot;
+    use crate::dag::execution_order;
     use crate::dto::from_path;
 
     fn bot_fixture() -> Box<Bot> {
@@ -91,12 +90,21 @@ mod tests {
     }
 
     #[test]
+    fn execute() {
+        let bot = bot_fixture();
+        let calc_order = execution_order(bot.dag());
+
+
+        ()
+    }
+
+    #[test]
     fn queries() {
         let bot = bot_fixture();
         let close_queries = bot
             .queries()
             .iter()
-            .filter(|calculation| (**calculation).name() == "close")
+            .filter(|calc| (**calc).name() == "close")
             .count();
         assert_eq!(close_queries, 1);
     }

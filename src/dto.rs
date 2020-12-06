@@ -7,21 +7,21 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct ScoreDTO {
-    calculation: String,
+    calc: String,
 }
 
 impl ScoreDTO {
-    pub fn new(calculation: String) -> Self {
-        ScoreDTO { calculation }
+    pub fn new(calc: String) -> Self {
+        ScoreDTO { calc }
     }
-    pub fn calculation(&self) -> &str {
-        &self.calculation
+    pub fn calc(&self) -> &str {
+        &self.calc
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct OperandDTO {
     name: String,
     _type: String,
@@ -46,7 +46,7 @@ impl OperandDTO {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct CalculationDTO {
     name: String,
     operation: String,
@@ -75,11 +75,11 @@ impl CalculationDTO {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct StrategyDTO {
     name: String,
     score: ScoreDTO,
-    calculations: Vec<CalculationDTO>,
+    calcs: Vec<CalculationDTO>,
 }
 
 impl StrategyDTO {
@@ -89,17 +89,17 @@ impl StrategyDTO {
     pub fn score(&self) -> &ScoreDTO {
         &self.score
     }
-    pub fn calculations(&self) -> &Vec<CalculationDTO> {
-        &self.calculations
+    pub fn calcs(&self) -> &Vec<CalculationDTO> {
+        &self.calcs
     }
 }
 
 impl StrategyDTO {
-    pub fn new(name: String, score: ScoreDTO, calculations: Vec<CalculationDTO>) -> Self {
+    pub fn new(name: String, score: ScoreDTO, calcs: Vec<CalculationDTO>) -> Self {
         StrategyDTO {
             name,
             score,
-            calculations,
+            calcs,
         }
     }
 }
@@ -124,9 +124,9 @@ mod tests {
         StrategyDTO {
             name: String::from("Example Strategy Document"),
             score: ScoreDTO {
-                calculation: String::from("sma_gap"),
+                calc: String::from("sma_gap"),
             },
-            calculations: vec![
+            calcs: vec![
                 CalculationDTO {
                     name: String::from("sma_gap"),
                     operation: String::from("div"),
@@ -209,8 +209,8 @@ mod tests {
             r#"---
 name: Example Strategy Document
 score:
-  calculation: sma_gap
-calculations:
+  calc: sma_gap
+calcs:
   - name: sma_gap
     operation: div
     operands:
@@ -260,10 +260,10 @@ calculations:
     fn constructors() {
         let s = get_strategy();
         assert_eq!(s.name, "Example Strategy Document");
-        assert_eq!(s.score.calculation, "sma_gap");
-        assert_eq!(s.calculations[0].name, "sma_gap");
-        assert_eq!(s.calculations[0].operation, "div");
-        assert_eq!(s.calculations[0].operands[0].name, "numerator");
+        assert_eq!(s.score.calc, "sma_gap");
+        assert_eq!(s.calcs[0].name, "sma_gap");
+        assert_eq!(s.calcs[0].operation, "div");
+        assert_eq!(s.calcs[0].operands[0].name, "numerator");
     }
 
     #[test]

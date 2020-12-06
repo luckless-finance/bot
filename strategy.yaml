@@ -1,8 +1,8 @@
 ---
 name: Example Strategy Document
 score:
-  calculation: sma_gap
-calculations:
+  calc: sma_gap
+calcs:
   - name: sma_gap
     operation: div
     operands:

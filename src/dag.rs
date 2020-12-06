@@ -44,12 +44,12 @@ pub fn to_dag(strategy: &StrategyDTO) -> Result<DagDTO, &str> {
     let mut node_lookup = HashMap::new();
 
     // add nodes
-    for calc in strategy.calculations() {
+    for calc in strategy.calcs() {
         let index = dag.add_node(calc.name().to_string());
         node_lookup.insert(calc.name(), index);
     }
     // add edges
-    for calc in strategy.calculations() {
+    for calc in strategy.calcs() {
         for op in calc.operands() {
             if node_lookup.contains_key(op.value()) {
                 let operand = node_lookup.get(op.value()).expect("operand not found");
@@ -196,7 +196,7 @@ mod learn_library {
         let root_node_id = dfs_post_order.next(&dag).unwrap();
         let root_node: &String = dag.node_weight(root_node_id).expect("unable to find root");
         println!("{:?}", root_node);
-        assert_eq!(root_node, strategy.score().calculation());
+        assert_eq!(root_node, strategy.score().calc());
     }
 
     #[test]
@@ -218,10 +218,10 @@ mod learn_library {
             let node_id = bfs.next(&dag).unwrap();
             node = dag.node_weight(node_id).expect("unable to find root");
             println!("{:?}", node);
-            if node == strategy.score().calculation() {
+            if node == strategy.score().calc() {
                 break;
             }
         }
-        assert_eq!(node, strategy.score().calculation());
+        assert_eq!(node, strategy.score().calc());
     }
 }
