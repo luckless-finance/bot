@@ -96,11 +96,7 @@ impl StrategyDTO {
 
 impl StrategyDTO {
     pub fn new(name: String, score: ScoreDTO, calcs: Vec<CalculationDTO>) -> Self {
-        StrategyDTO {
-            name,
-            score,
-            calcs,
-        }
+        StrategyDTO { name, score, calcs }
     }
 }
 

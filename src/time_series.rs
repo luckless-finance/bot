@@ -36,14 +36,14 @@ impl TimeSeries1D {
     fn sma(&self, window_size: usize) -> Self {
         let mut index = self.index.clone();
         index.truncate(self.len() - window_size + 1);
-        println!("index={:?}", index);
+        // println!("index={:?}", index);
         let values = self
             .values
             .windows(window_size)
             .map(|x| x.iter().sum::<DataPointValue>())
             .map(|x| x.div(window_size as DataPointValue))
             .collect();
-        println!("values={:?}", values);
+        // println!("values={:?}", values);
         TimeSeries1D::new(index, values)
     }
     fn align(&self, rhs: TimeSeries1D) -> (Self, Self) {
@@ -87,8 +87,8 @@ impl TimeSeries1D {
     // generic solution https://stackoverflow.com/a/41207820
     fn mul(&self, rhs: TimeSeries1D) -> Self {
         let (mut lhs, rhs) = self.align(rhs);
-        println!("{:?}", lhs);
-        println!("{:?}", rhs);
+        // println!("{:?}", lhs);
+        // println!("{:?}", rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l *= *r;
         }

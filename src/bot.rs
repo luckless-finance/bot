@@ -2,22 +2,40 @@
 
 use std::collections::HashMap;
 
-use crate::dag::{DagDTO, to_dag};
-use crate::data::MockDataClient;
+use crate::dag::{execution_order, to_dag, DagDTO};
+use crate::data::{Asset, MockDataClient};
 use crate::dto::{CalculationDTO, StrategyDTO};
+use crate::time_series::{TimeSeries1D, TimeStamp};
 
+#[derive(Debug, Clone)]
 pub struct Bot {
     strategy: StrategyDTO,
+    // TODO replace with Dag
     dag: DagDTO,
     calc_lkup: HashMap<String, CalculationDTO>,
 }
 
+#[derive(Debug)]
 pub struct ExecutableBot {
+    bot: Bot,
+    asset: Asset,
+    timestamp: TimeStamp,
     // TODO replace type with trait DataClient
     data_client: MockDataClient,
     calc_status_lkup: HashMap<String, CalculationStatus>,
+    calc_data_lkup: HashMap<String, TimeSeries1D>,
 }
 
+impl ExecutableBot {
+    fn execute(&self) {
+        let calc_order = execution_order(&self.bot.dag);
+        for calc in calc_order {
+            println!("\nexecuting {}", calc);
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum CalculationStatus {
     NotStarted,
     Complete,
@@ -44,12 +62,7 @@ impl Bot {
         &self.strategy
     }
     pub fn calc(&self, name: &str) -> Result<&CalculationDTO, &str> {
-        let _calc = self
-            .strategy
-            .calcs()
-            .iter()
-            .find(|calc| calc.name() == name);
-        _calc.ok_or("not found")
+        self.calc_lkup.get(name).ok_or("not found")
     }
     pub fn queries(&self) -> Vec<&CalculationDTO> {
         self.strategy
@@ -58,22 +71,39 @@ impl Bot {
             .filter(|c| (c.operation()) == "query")
             .collect()
     }
-    //
-    // pub fn execute(&self, asset: &Asset, timestamp: &TimeStamp) -> () {
-    //     let _dag_node_output_lookup: HashMap<String, TimeSeries1D> = HashMap::new();
-    //
-    //     let _dag_node_output_lookup: HashMap<String, TimeSeries1D> = self
-    //         .queries()
-    //         .iter()
-    //         .map(|c| {
-    //             (
-    //                 c.name().to_string(),
-    //                 self.data_client.query(asset, timestamp),
-    //             )
-    //         })
-    //         .collect();
-    //     let _score_calc = self.strategy.score().calc();
-    // }
+
+    pub fn as_executable(&self, asset: Asset, timestamp: TimeStamp) -> ExecutableBot {
+        ExecutableBot {
+            asset,
+            timestamp,
+            bot: self.clone(),
+            data_client: MockDataClient::new(),
+            calc_status_lkup: self
+                .strategy
+                .calcs()
+                .iter()
+                .map(|c| (c.name().to_string(), CalculationStatus::NotStarted))
+                .collect(),
+            calc_data_lkup: HashMap::new(),
+        }
+
+        // let calc_order = execution_order(self.dag());
+
+        //
+        // let _dag_node_output_lookup: HashMap<String, TimeSeries1D> = HashMap::new();
+        //
+        // let _dag_node_output_lookup: HashMap<String, TimeSeries1D> = self
+        //     .queries()
+        //     .iter()
+        //     .map(|c| {
+        //         (
+        //             c.name().to_string(),
+        //             self.data_client.query(asset, timestamp),
+        //         )
+        //     })
+        //     .collect();
+        // let _score_calc = self.strategy.score().calc();
+    }
 }
 
 #[cfg(test)]
@@ -81,7 +111,7 @@ mod tests {
     use std::path::Path;
 
     use crate::bot::Bot;
-    use crate::dag::execution_order;
+    use crate::data::{Asset, TODAY};
     use crate::dto::from_path;
 
     fn bot_fixture() -> Box<Bot> {
@@ -92,10 +122,10 @@ mod tests {
     #[test]
     fn execute() {
         let bot = bot_fixture();
-        let calc_order = execution_order(bot.dag());
-
-
-        ()
+        let asset = Asset::new(String::from("A"));
+        let timestamp = TODAY;
+        let executable_bot = bot.as_executable(asset, timestamp);
+        executable_bot.execute();
     }
 
     #[test]
