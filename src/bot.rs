@@ -1,14 +1,11 @@
 #![allow(dead_code)]
+// #![allow(unused)]
 
 use std::collections::HashMap;
-use std::iter::Map;
 
-use petgraph::prelude::*;
-
-use crate::dag::{execution_order, to_dag, DagDTO};
-use crate::data::{Asset, MockDataClient};
+use crate::dag::{to_dag, DagDTO};
+use crate::data::MockDataClient;
 use crate::dto::{CalculationDTO, StrategyDTO};
-use crate::time_series::{TimeSeries1D, TimeStamp};
 
 pub struct Bot {
     strategy: StrategyDTO,
@@ -83,17 +80,10 @@ impl Bot {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use std::path::Path;
 
-    use petgraph::algo::toposort;
-    use petgraph::graph::NodeIndex;
-
-    use crate::bot::{Bot, CalculationStatus};
-    use crate::dag::execution_order;
-    use crate::data::TODAY;
+    use crate::bot::Bot;
     use crate::dto::from_path;
-    use crate::time_series::TimeSeries1D;
 
     fn bot_fixture() -> Box<Bot> {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
@@ -109,29 +99,5 @@ mod tests {
             .filter(|calculation| (**calculation).name() == "close")
             .count();
         assert_eq!(close_queries, 1);
-    }
-
-    #[test]
-    fn execute() {
-        let bot: Box<Bot> = bot_fixture();
-        let execution_order: Vec<&String> = execution_order(bot.dag());
-        let node_data: HashMap<String, TimeSeries1D> = HashMap::new();
-        let node_statuses: HashMap<&String, CalculationStatus> = bot
-            .dag
-            .node_indices()
-            .into_iter()
-            .map(|node_idx: NodeIndex| {
-                (
-                    bot.dag.node_weight(node_idx).unwrap(),
-                    CalculationStatus::NotStarted,
-                )
-            })
-            .collect();
-
-        // execute leaves (queries)
-        for node_idx in toposort(&bot.dag, None).expect("unable to toposort").iter() {
-            println!("{:?}", bot.dag.node_weight(*node_idx));
-        }
-        ()
     }
 }
