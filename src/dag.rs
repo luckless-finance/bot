@@ -1,7 +1,6 @@
 #![allow(dead_code)]
-#![allow(unused)]
+// #![allow(unused)]
 
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::env::current_dir;
 use std::fs::File;
@@ -74,12 +73,9 @@ mod tests {
     use std::borrow::Borrow;
     use std::collections::HashMap;
     use std::fs::read_to_string;
-    use std::iter::Map;
     use std::path::Path;
 
-    use petgraph::algo::{is_cyclic_directed, toposort};
     use petgraph::prelude::*;
-    use petgraph::visit::{Bfs, DfsPostOrder};
 
     use crate::dag::{execution_order, to_dag, to_dot_file, DagDTO};
     use crate::dto::{from_path, StrategyDTO};
@@ -160,7 +156,7 @@ mod learn_library {
     use petgraph::algo::toposort;
     use petgraph::prelude::*;
 
-    use crate::dag::{to_dag, to_dot_file, DagDTO};
+    use crate::dag::{to_dag, DagDTO};
     use crate::dto::from_path;
 
     #[test]
