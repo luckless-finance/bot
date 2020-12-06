@@ -1,7 +1,7 @@
 #![allow(dead_code)]
+#![allow(unused)]
 
 use std::collections::HashMap;
-use std::iter::Map;
 
 use petgraph::prelude::*;
 

@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(unused)]
 
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -154,12 +155,13 @@ mod tests {
 
 #[cfg(test)]
 mod learn_library {
+    use std::path::Path;
+
+    use petgraph::algo::toposort;
     use petgraph::prelude::*;
 
     use crate::dag::{to_dag, to_dot_file, DagDTO};
     use crate::dto::from_path;
-    use petgraph::algo::toposort;
-    use std::path::Path;
 
     #[test]
     fn topo() {
