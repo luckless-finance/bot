@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::dag::{execution_order, to_dag, DagDTO};
+use crate::dag::Dag;
 use crate::data::{Asset, MockDataClient};
 use crate::dto::{CalculationDTO, StrategyDTO};
 use crate::time_series::{TimeSeries1D, TimeStamp};
@@ -10,8 +10,7 @@ use crate::time_series::{TimeSeries1D, TimeStamp};
 #[derive(Debug, Clone)]
 pub struct Bot {
     strategy: StrategyDTO,
-    // TODO replace with Dag
-    dag: DagDTO,
+    dag: Dag,
     calc_lkup: HashMap<String, CalculationDTO>,
 }
 
@@ -28,7 +27,7 @@ pub struct ExecutableBot {
 
 impl ExecutableBot {
     fn execute(&self) {
-        let calc_order = execution_order(&self.bot.dag);
+        let calc_order = &self.bot.dag.execution_order();
         for calc in calc_order {
             println!("\nexecuting {}", calc);
         }
@@ -43,7 +42,7 @@ pub enum CalculationStatus {
 
 impl Bot {
     pub fn new(strategy: StrategyDTO) -> Box<Self> {
-        let dag = to_dag(&strategy).expect("unable to build bot");
+        let dag = Dag::new(strategy.clone());
         let calc_lkup: HashMap<String, CalculationDTO> = strategy
             .calcs()
             .iter()
@@ -55,7 +54,7 @@ impl Bot {
             calc_lkup,
         })
     }
-    fn dag(&self) -> &DagDTO {
+    fn dag(&self) -> &Dag {
         &self.dag
     }
     fn strategy(&self) -> &StrategyDTO {

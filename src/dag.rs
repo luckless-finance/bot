@@ -13,13 +13,15 @@ use petgraph::Direction;
 
 use crate::dto::StrategyDTO;
 
+#[derive(Debug, Clone)]
 pub struct Dag {
     dag_dto: DagDTO,
     node_lkup: HashMap<String, NodeIndex>,
 }
 
 impl Dag {
-    pub fn new(dag_dto: DagDTO) -> Self {
+    pub fn new(strategy_dto: StrategyDTO) -> Self {
+        let dag_dto = to_dag(&strategy_dto).expect("unable to build dag from strategy");
         let node_lkup: HashMap<String, NodeIndex<u32>> = dag_dto
             .node_indices()
             .into_iter()
@@ -36,34 +38,31 @@ impl Dag {
             .map(|x| self.dag_dto.node_weight(x).expect("node not found").clone())
             .collect()
     }
+    pub fn execution_order(&self) -> Vec<String> {
+        toposort(&self.dag_dto, None)
+            .expect("unable to toposort")
+            .iter()
+            .map(|node_idx: &NodeIndex| self.dag_dto.node_weight(*node_idx).unwrap().clone())
+            .collect()
+    }
+    fn to_dot_file(&self) {
+        let mut output_file = File::create(
+            current_dir()
+                .expect("unable to find current_dir")
+                .join("output.dot"),
+        )
+        .expect("unable to open output file");
+        let dot_text = format!(
+            "{:?}",
+            Dot::with_config(&self.dag_dto, &[Config::EdgeNoLabel])
+        );
+        output_file
+            .write_all(dot_text.as_bytes())
+            .expect("unable to write file");
+    }
 }
 
-pub type DagDTO = DiGraph<String, String>;
-
-pub fn execution_order(g: &DagDTO) -> Vec<&String> {
-    toposort(g, None)
-        .expect("unable to toposort")
-        .iter()
-        .map(|node_idx: &NodeIndex| g.node_weight(*node_idx).unwrap())
-        .collect()
-}
-
-pub fn to_dot_text(g: &DagDTO) -> String {
-    format!("{:?}", Dot::with_config(g, &[Config::EdgeNoLabel]))
-}
-
-pub fn to_dot_file(g: &DagDTO) {
-    let mut output_file = File::create(
-        current_dir()
-            .expect("unable to find current_dir")
-            .join("output.dot"),
-    )
-    .expect("unable to open output file");
-    let dot_text = to_dot_text(g);
-    output_file
-        .write_all(dot_text.as_bytes())
-        .expect("unable to write file");
-}
+type DagDTO = DiGraph<String, String>;
 
 pub fn to_dag(strategy: &StrategyDTO) -> Result<DagDTO, &str> {
     let mut dag: DagDTO = DiGraph::new();
@@ -96,34 +95,32 @@ pub fn to_dag(strategy: &StrategyDTO) -> Result<DagDTO, &str> {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Borrow;
     use std::collections::HashMap;
     use std::fs::read_to_string;
     use std::path::Path;
 
-    use petgraph::prelude::*;
-
-    use crate::dag::{execution_order, to_dag, to_dot_file, Dag, DagDTO};
+    use crate::dag::Dag;
     use crate::dto::{from_path, StrategyDTO};
 
     fn strategy_fixture() -> StrategyDTO {
         from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
     }
 
-    fn dag_fixture() -> DagDTO {
-        to_dag(strategy_fixture().borrow()).expect("unable to convert to bot")
+    fn dag_fixture() -> Dag {
+        Dag::new(strategy_fixture())
     }
 
     #[test]
     fn strategy_to_dag() {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
-        let dag = to_dag(&strategy).expect("unable to convert to bot");
-        to_dot_file(&dag);
-        assert_eq!(dag.node_count(), 5);
-        assert_eq!(dag.edge_count(), 6);
-        let nodes = dag
+        let dag = Dag::new(strategy);
+        dag.to_dot_file();
+        let dag_dto = dag.dag_dto;
+        assert_eq!(dag_dto.node_count(), 5);
+        assert_eq!(dag_dto.edge_count(), 6);
+        let nodes = dag_dto
             .node_indices()
-            .map(|i| dag.node_weight(i).expect("node not found"))
+            .map(|i| dag_dto.node_weight(i).expect("node not found"))
             .find(|d| d.as_str().eq("sma200"))
             .expect("sma200 not found");
         assert_eq!(nodes, "sma200")
@@ -131,12 +128,12 @@ mod tests {
 
     #[test]
     fn traverse_dag_order() {
-        let dag: DagDTO = dag_fixture();
-        let exe_order = execution_order(&dag);
+        let dag: Dag = dag_fixture();
+        let exe_order = dag.execution_order();
 
         let node_execution_order_lkup: HashMap<&String, usize> = (0..exe_order.len())
             .into_iter()
-            .map(|position| (exe_order.get(position).unwrap().clone(), position))
+            .map(|position| (exe_order.get(position).unwrap(), position))
             .collect();
         let order_constraints = &[
             &["close", "sma50", "sma_diff", "sma_gap"],
@@ -158,16 +155,9 @@ mod tests {
 
     #[test]
     fn dag_to_dot_file() {
-        let mut dag: DagDTO = DiGraph::new();
-        let node_index_a: NodeIndex = dag.add_node(String::from("A"));
-        let node_index_b = dag.add_node(String::from("B"));
-        let node_index_c = dag.add_node(String::from("C"));
-        let node_index_d = dag.add_node(String::from("D"));
-        dag.add_edge(node_index_a, node_index_b, String::from(""));
-        dag.add_edge(node_index_a, node_index_c, String::from(""));
-        dag.add_edge(node_index_b, node_index_d, String::from(""));
-        dag.add_edge(node_index_c, node_index_d, String::from(""));
-        to_dot_file(&dag);
+        let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
+        let dag = Dag::new(strategy);
+        dag.to_dot_file();
         let expected_output =
             read_to_string("expected_output.dot").expect("expected_output.dot not found.");
         let output = read_to_string("output.dot").expect("output.dot not found.");
@@ -176,8 +166,8 @@ mod tests {
 
     #[test]
     fn dag_upstream() {
-        let dag_dto = dag_fixture();
-        let dag = Dag::new(dag_dto);
+        let strategy_dto = strategy_fixture();
+        let dag = Dag::new(strategy_dto);
         let upstream = dag.upstream(&String::from("sma50"));
         assert_eq!(upstream, vec![String::from("close")]);
 
