@@ -7,9 +7,9 @@ use std::fs::File;
 use std::io::Write;
 
 use petgraph::algo::{connected_components, is_cyclic_directed, toposort};
+use petgraph::Direction;
 use petgraph::dot::{Config, Dot};
 use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::Direction;
 
 use crate::dto::StrategyDTO;
 
@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn strategy_to_dag() {
-        let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
+        let strategy = strategy_fixture();
         let dag = Dag::new(strategy);
         dag.to_dot_file();
         let dag_dto = dag.dag_dto;
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn dag_to_dot_file() {
-        let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
+        let strategy = strategy_fixture();
         let dag = Dag::new(strategy);
         dag.to_dot_file();
         let expected_output =
@@ -186,8 +186,16 @@ mod learn_library {
     use petgraph::algo::toposort;
     use petgraph::prelude::*;
 
-    use crate::dag::{to_dag, DagDTO};
-    use crate::dto::from_path;
+    use crate::dag::{Dag, DagDTO, to_dag};
+    use crate::dto::{from_path, StrategyDTO};
+
+    fn strategy_fixture() -> StrategyDTO {
+        from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
+    }
+
+    fn dag_fixture() -> Dag {
+        Dag::new(strategy_fixture())
+    }
 
     #[test]
     fn topo() {
@@ -213,7 +221,7 @@ mod learn_library {
 
     #[test]
     fn dfs_post_order() {
-        let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
+        let strategy = strategy_fixture();
         let dag: DagDTO = to_dag(&strategy).expect("unable to convert to bot");
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
 
@@ -232,7 +240,7 @@ mod learn_library {
 
     #[test]
     fn bfs() {
-        let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
+        let strategy = strategy_fixture();
         let dag: DagDTO = to_dag(&strategy).expect("unable to convert to bot");
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
 

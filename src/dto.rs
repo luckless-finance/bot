@@ -191,9 +191,9 @@ mod tests {
                     name: String::from("close"),
                     operation: String::from("query"),
                     operands: vec![OperandDTO {
-                        name: String::from("tbd"),
-                        _type: String::from("tbd"),
-                        value: String::from("tbd"),
+                        name: String::from("symbol"),
+                        _type: String::from("str"),
+                        value: String::from("GOOG"),
                     }],
                 },
             ],
@@ -246,9 +246,9 @@ calcs:
   - name: close
     operation: query
     operands:
-      - name: tbd
-        _type: tbd
-        value: tbd"#,
+      - name: symbol
+        _type: str
+        value: GOOG"#,
         )
     }
 
