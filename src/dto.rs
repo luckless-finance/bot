@@ -45,11 +45,18 @@ impl OperandDTO {
         OperandDTO { name, _type, value }
     }
 }
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub enum Operation {
+    sma,
+    div,
+    sub,
+    query,
+}
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct CalculationDTO {
     name: String,
-    operation: String,
+    operation: Operation,
     operands: Vec<OperandDTO>,
 }
 
@@ -57,7 +64,7 @@ impl CalculationDTO {
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn operation(&self) -> &str {
+    pub fn operation(&self) -> &Operation {
         &self.operation
     }
     pub fn operands(&self) -> &Vec<OperandDTO> {
@@ -66,7 +73,7 @@ impl CalculationDTO {
 }
 
 impl CalculationDTO {
-    pub fn new(name: String, operation: String, operands: Vec<OperandDTO>) -> Self {
+    pub fn new(name: String, operation: Operation, operands: Vec<OperandDTO>) -> Self {
         CalculationDTO {
             name,
             operation,
@@ -114,7 +121,7 @@ mod tests {
     use std::env::current_dir;
     use std::path::Path;
 
-    use crate::dto::{from_path, CalculationDTO, OperandDTO, ScoreDTO, StrategyDTO};
+    use crate::dto::{from_path, CalculationDTO, OperandDTO, Operation, ScoreDTO, StrategyDTO};
 
     fn get_strategy() -> StrategyDTO {
         StrategyDTO {
@@ -125,7 +132,7 @@ mod tests {
             calcs: vec![
                 CalculationDTO {
                     name: String::from("sma_gap"),
-                    operation: String::from("div"),
+                    operation: Operation::div,
                     operands: vec![
                         OperandDTO {
                             name: String::from("numerator"),
@@ -141,7 +148,7 @@ mod tests {
                 },
                 CalculationDTO {
                     name: String::from("sma_diff"),
-                    operation: String::from("sub"),
+                    operation: Operation::sub,
                     operands: vec![
                         OperandDTO {
                             name: String::from("left"),
@@ -157,7 +164,7 @@ mod tests {
                 },
                 CalculationDTO {
                     name: String::from("sma50"),
-                    operation: String::from("sma"),
+                    operation: Operation::sma,
                     operands: vec![
                         OperandDTO {
                             name: String::from("window_size"),
@@ -173,7 +180,7 @@ mod tests {
                 },
                 CalculationDTO {
                     name: String::from("sma200"),
-                    operation: String::from("sma"),
+                    operation: Operation::sma,
                     operands: vec![
                         OperandDTO {
                             name: String::from("window_size"),
@@ -189,7 +196,7 @@ mod tests {
                 },
                 CalculationDTO {
                     name: String::from("close"),
-                    operation: String::from("query"),
+                    operation: Operation::query,
                     operands: vec![OperandDTO {
                         name: String::from("symbol"),
                         _type: String::from("symbol"),
@@ -258,7 +265,7 @@ calcs:
         assert_eq!(s.name, "Example Strategy Document");
         assert_eq!(s.score.calc, "sma_gap");
         assert_eq!(s.calcs[0].name, "sma_gap");
-        assert_eq!(s.calcs[0].operation, "div");
+        assert_eq!(s.calcs[0].operation, Operation::div);
         assert_eq!(s.calcs[0].operands[0].name, "numerator");
     }
 

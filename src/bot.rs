@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::dag::Dag;
 use crate::data::{Asset, MockDataClient};
-use crate::dto::{CalculationDTO, StrategyDTO};
+use crate::dto::{CalculationDTO, Operation, StrategyDTO};
 use crate::time_series::{TimeSeries1D, TimeStamp};
 
 #[derive(Debug, Clone)]
@@ -33,10 +33,10 @@ impl ExecutableBot {
             let calc = self.bot.calc_lkup.get(calc_name).expect("calc not found");
             println!("{:?}", calc.operation());
             match calc.operation() {
-                "div" => self.handle_div(calc),
-                "sma" => self.handle_sma(calc),
-                "sub" => self.handle_sub(calc),
-                "query" => self.handle_query(calc),
+                Operation::div => self.handle_div(calc),
+                Operation::sma => self.handle_sma(calc),
+                Operation::sub => self.handle_sub(calc),
+                Operation::query => self.handle_query(calc),
                 _ => (),
             }
         }
@@ -88,7 +88,7 @@ impl Bot {
         self.strategy
             .calcs()
             .iter()
-            .filter(|c| (c.operation()) == "query")
+            .filter(|c| (c.operation()) == &Operation::query)
             .collect()
     }
 
