@@ -4,7 +4,7 @@ score:
   calc: sma_gap
 calcs:
   - name: sma_gap
-    operation: div
+    operation: DIV
     operands:
       - name: numerator
         _type: ref
@@ -13,7 +13,7 @@ calcs:
         _type: ref
         value: sma50
   - name: sma_diff
-    operation: sub
+    operation: SUB
     operands:
       - name: left
         _type: ref
@@ -22,7 +22,7 @@ calcs:
         _type: ref
         value: sma200
   - name: sma50
-    operation: sma
+    operation: SMA
     operands:
       - name: window_size
         _type: i32
@@ -31,7 +31,7 @@ calcs:
         _type: ref
         value: close
   - name: sma200
-    operation: sma
+    operation: SMA
     operands:
       - name: window_size
         _type: i32
@@ -40,7 +40,7 @@ calcs:
         _type: ref
         value: close
   - name: close
-    operation: query
+    operation: QUERY
     operands:
       - name: symbol
         _type: symbol

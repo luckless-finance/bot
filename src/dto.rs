@@ -47,10 +47,10 @@ impl OperandDTO {
 }
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum Operation {
-    sma,
-    div,
-    sub,
-    query,
+    SMA,
+    DIV,
+    SUB,
+    QUERY,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -132,7 +132,7 @@ mod tests {
             calcs: vec![
                 CalculationDTO {
                     name: String::from("sma_gap"),
-                    operation: Operation::div,
+                    operation: Operation::DIV,
                     operands: vec![
                         OperandDTO {
                             name: String::from("numerator"),
@@ -148,7 +148,7 @@ mod tests {
                 },
                 CalculationDTO {
                     name: String::from("sma_diff"),
-                    operation: Operation::sub,
+                    operation: Operation::SUB,
                     operands: vec![
                         OperandDTO {
                             name: String::from("left"),
@@ -164,7 +164,7 @@ mod tests {
                 },
                 CalculationDTO {
                     name: String::from("sma50"),
-                    operation: Operation::sma,
+                    operation: Operation::SMA,
                     operands: vec![
                         OperandDTO {
                             name: String::from("window_size"),
@@ -180,7 +180,7 @@ mod tests {
                 },
                 CalculationDTO {
                     name: String::from("sma200"),
-                    operation: Operation::sma,
+                    operation: Operation::SMA,
                     operands: vec![
                         OperandDTO {
                             name: String::from("window_size"),
@@ -196,7 +196,7 @@ mod tests {
                 },
                 CalculationDTO {
                     name: String::from("close"),
-                    operation: Operation::query,
+                    operation: Operation::QUERY,
                     operands: vec![OperandDTO {
                         name: String::from("symbol"),
                         _type: String::from("symbol"),
@@ -215,7 +215,7 @@ score:
   calc: sma_gap
 calcs:
   - name: sma_gap
-    operation: div
+    operation: DIV
     operands:
       - name: numerator
         _type: ref
@@ -224,7 +224,7 @@ calcs:
         _type: ref
         value: sma50
   - name: sma_diff
-    operation: sub
+    operation: SUB
     operands:
       - name: left
         _type: ref
@@ -233,7 +233,7 @@ calcs:
         _type: ref
         value: sma200
   - name: sma50
-    operation: sma
+    operation: SMA
     operands:
       - name: window_size
         _type: i32
@@ -242,7 +242,7 @@ calcs:
         _type: ref
         value: close
   - name: sma200
-    operation: sma
+    operation: SMA
     operands:
       - name: window_size
         _type: i32
@@ -251,7 +251,7 @@ calcs:
         _type: ref
         value: close
   - name: close
-    operation: query
+    operation: QUERY
     operands:
       - name: symbol
         _type: symbol
@@ -265,7 +265,7 @@ calcs:
         assert_eq!(s.name, "Example Strategy Document");
         assert_eq!(s.score.calc, "sma_gap");
         assert_eq!(s.calcs[0].name, "sma_gap");
-        assert_eq!(s.calcs[0].operation, Operation::div);
+        assert_eq!(s.calcs[0].operation, Operation::DIV);
         assert_eq!(s.calcs[0].operands[0].name, "numerator");
     }
 

@@ -33,11 +33,10 @@ impl ExecutableBot {
             let calc = self.bot.calc_lkup.get(calc_name).expect("calc not found");
             println!("{:?}", calc.operation());
             match calc.operation() {
-                Operation::div => self.handle_div(calc),
-                Operation::sma => self.handle_sma(calc),
-                Operation::sub => self.handle_sub(calc),
-                Operation::query => self.handle_query(calc),
-                _ => (),
+                Operation::DIV => self.handle_div(calc),
+                Operation::SMA => self.handle_sma(calc),
+                Operation::SUB => self.handle_sub(calc),
+                Operation::QUERY => self.handle_query(calc),
             }
         }
     }
@@ -88,7 +87,7 @@ impl Bot {
         self.strategy
             .calcs()
             .iter()
-            .filter(|c| (c.operation()) == &Operation::query)
+            .filter(|c| (c.operation()) == &Operation::QUERY)
             .collect()
     }
 
