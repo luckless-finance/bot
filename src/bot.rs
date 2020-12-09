@@ -26,10 +26,13 @@ pub struct ExecutableBot {
 }
 // TODO implement handlers and result memoization
 impl ExecutableBot {
-    fn execute(&self) {
+    fn execute(&mut self) {
         let calc_order = &self.bot.dag.execution_order();
         for calc_name in calc_order {
             println!("\nexecuting {}", calc_name);
+            if let Some(calc_status) = self.calc_status_lkup.get_mut(calc_name) {
+                *calc_status = CalculationStatus::InProgress;
+            }
             let calc = self.bot.calc_lkup.get(calc_name).expect("calc not found");
             println!("{:?}", calc.operation());
             match calc.operation() {
@@ -57,6 +60,7 @@ impl ExecutableBot {
 #[derive(Debug, Clone)]
 pub enum CalculationStatus {
     NotStarted,
+    InProgress,
     Complete,
 }
 
@@ -143,7 +147,7 @@ mod tests {
         let bot = bot_fixture();
         let asset = Asset::new(String::from("A"));
         let timestamp = TODAY;
-        let executable_bot = bot.as_executable(asset, timestamp);
+        let mut executable_bot = bot.as_executable(asset, timestamp);
         executable_bot.execute();
     }
 
