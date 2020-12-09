@@ -37,18 +37,22 @@ impl ExecutableBot {
                 "sma" => self.handle_sma(calc),
                 "sub" => self.handle_sub(calc),
                 "query" => self.handle_query(calc),
-                _ => ()
+                _ => (),
             }
         }
     }
     fn handle_div(&self, calc: &CalculationDTO) {
         println!("TODO execute {}", calc.name())
     }
-    fn handle_sma(&self, calc: &CalculationDTO) { println!("TODO execute {}", calc.name()) }
+    fn handle_sma(&self, calc: &CalculationDTO) {
+        println!("TODO execute {}", calc.name())
+    }
     fn handle_sub(&self, calc: &CalculationDTO) {
         println!("TODO execute {}", calc.name())
     }
-    fn handle_query(&self, calc: &CalculationDTO) { println!("TODO execute {}", calc.name()) }
+    fn handle_query(&self, calc: &CalculationDTO) {
+        println!("TODO execute {}", calc.name())
+    }
 }
 
 #[derive(Debug, Clone)]

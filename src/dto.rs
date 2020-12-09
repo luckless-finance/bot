@@ -165,8 +165,8 @@ mod tests {
                             value: String::from("50"),
                         },
                         OperandDTO {
-                            name: String::from("sequence"),
-                            _type: String::from("query"),
+                            name: String::from("time_series"),
+                            _type: String::from("ref"),
                             value: String::from("close"),
                         },
                     ],
@@ -181,8 +181,8 @@ mod tests {
                             value: String::from("200"),
                         },
                         OperandDTO {
-                            name: String::from("sequence"),
-                            _type: String::from("query"),
+                            name: String::from("time_series"),
+                            _type: String::from("ref"),
                             value: String::from("close"),
                         },
                     ],
@@ -192,7 +192,7 @@ mod tests {
                     operation: String::from("query"),
                     operands: vec![OperandDTO {
                         name: String::from("symbol"),
-                        _type: String::from("str"),
+                        _type: String::from("symbol"),
                         value: String::from("GOOG"),
                     }],
                 },
@@ -231,8 +231,8 @@ calcs:
       - name: window_size
         _type: i32
         value: "50"
-      - name: sequence
-        _type: query
+      - name: time_series
+        _type: ref
         value: close
   - name: sma200
     operation: sma
@@ -240,14 +240,14 @@ calcs:
       - name: window_size
         _type: i32
         value: "200"
-      - name: sequence
-        _type: query
+      - name: time_series
+        _type: ref
         value: close
   - name: close
     operation: query
     operands:
       - name: symbol
-        _type: str
+        _type: symbol
         value: GOOG"#,
         )
     }

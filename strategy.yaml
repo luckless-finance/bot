@@ -27,8 +27,8 @@ calcs:
       - name: window_size
         _type: i32
         value: "50"
-      - name: sequence
-        _type: query
+      - name: time_series
+        _type: ref
         value: close
   - name: sma200
     operation: sma
@@ -36,12 +36,12 @@ calcs:
       - name: window_size
         _type: i32
         value: "200"
-      - name: sequence
-        _type: query
+      - name: time_series
+        _type: ref
         value: close
   - name: close
     operation: query
     operands:
-      - name: tbd
-        _type: tbd
-        value: tbd
+      - name: symbol
+        _type: symbol
+        value: GOOG

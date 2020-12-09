@@ -7,9 +7,9 @@ use std::fs::File;
 use std::io::Write;
 
 use petgraph::algo::{connected_components, is_cyclic_directed, toposort};
-use petgraph::Direction;
 use petgraph::dot::{Config, Dot};
 use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::Direction;
 
 use crate::dto::StrategyDTO;
 
@@ -186,7 +186,7 @@ mod learn_library {
     use petgraph::algo::toposort;
     use petgraph::prelude::*;
 
-    use crate::dag::{Dag, DagDTO, to_dag};
+    use crate::dag::{to_dag, Dag, DagDTO};
     use crate::dto::{from_path, StrategyDTO};
 
     fn strategy_fixture() -> StrategyDTO {
