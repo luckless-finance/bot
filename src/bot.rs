@@ -24,14 +24,31 @@ pub struct ExecutableBot {
     calc_status_lkup: HashMap<String, CalculationStatus>,
     calc_data_lkup: HashMap<String, TimeSeries1D>,
 }
-
+// TODO implement handlers and result memoization
 impl ExecutableBot {
     fn execute(&self) {
         let calc_order = &self.bot.dag.execution_order();
-        for calc in calc_order {
-            println!("\nexecuting {}", calc);
+        for calc_name in calc_order {
+            println!("\nexecuting {}", calc_name);
+            let calc = self.bot.calc_lkup.get(calc_name).expect("calc not found");
+            println!("{:?}", calc.operation());
+            match calc.operation() {
+                "div" => self.handle_div(calc),
+                "sma" => self.handle_sma(calc),
+                "sub" => self.handle_sub(calc),
+                "query" => self.handle_query(calc),
+                _ => ()
+            }
         }
     }
+    fn handle_div(&self, calc: &CalculationDTO) {
+        println!("TODO execute {}", calc.name())
+    }
+    fn handle_sma(&self, calc: &CalculationDTO) { println!("TODO execute {}", calc.name()) }
+    fn handle_sub(&self, calc: &CalculationDTO) {
+        println!("TODO execute {}", calc.name())
+    }
+    fn handle_query(&self, calc: &CalculationDTO) { println!("TODO execute {}", calc.name()) }
 }
 
 #[derive(Debug, Clone)]
