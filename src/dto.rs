@@ -32,6 +32,7 @@ pub enum OperandType {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct OperandDTO {
     name: String,
+    #[serde(rename = "type")]
     _type: OperandType,
     value: String,
 }
@@ -228,43 +229,43 @@ calcs:
     operation: DIV
     operands:
       - name: numerator
-        _type: Reference
+        type: Reference
         value: sma_diff
       - name: denominator
-        _type: Reference
+        type: Reference
         value: sma50
   - name: sma_diff
     operation: SUB
     operands:
       - name: left
-        _type: Reference
+        type: Reference
         value: sma50
       - name: right
-        _type: Reference
+        type: Reference
         value: sma200
   - name: sma50
     operation: SMA
     operands:
       - name: window_size
-        _type: Integer
+        type: Integer
         value: "50"
       - name: time_series
-        _type: Reference
+        type: Reference
         value: price
   - name: sma200
     operation: SMA
     operands:
       - name: window_size
-        _type: Integer
+        type: Integer
         value: "200"
       - name: time_series
-        _type: Reference
+        type: Reference
         value: price
   - name: price
     operation: QUERY
     operands:
       - name: field
-        _type: Text
+        type: Text
         value: close"#,
         )
     }
