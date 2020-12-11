@@ -3,7 +3,7 @@ digraph {
     1 [ label = "\"sma_diff\"" ]
     2 [ label = "\"sma50\"" ]
     3 [ label = "\"sma200\"" ]
-    4 [ label = "\"close\"" ]
+    4 [ label = "\"price\"" ]
     1 -> 0 [ ]
     2 -> 0 [ ]
     2 -> 1 [ ]
