@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crate::dag::Dag;
-use crate::data::{Asset, MockDataClient};
+use crate::data::{Asset, MockDataClient, TODAY};
 use crate::dto::{CalculationDTO, Operation, StrategyDTO};
 use crate::time_series::{TimeSeries1D, TimeStamp};
 
@@ -24,6 +24,7 @@ pub struct ExecutableBot {
     calc_status_lkup: HashMap<String, CalculationStatus>,
     calc_data_lkup: HashMap<String, TimeSeries1D>,
 }
+
 // TODO implement handlers and result memoization
 impl ExecutableBot {
     fn execute(&mut self) {
@@ -35,25 +36,50 @@ impl ExecutableBot {
             }
             let calc = self.bot.calc_lkup.get(calc_name).expect("calc not found");
             println!("{:?}", calc.operation());
-            match calc.operation() {
-                Operation::DIV => self.handle_div(calc),
-                Operation::SMA => self.handle_sma(calc),
-                Operation::SUB => self.handle_sub(calc),
-                Operation::QUERY => self.handle_query(calc),
-            }
+            self.calc_data_lkup.insert(
+                calc_name.clone(),
+                match calc.operation() {
+                    Operation::DIV => self.handle_div(calc),
+                    Operation::SMA => self.handle_sma(calc),
+                    Operation::SUB => self.handle_sub(calc),
+                    Operation::QUERY => self.handle_query(calc),
+                },
+            );
         }
     }
-    fn handle_div(&self, calc: &CalculationDTO) {
-        println!("TODO execute {}", calc.name())
+    fn handle_div(&self, calc: &CalculationDTO) -> TimeSeries1D {
+        assert_eq!(*calc.operation(), Operation::DIV);
+        println!("TODO execute {}", calc.name());
+        let values = vec![5., 10., 15.];
+        let index = vec![1, 3, 4];
+        TimeSeries1D::new(index, values)
     }
-    fn handle_sma(&self, calc: &CalculationDTO) {
-        println!("TODO execute {}", calc.name())
+    fn handle_sma(&self, calc: &CalculationDTO) -> TimeSeries1D {
+        assert_eq!(*calc.operation(), Operation::SMA);
+        println!("TODO execute {}", calc.name());
+        let values = vec![5., 10., 15.];
+        let index = vec![1, 3, 4];
+        TimeSeries1D::new(index, values)
     }
-    fn handle_sub(&self, calc: &CalculationDTO) {
-        println!("TODO execute {}", calc.name())
+    fn handle_sub(&self, calc: &CalculationDTO) -> TimeSeries1D {
+        assert_eq!(*calc.operation(), Operation::SUB);
+        println!("TODO execute {}", calc.name());
+        let values = vec![5., 10., 15.];
+        let index = vec![1, 3, 4];
+        TimeSeries1D::new(index, values)
     }
-    fn handle_query(&self, calc: &CalculationDTO) {
-        println!("TODO execute {}", calc.name())
+    fn handle_query(&self, calc: &CalculationDTO) -> TimeSeries1D {
+        assert_eq!(*calc.operation(), Operation::QUERY);
+        println!("TODO execute {}", calc.name());
+        let name = "field";
+        // TODO parameterized query
+        let _field: &str = calc
+            .operands()
+            .iter()
+            .find(|o| o.name() == name)
+            .expect("symbol operand not found")
+            .value();
+        self.data_client.query(&self.asset, &TODAY)
     }
 }
 
@@ -135,7 +161,25 @@ mod tests {
 
     use crate::bot::Bot;
     use crate::data::{Asset, TODAY};
-    use crate::dto::from_path;
+    use crate::dto::{
+        from_path, CalculationDTO, OperandDTO, OperandType, Operation, ScoreDTO, StrategyDTO,
+    };
+
+    fn strategy_fixture() -> StrategyDTO {
+        StrategyDTO::new(
+            String::from("Example Strategy Document"),
+            ScoreDTO::new(String::from("close1")),
+            vec![CalculationDTO::new(
+                String::from("close1"),
+                Operation::QUERY,
+                vec![OperandDTO::new(
+                    String::from("field"),
+                    OperandType::Text,
+                    String::from("close"),
+                )],
+            )],
+        )
+    }
 
     fn bot_fixture() -> Box<Bot> {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
@@ -157,7 +201,7 @@ mod tests {
         let close_queries = bot
             .queries()
             .iter()
-            .filter(|calc| (**calc).name() == "close")
+            .filter(|calc| (**calc).name() == "price")
             .count();
         assert_eq!(close_queries, 1);
     }

@@ -7,41 +7,41 @@ calcs:
     operation: DIV
     operands:
       - name: numerator
-        _type: ref
+        type: Reference
         value: sma_diff
       - name: denominator
-        _type: ref
+        type: Reference
         value: sma50
   - name: sma_diff
     operation: SUB
     operands:
       - name: left
-        _type: ref
+        type: Reference
         value: sma50
       - name: right
-        _type: ref
+        type: Reference
         value: sma200
   - name: sma50
     operation: SMA
     operands:
       - name: window_size
-        _type: i32
+        type: Integer
         value: "50"
       - name: time_series
-        _type: ref
-        value: close
+        type: Reference
+        value: price
   - name: sma200
     operation: SMA
     operands:
       - name: window_size
-        _type: i32
+        type: Integer
         value: "200"
       - name: time_series
-        _type: ref
-        value: close
-  - name: close
+        type: Reference
+        value: price
+  - name: price
     operation: QUERY
     operands:
-      - name: symbol
-        _type: symbol
-        value: GOOG
+      - name: field
+        type: Text
+        value: close

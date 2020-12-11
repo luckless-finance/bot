@@ -22,9 +22,18 @@ impl ScoreDTO {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub enum OperandType {
+    Text,
+    Integer,
+    Decimal,
+    Reference,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct OperandDTO {
     name: String,
-    _type: String,
+    #[serde(rename = "type")]
+    _type: OperandType,
     value: String,
 }
 
@@ -32,7 +41,7 @@ impl OperandDTO {
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn _type(&self) -> &str {
+    pub fn _type(&self) -> &OperandType {
         &self._type
     }
     pub fn value(&self) -> &str {
@@ -41,7 +50,7 @@ impl OperandDTO {
 }
 
 impl OperandDTO {
-    pub fn new(name: String, _type: String, value: String) -> Self {
+    pub fn new(name: String, _type: OperandType, value: String) -> Self {
         OperandDTO { name, _type, value }
     }
 }
@@ -121,7 +130,9 @@ mod tests {
     use std::env::current_dir;
     use std::path::Path;
 
-    use crate::dto::{from_path, CalculationDTO, OperandDTO, Operation, ScoreDTO, StrategyDTO};
+    use crate::dto::{
+        from_path, CalculationDTO, OperandDTO, OperandType, Operation, ScoreDTO, StrategyDTO,
+    };
 
     fn get_strategy() -> StrategyDTO {
         StrategyDTO {
@@ -136,12 +147,12 @@ mod tests {
                     operands: vec![
                         OperandDTO {
                             name: String::from("numerator"),
-                            _type: String::from("ref"),
+                            _type: OperandType::Reference,
                             value: String::from("sma_diff"),
                         },
                         OperandDTO {
                             name: String::from("denominator"),
-                            _type: String::from("ref"),
+                            _type: OperandType::Reference,
                             value: String::from("sma50"),
                         },
                     ],
@@ -152,12 +163,12 @@ mod tests {
                     operands: vec![
                         OperandDTO {
                             name: String::from("left"),
-                            _type: String::from("ref"),
+                            _type: OperandType::Reference,
                             value: String::from("sma50"),
                         },
                         OperandDTO {
                             name: String::from("right"),
-                            _type: String::from("ref"),
+                            _type: OperandType::Reference,
                             value: String::from("sma200"),
                         },
                     ],
@@ -168,13 +179,13 @@ mod tests {
                     operands: vec![
                         OperandDTO {
                             name: String::from("window_size"),
-                            _type: String::from("i32"),
+                            _type: OperandType::Integer,
                             value: String::from("50"),
                         },
                         OperandDTO {
                             name: String::from("time_series"),
-                            _type: String::from("ref"),
-                            value: String::from("close"),
+                            _type: OperandType::Reference,
+                            value: String::from("price"),
                         },
                     ],
                 },
@@ -184,23 +195,23 @@ mod tests {
                     operands: vec![
                         OperandDTO {
                             name: String::from("window_size"),
-                            _type: String::from("i32"),
+                            _type: OperandType::Integer,
                             value: String::from("200"),
                         },
                         OperandDTO {
                             name: String::from("time_series"),
-                            _type: String::from("ref"),
-                            value: String::from("close"),
+                            _type: OperandType::Reference,
+                            value: String::from("price"),
                         },
                     ],
                 },
                 CalculationDTO {
-                    name: String::from("close"),
+                    name: String::from("price"),
                     operation: Operation::QUERY,
                     operands: vec![OperandDTO {
-                        name: String::from("symbol"),
-                        _type: String::from("symbol"),
-                        value: String::from("GOOG"),
+                        name: String::from("field"),
+                        _type: OperandType::Text,
+                        value: String::from("close"),
                     }],
                 },
             ],
@@ -218,44 +229,44 @@ calcs:
     operation: DIV
     operands:
       - name: numerator
-        _type: ref
+        type: Reference
         value: sma_diff
       - name: denominator
-        _type: ref
+        type: Reference
         value: sma50
   - name: sma_diff
     operation: SUB
     operands:
       - name: left
-        _type: ref
+        type: Reference
         value: sma50
       - name: right
-        _type: ref
+        type: Reference
         value: sma200
   - name: sma50
     operation: SMA
     operands:
       - name: window_size
-        _type: i32
+        type: Integer
         value: "50"
       - name: time_series
-        _type: ref
-        value: close
+        type: Reference
+        value: price
   - name: sma200
     operation: SMA
     operands:
       - name: window_size
-        _type: i32
+        type: Integer
         value: "200"
       - name: time_series
-        _type: ref
-        value: close
-  - name: close
+        type: Reference
+        value: price
+  - name: price
     operation: QUERY
     operands:
-      - name: symbol
-        _type: symbol
-        value: GOOG"#,
+      - name: field
+        type: Text
+        value: close"#,
         )
     }
 

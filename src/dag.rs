@@ -11,7 +11,7 @@ use petgraph::dot::{Config, Dot};
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::Direction;
 
-use crate::dto::StrategyDTO;
+use crate::dto::{OperandType, StrategyDTO};
 
 #[derive(Debug, Clone)]
 pub struct Dag {
@@ -70,13 +70,14 @@ pub fn to_dag(strategy: &StrategyDTO) -> Result<DagDTO, &str> {
 
     // add nodes
     for calc in strategy.calcs() {
+        // println!("{}", calc.name());
         let index = dag.add_node(calc.name().to_string());
         node_lookup.insert(calc.name(), index);
     }
     // add edges
     for calc in strategy.calcs() {
         for op in calc.operands() {
-            if node_lookup.contains_key(op.value()) {
+            if node_lookup.contains_key(op.value()) && op._type() == &OperandType::Reference {
                 let operand = node_lookup.get(op.value()).expect("operand not found");
                 let calc = node_lookup.get(calc.name()).expect("calc not found");
                 dag.add_edge(*operand, *calc, String::new());
@@ -136,8 +137,8 @@ mod tests {
             .map(|position| (exe_order.get(position).unwrap(), position))
             .collect();
         let order_constraints = &[
-            &["close", "sma50", "sma_diff", "sma_gap"],
-            &["close", "sma200", "sma_diff", "sma_gap"],
+            &["price", "sma50", "sma_diff", "sma_gap"],
+            &["price", "sma200", "sma_diff", "sma_gap"],
         ];
         for outer_idx in 0..order_constraints.len() {
             let expected_order = order_constraints[outer_idx];
@@ -169,7 +170,7 @@ mod tests {
         let strategy_dto = strategy_fixture();
         let dag = Dag::new(strategy_dto);
         let upstream = dag.upstream(&String::from("sma50"));
-        assert_eq!(upstream, vec![String::from("close")]);
+        assert_eq!(upstream, vec![String::from("price")]);
 
         let upstream = dag.upstream(&String::from("sma_gap"));
         assert!(upstream.contains(&String::from("sma_diff")));
@@ -229,7 +230,7 @@ mod learn_library {
         let leaf_node = dag
             .node_weight(*leaf_node_idx)
             .expect("unable to find node");
-        assert_eq!(leaf_node, "close");
+        assert_eq!(leaf_node, "price");
 
         let mut dfs_post_order = DfsPostOrder::new(&dag, *leaf_node_idx);
         let root_node_id = dfs_post_order.next(&dag).unwrap();
@@ -248,7 +249,7 @@ mod learn_library {
         let leaf_node = dag
             .node_weight(*leaf_node_idx)
             .expect("unable to find node");
-        assert_eq!(leaf_node, "close");
+        assert_eq!(leaf_node, "price");
 
         let mut bfs = Bfs::new(&dag, *leaf_node_idx);
 
