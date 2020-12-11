@@ -123,9 +123,9 @@ mod tests {
     #[test]
     fn mock_data_client_assets() {
         let client = MockDataClient::new();
-        println!("{:?}", client);
+        // println!("{:?}", client);
         let symbols: HashSet<&String> = client.assets().keys().collect();
-        println!("{:?}", symbols);
+        // println!("{:?}", symbols);
         assert_eq!(
             symbols,
             vec![String::from("A"), String::from("B"), String::from("C")]
@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn mock_data_client_query() {
         let client = MockDataClient::new();
-        println!("{:?}", client);
+        // println!("{:?}", client);
         let asset = client.assets.get("A").unwrap();
         let ts = client.query(asset, &TODAY);
         // println!("{:?}", ts);

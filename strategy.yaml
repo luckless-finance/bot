@@ -1,10 +1,10 @@
 ---
 name: Example Strategy Document
 score:
-  calculation: sma_gap
-calculations:
+  calc: sma_gap
+calcs:
   - name: sma_gap
-    operation: div
+    operation: DIV
     operands:
       - name: numerator
         _type: ref
@@ -13,7 +13,7 @@ calculations:
         _type: ref
         value: sma50
   - name: sma_diff
-    operation: sub
+    operation: SUB
     operands:
       - name: left
         _type: ref
@@ -22,26 +22,26 @@ calculations:
         _type: ref
         value: sma200
   - name: sma50
-    operation: sma
+    operation: SMA
     operands:
       - name: window_size
         _type: i32
         value: "50"
-      - name: sequence
-        _type: query
+      - name: time_series
+        _type: ref
         value: close
   - name: sma200
-    operation: sma
+    operation: SMA
     operands:
       - name: window_size
         _type: i32
         value: "200"
-      - name: sequence
-        _type: query
+      - name: time_series
+        _type: ref
         value: close
   - name: close
-    operation: query
+    operation: QUERY
     operands:
-      - name: tbd
-        _type: tbd
-        value: tbd
+      - name: symbol
+        _type: symbol
+        value: GOOG

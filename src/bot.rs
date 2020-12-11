@@ -1,81 +1,132 @@
 #![allow(dead_code)]
-// #![allow(unused)]
 
 use std::collections::HashMap;
 
-use crate::dag::{to_dag, DagDTO};
-use crate::data::MockDataClient;
-use crate::dto::{CalculationDTO, StrategyDTO};
+use crate::dag::Dag;
+use crate::data::{Asset, MockDataClient};
+use crate::dto::{CalculationDTO, Operation, StrategyDTO};
+use crate::time_series::{TimeSeries1D, TimeStamp};
 
+#[derive(Debug, Clone)]
 pub struct Bot {
     strategy: StrategyDTO,
-    dag: DagDTO,
-    // TODO add calc_lkup
-    // calc_lkup: HashMap<String, CalculationDTO>,
+    dag: Dag,
+    calc_lkup: HashMap<String, CalculationDTO>,
 }
 
+#[derive(Debug)]
 pub struct ExecutableBot {
+    bot: Bot,
+    asset: Asset,
+    timestamp: TimeStamp,
     // TODO replace type with trait DataClient
     data_client: MockDataClient,
-    calculation_status_lkup: HashMap<String, CalculationStatus>,
+    calc_status_lkup: HashMap<String, CalculationStatus>,
+    calc_data_lkup: HashMap<String, TimeSeries1D>,
+}
+// TODO implement handlers and result memoization
+impl ExecutableBot {
+    fn execute(&mut self) {
+        let calc_order = &self.bot.dag.execution_order();
+        for calc_name in calc_order {
+            println!("\nexecuting {}", calc_name);
+            if let Some(calc_status) = self.calc_status_lkup.get_mut(calc_name) {
+                *calc_status = CalculationStatus::InProgress;
+            }
+            let calc = self.bot.calc_lkup.get(calc_name).expect("calc not found");
+            println!("{:?}", calc.operation());
+            match calc.operation() {
+                Operation::DIV => self.handle_div(calc),
+                Operation::SMA => self.handle_sma(calc),
+                Operation::SUB => self.handle_sub(calc),
+                Operation::QUERY => self.handle_query(calc),
+            }
+        }
+    }
+    fn handle_div(&self, calc: &CalculationDTO) {
+        println!("TODO execute {}", calc.name())
+    }
+    fn handle_sma(&self, calc: &CalculationDTO) {
+        println!("TODO execute {}", calc.name())
+    }
+    fn handle_sub(&self, calc: &CalculationDTO) {
+        println!("TODO execute {}", calc.name())
+    }
+    fn handle_query(&self, calc: &CalculationDTO) {
+        println!("TODO execute {}", calc.name())
+    }
 }
 
+#[derive(Debug, Clone)]
 pub enum CalculationStatus {
     NotStarted,
+    InProgress,
     Complete,
 }
 
 impl Bot {
     pub fn new(strategy: StrategyDTO) -> Box<Self> {
-        let dag = to_dag(&strategy).expect("unable to build bot");
-        // let calc_lkup: HashMap<String, CalculationDTO> = strategy
-        //     .calculations()
-        //     .iter()
-        //     .map(|calc| (calc.name().to_string(), calc.clone()))
-        //     .collect();
+        let dag = Dag::new(strategy.clone());
+        let calc_lkup: HashMap<String, CalculationDTO> = strategy
+            .calcs()
+            .iter()
+            .map(|calc| (calc.name().to_string(), calc.clone()))
+            .collect();
         Box::from(Bot {
             strategy,
             dag,
-            // calc_lkup,
+            calc_lkup,
         })
     }
-    fn dag(&self) -> &DagDTO {
+    fn dag(&self) -> &Dag {
         &self.dag
     }
     fn strategy(&self) -> &StrategyDTO {
         &self.strategy
     }
     pub fn calc(&self, name: &str) -> Result<&CalculationDTO, &str> {
-        let _calc = self
-            .strategy
-            .calculations()
-            .iter()
-            .find(|calc| calc.name() == name);
-        _calc.ok_or("not found")
+        self.calc_lkup.get(name).ok_or("not found")
     }
     pub fn queries(&self) -> Vec<&CalculationDTO> {
         self.strategy
-            .calculations()
+            .calcs()
             .iter()
-            .filter(|c| (c.operation()) == "query")
+            .filter(|c| (c.operation()) == &Operation::QUERY)
             .collect()
     }
-    //
-    // pub fn execute(&self, asset: &Asset, timestamp: &TimeStamp) -> () {
-    //     let _dag_node_output_lookup: HashMap<String, TimeSeries1D> = HashMap::new();
-    //
-    //     let _dag_node_output_lookup: HashMap<String, TimeSeries1D> = self
-    //         .queries()
-    //         .iter()
-    //         .map(|c| {
-    //             (
-    //                 c.name().to_string(),
-    //                 self.data_client.query(asset, timestamp),
-    //             )
-    //         })
-    //         .collect();
-    //     let _score_calc = self.strategy.score().calculation();
-    // }
+
+    pub fn as_executable(&self, asset: Asset, timestamp: TimeStamp) -> ExecutableBot {
+        ExecutableBot {
+            asset,
+            timestamp,
+            bot: self.clone(),
+            data_client: MockDataClient::new(),
+            calc_status_lkup: self
+                .strategy
+                .calcs()
+                .iter()
+                .map(|c| (c.name().to_string(), CalculationStatus::NotStarted))
+                .collect(),
+            calc_data_lkup: HashMap::new(),
+        }
+
+        // let calc_order = execution_order(self.dag());
+
+        //
+        // let _dag_node_output_lookup: HashMap<String, TimeSeries1D> = HashMap::new();
+        //
+        // let _dag_node_output_lookup: HashMap<String, TimeSeries1D> = self
+        //     .queries()
+        //     .iter()
+        //     .map(|c| {
+        //         (
+        //             c.name().to_string(),
+        //             self.data_client.query(asset, timestamp),
+        //         )
+        //     })
+        //     .collect();
+        // let _score_calc = self.strategy.score().calc();
+    }
 }
 
 #[cfg(test)]
@@ -83,6 +134,7 @@ mod tests {
     use std::path::Path;
 
     use crate::bot::Bot;
+    use crate::data::{Asset, TODAY};
     use crate::dto::from_path;
 
     fn bot_fixture() -> Box<Bot> {
@@ -91,12 +143,21 @@ mod tests {
     }
 
     #[test]
+    fn execute() {
+        let bot = bot_fixture();
+        let asset = Asset::new(String::from("A"));
+        let timestamp = TODAY;
+        let mut executable_bot = bot.as_executable(asset, timestamp);
+        executable_bot.execute();
+    }
+
+    #[test]
     fn queries() {
         let bot = bot_fixture();
         let close_queries = bot
             .queries()
             .iter()
-            .filter(|calculation| (**calculation).name() == "close")
+            .filter(|calc| (**calc).name() == "close")
             .count();
         assert_eq!(close_queries, 1);
     }
