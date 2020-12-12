@@ -167,10 +167,10 @@ mod tests {
 
     fn strategy_fixture() -> StrategyDTO {
         StrategyDTO::new(
-            String::from("Example Strategy Document"),
-            ScoreDTO::new(String::from("close1")),
+            String::from("Small Strategy Document"),
+            ScoreDTO::new(String::from("price")),
             vec![CalculationDTO::new(
-                String::from("close1"),
+                String::from("price"),
                 Operation::QUERY,
                 vec![OperandDTO::new(
                     String::from("field"),
