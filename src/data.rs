@@ -103,11 +103,12 @@ fn simulate(limit: usize) -> Vec<DataPointValue> {
 
 pub fn plot(x: Vec<f64>, y: Vec<f64>) {
     let mut fg = Figure::new();
-    let y_max: f64 = y.iter().cloned().fold(f64::NAN, f64::max) * 1.1;
-    let y_min: f64 = f64::min(y.iter().cloned().fold(f64::NAN, f64::min) * 0.9, 0f64);
-    // let y2: Vec<f64> = y.clone().iter().map(|e| *e - 10f64).collect();
-    // let yy: Vec<Vec<f64>> = vec![y.clone(), y2.clone()];
-    let graph = fg.axes2d()
+    let y_max: f64 = y.as_slice().iter()
+        .fold(f64::NAN, |a, b| f64::max(a, *b).clone()) * 1.1;
+    let mut y_min = y.as_slice().iter()
+        .fold(f64::NAN, |a, b| f64::min(a, *b).clone());
+    y_min = f64::min(y_min - y_min.abs() * 0.1, 0f64);
+    fg.axes2d()
         .set_title("Time Series Plot", &[])
         .set_legend(Graph(0.5), Graph(0.9), &[], &[])
         .set_x_label("timestamp", &[])
@@ -118,7 +119,6 @@ pub fn plot(x: Vec<f64>, y: Vec<f64>) {
             y,
             &[Caption("Price")],
         );
-    // graph.lines(x.clone(), y2, &[Caption("Lower Price")]);
     fg.show().unwrap();
 }
 
