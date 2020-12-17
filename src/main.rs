@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate approx;
+
 use std::env::current_dir;
 use std::path::Path;
 
