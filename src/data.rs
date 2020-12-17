@@ -6,13 +6,13 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::Index;
 
-use gnuplot::{AxesCommon, Figure};
 use gnuplot::AutoOption::Fix;
 use gnuplot::Coordinate::Graph;
 use gnuplot::PlotOption::Caption;
+use gnuplot::{AxesCommon, Figure};
 use rand::thread_rng;
-use rand_distr::{Distribution, Normal};
 use rand_distr::num_traits::Pow;
+use rand_distr::{Distribution, Normal};
 
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
@@ -101,11 +101,43 @@ fn simulate(limit: usize) -> Vec<DataPointValue> {
     values
 }
 
+pub fn plots(x: Vec<f64>, ys: Vec<Vec<f64>>) {
+    let mut fg = Figure::new();
+    let y_max: f64 = ys
+        .as_slice()
+        .iter()
+        .flatten()
+        .fold(f64::NAN, |a, b| f64::max(a, *b).clone())
+        * 1.1;
+    let mut y_min = ys
+        .as_slice()
+        .iter()
+        .flatten()
+        .fold(f64::NAN, |a, b| f64::min(a, *b).clone());
+    y_min = f64::min(y_min - y_min.abs() * 0.1, 0f64);
+    let axis = fg
+        .axes2d()
+        .set_title("Time Series Plot", &[])
+        .set_legend(Graph(0.5), Graph(0.9), &[], &[])
+        .set_x_label("timestamp", &[])
+        .set_y_label("values", &[])
+        .set_y_range(Fix::<f64>(y_min), Fix::<f64>(y_max));
+    for i in 0..ys.len() {
+        axis.lines(x.clone(), ys.get(i).unwrap(), &[Caption(&format!("{}", i))]);
+    }
+    fg.show().unwrap();
+}
+
 pub fn plot(x: Vec<f64>, y: Vec<f64>) {
     let mut fg = Figure::new();
-    let y_max: f64 = y.as_slice().iter()
-        .fold(f64::NAN, |a, b| f64::max(a, *b).clone()) * 1.1;
-    let mut y_min = y.as_slice().iter()
+    let y_max: f64 = y
+        .as_slice()
+        .iter()
+        .fold(f64::NAN, |a, b| f64::max(a, *b).clone())
+        * 1.1;
+    let mut y_min = y
+        .as_slice()
+        .iter()
         .fold(f64::NAN, |a, b| f64::min(a, *b).clone());
     y_min = f64::min(y_min - y_min.abs() * 0.1, 0f64);
     fg.axes2d()
@@ -114,11 +146,7 @@ pub fn plot(x: Vec<f64>, y: Vec<f64>) {
         .set_x_label("timestamp", &[])
         .set_y_label("values", &[])
         .set_y_range(Fix::<f64>(y_min), Fix::<f64>(y_max))
-        .lines(
-            x.clone(),
-            y,
-            &[Caption("Price")],
-        );
+        .lines(x.clone(), y, &[Caption("Price")]);
     fg.show().unwrap();
 }
 
@@ -127,7 +155,7 @@ fn sin(x: &[f64], period: f64, amplitude: f64, offset: f64) -> Vec<f64> {
     assert_eq!(x_max, 1f64);
     x.iter()
         .map(|x| period * PI * 2.0 * *x as f64 / 1 as f64)
-        .map(|x| amplitude * x.sin() + offset)// 1 period
+        .map(|x| amplitude * x.sin() + offset) // 1 period
         .collect()
 }
 
@@ -135,7 +163,7 @@ fn parabola(x: &[f64], amplitude: f64, offset: f64) -> Vec<f64> {
     x.iter()
         .map(|x| *x * 2f64 - 1f64)
         .map(|x| x.pow(2f64))
-        .map(|x| amplitude * x + offset)// 1 period
+        .map(|x| amplitude * x + offset) // 1 period
         .collect()
 }
 
@@ -144,7 +172,7 @@ fn add(a: &[f64], b: &[f64]) -> Vec<f64> {
     let mut y: Vec<f64> = Vec::with_capacity(a.len());
     for i in 0..=a.len() {
         y.insert(i, a[i] + b[i]);
-    };
+    }
     y
 }
 
@@ -156,13 +184,17 @@ fn sum(v: &[&[f64]]) -> Vec<f64> {
             temp += v[j][i];
         }
         y.insert(i, temp);
-    };
+    }
     y
 }
 
+// TODO proper linspace builder
 fn x(n: usize) -> Vec<f64> {
     let (xi, xf) = (0, n);
-    (xi..=xf).into_iter().map(|x| x as f64 / xf as f64).collect()
+    (xi..=xf)
+        .into_iter()
+        .map(|x| x as f64 / xf as f64)
+        .collect()
 }
 
 fn _polynomial(xi: &f64, coefficients: &[f64]) -> f64 {
@@ -170,7 +202,7 @@ fn _polynomial(xi: &f64, coefficients: &[f64]) -> f64 {
     for i in 0..coefficients.len() {
         // println!("{} + {}**{}", sum, xi, i);
         sum = sum + coefficients[i] * xi.pow(i as f64);
-    };
+    }
     // println!("sum={:?}", &sum);
     sum
 }
@@ -178,7 +210,6 @@ fn _polynomial(xi: &f64, coefficients: &[f64]) -> f64 {
 fn polynomial(xi: &[f64], coefficients: &[f64]) -> Vec<f64> {
     xi.iter().map(|x| _polynomial(x, coefficients)).collect()
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -189,7 +220,9 @@ mod tests {
 
     use rand_distr::num_traits::AsPrimitive;
 
-    use crate::data::{_polynomial, DATA_SIZE, MockDataClient, plot, polynomial, sin, sum, TODAY, x};
+    use crate::data::{
+        _polynomial, plot, plots, polynomial, sin, sum, x, MockDataClient, DATA_SIZE, TODAY,
+    };
 
     const EPSILON: f64 = 1E-10;
 
@@ -249,11 +282,11 @@ mod tests {
     fn test_sin() {
         let x = x(100);
         let y = sin(&x, 1.as_(), 1.as_(), 0.as_());
-        assert_abs_diff_eq!(y[0], 0f64, epsilon= EPSILON);
-        assert_abs_diff_eq!(y[25], 1f64, epsilon= EPSILON);
-        assert_abs_diff_eq!(y[50], 0f64, epsilon= EPSILON);
-        assert_abs_diff_eq!(y[75], -1f64, epsilon= EPSILON);
-        assert_abs_diff_eq!(y[100], 0f64, epsilon= EPSILON);
+        assert_abs_diff_eq!(y[0], 0f64, epsilon = EPSILON);
+        assert_abs_diff_eq!(y[25], 1f64, epsilon = EPSILON);
+        assert_abs_diff_eq!(y[50], 0f64, epsilon = EPSILON);
+        assert_abs_diff_eq!(y[75], -1f64, epsilon = EPSILON);
+        assert_abs_diff_eq!(y[100], 0f64, epsilon = EPSILON);
     }
 
     #[test]
@@ -291,8 +324,8 @@ mod tests {
         let offset = 100f64;
         let y1 = sin(&x, (0.5).as_(), 50.as_(), 0.as_());
         let y2 = sin(&x, 4.as_(), 10.as_(), 0.as_());
-        // let y11 = y1.clone();
-        // let y22 = y2.clone();
+        let y11 = y1.clone();
+        let y22 = y2.clone();
         let mut y: Vec<f64> = Vec::with_capacity(100);
         for i in 0..=100 {
             y.insert(i, y1[i] + y2[i] + offset);
@@ -300,7 +333,7 @@ mod tests {
         println!("{:?}", x);
         println!("{:?}", y);
         // plot(x, y);
-        // plots(x, vec![y, y11, y22]);
+        plots(x, vec![y, y11, y22]);
     }
 
     #[test]

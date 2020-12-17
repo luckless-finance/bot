@@ -4,9 +4,9 @@ extern crate approx;
 use std::env::current_dir;
 use std::path::Path;
 
-use gnuplot::{AxesCommon, Figure};
 use gnuplot::Coordinate::Graph;
 use gnuplot::PlotOption::Caption;
+use gnuplot::{AxesCommon, Figure};
 
 use crate::dag::to_dag;
 use crate::dto::{from_path, StrategyDTO};
