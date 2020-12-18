@@ -18,19 +18,20 @@ use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
 static DATA_SIZE: usize = 10_000;
 pub static TODAY: usize = DATA_SIZE;
+pub type Symbol = String;
 
 pub trait DataClient {
-    fn asset(&self, symbol: String) -> Result<&Asset, &str>;
+    fn asset(&self, symbol: Symbol) -> Result<&Asset, &str>;
     fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> Result<TimeSeries1D, &str>;
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub struct Asset {
-    symbol: String,
+    symbol: Symbol,
 }
 
 impl Asset {
-    pub fn new(symbol: String) -> Self {
+    pub fn new(symbol: Symbol) -> Self {
         Asset { symbol }
     }
 }
@@ -43,11 +44,11 @@ impl Display for Asset {
 
 #[derive(Debug)]
 pub struct MockDataClient {
-    assets: HashMap<String, Asset>,
+    assets: HashMap<Symbol, Asset>,
 }
 
 impl DataClient for MockDataClient {
-    fn asset(&self, symbol: String) -> Result<&Asset, &str> {
+    fn asset(&self, symbol: Symbol) -> Result<&Asset, &str> {
         Ok(self.assets.index(symbol.as_str()))
     }
 
@@ -68,16 +69,16 @@ impl MockDataClient {
     pub fn new() -> Self {
         MockDataClient {
             assets: vec![
-                (String::from("A"), Asset::new(String::from("A"))),
-                (String::from("B"), Asset::new(String::from("B"))),
-                (String::from("C"), Asset::new(String::from("C"))),
+                (Symbol::from("A"), Asset::new(Symbol::from("A"))),
+                (Symbol::from("B"), Asset::new(Symbol::from("B"))),
+                (Symbol::from("C"), Asset::new(Symbol::from("C"))),
             ]
             .into_iter()
             .collect(),
         }
     }
     // TODO make this private
-    pub fn assets(&self) -> &HashMap<String, Asset> {
+    pub fn assets(&self) -> &HashMap<Symbol, Asset> {
         &self.assets
     }
     pub fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> TimeSeries1D {
@@ -231,7 +232,7 @@ mod tests {
     use rand_distr::num_traits::AsPrimitive;
 
     use crate::data::{
-        _polynomial, plot, plots, polynomial, sin, sum, x, MockDataClient, DATA_SIZE, TODAY,
+        _polynomial, plot, plots, polynomial, sin, sum, x, MockDataClient, Symbol, DATA_SIZE, TODAY,
     };
 
     const EPSILON: f64 = 1E-10;
@@ -240,11 +241,11 @@ mod tests {
     fn mock_data_client_assets() {
         let client = MockDataClient::new();
         // println!("{:?}", client);
-        let symbols: HashSet<&String> = client.assets().keys().collect();
+        let symbols: HashSet<&Symbol> = client.assets().keys().collect();
         // println!("{:?}", symbols);
         assert_eq!(
             symbols,
-            vec![String::from("A"), String::from("B"), String::from("C")]
+            vec![Symbol::from("A"), Symbol::from("B"), Symbol::from("C")]
                 .iter()
                 .collect()
         )
