@@ -29,60 +29,157 @@ pub struct ExecutableBot {
 
 // TODO implement handlers and result memoization
 impl ExecutableBot {
-    fn execute(&mut self) {
-        let calc_order = &self.bot.dag.execution_order();
-        for calc_name in calc_order {
-            println!("\nexecuting {}", calc_name);
-            if let Some(calc_status) = self.calc_status_lkup.get_mut(calc_name) {
-                *calc_status = CalculationStatus::InProgress;
-            }
-            let calc = self.bot.calc_lkup.get(calc_name).expect("calc not found");
-            println!("{:?}", calc.operation());
-            self.calc_data_lkup.insert(
-                calc_name.clone(),
-                match calc.operation() {
-                    Operation::DIV => self.handle_div(calc),
-                    Operation::SMA => self.handle_sma(calc),
-                    Operation::SUB => self.handle_sub(calc),
-                    Operation::QUERY => self.handle_query(calc),
-                },
-            );
+    fn set_status(&mut self, calc_name: &str, new_calc_status: CalculationStatus) {
+        if let Some(calc_status) = self.calc_status_lkup.get_mut(calc_name) {
+            *calc_status = new_calc_status;
         }
     }
-    fn handle_div(&self, calc: &CalculationDTO) -> TimeSeries1D {
-        assert_eq!(*calc.operation(), Operation::DIV);
-        println!("TODO execute {}", calc.name());
-        let values = vec![5., 10., 15.];
-        let index = vec![1, 3, 4];
-        TimeSeries1D::new(index, values)
+
+    /// Traverse `Dag` executing each node for given `Asset` as of `Timestamp`
+    fn execute(&mut self) -> Result<(), String> {
+        let calc_order = &self.bot.dag.execution_order();
+        for calc_name in calc_order {
+            // println!("\nexecuting {}", calc_name);
+            self.set_status(calc_name, CalculationStatus::InProgress);
+            let calc = self.bot.calc_lkup.get(calc_name).unwrap();
+            // println!("{:?}", calc?.operation());
+
+            let calc_time_series = match calc.operation() {
+                Operation::DIV => foo_handle_div(
+                    calc,
+                    &self.calc_data_lkup,
+                    &self.data_client,
+                    &self.asset,
+                    &self.timestamp,
+                ),
+                Operation::SMA => foo_handle_sma(
+                    calc,
+                    &self.calc_data_lkup,
+                    &self.data_client,
+                    &self.asset,
+                    &self.timestamp,
+                ),
+                Operation::SUB => foo_handle_sub(
+                    calc,
+                    &self.calc_data_lkup,
+                    &self.data_client,
+                    &self.asset,
+                    &self.timestamp,
+                ),
+                Operation::QUERY => foo_handle_query(
+                    calc,
+                    &self.calc_data_lkup,
+                    &self.data_client,
+                    &self.asset,
+                    &self.timestamp,
+                ),
+            };
+
+            if calc_time_series.is_err() {
+                self.set_status(calc_name, CalculationStatus::Error);
+            };
+
+            self.calc_data_lkup
+                .insert(calc_name.clone(), calc_time_series?);
+        }
+        Ok(())
     }
-    fn handle_sma(&self, calc: &CalculationDTO) -> TimeSeries1D {
-        assert_eq!(*calc.operation(), Operation::SMA);
-        println!("TODO execute {}", calc.name());
-        let values = vec![5., 10., 15.];
-        let index = vec![1, 3, 4];
-        TimeSeries1D::new(index, values)
-    }
-    fn handle_sub(&self, calc: &CalculationDTO) -> TimeSeries1D {
-        assert_eq!(*calc.operation(), Operation::SUB);
-        println!("TODO execute {}", calc.name());
-        let values = vec![5., 10., 15.];
-        let index = vec![1, 3, 4];
-        TimeSeries1D::new(index, values)
-    }
-    fn handle_query(&self, calc: &CalculationDTO) -> TimeSeries1D {
-        assert_eq!(*calc.operation(), Operation::QUERY);
-        println!("TODO execute {}", calc.name());
-        let name = "field";
-        // TODO parameterized query
-        let _field: &str = calc
-            .operands()
-            .iter()
-            .find(|o| o.name() == name)
-            .expect("symbol operand not found")
-            .value();
-        self.data_client.query(&self.asset, &TODAY)
-    }
+    // fn handle_div(&mut self, calc: &CalculationDTO) -> Result<TimeSeries1D, &str> {
+    //     assert_eq!(*calc.operation(), Operation::DIV);
+    //     println!("TODO execute {}", calc.name());
+    //     let values = vec![5., 10., 15.];
+    //     let index = vec![1, 3, 4];
+    //     Ok(TimeSeries1D::new(index, values))
+    // }
+    // fn handle_sma(&mut self, calc: &CalculationDTO) -> Result<TimeSeries1D, &str> {
+    //     assert_eq!(*calc.operation(), Operation::SMA);
+    //     println!("TODO execute {}", calc.name());
+    //     let values = vec![5., 10., 15.];
+    //     let index = vec![1, 3, 4];
+    //     Ok(TimeSeries1D::new(index, values))
+    // }
+    // fn handle_sub(&mut self, calc: &CalculationDTO) -> Result<TimeSeries1D, &str> {
+    //     assert_eq!(*calc.operation(), Operation::SUB);
+    //     println!("TODO execute {}", calc.name());
+    //     let values = vec![5., 10., 15.];
+    //     let index = vec![1, 3, 4];
+    //     Ok(TimeSeries1D::new(index, values))
+    // }
+    // fn handle_query(&mut self, calc: &CalculationDTO) -> Result<TimeSeries1D, &str> {
+    //     assert_eq!(*calc.operation(), Operation::QUERY);
+    //     println!("TODO execute {}", calc.name());
+    //     let name = "field";
+    //     // TODO parameterized query
+    //     let _field: &str = calc
+    //         .operands()
+    //         .iter()
+    //         .find(|o| o.name() == name)
+    //         .expect("symbol operand not found")
+    //         .value();
+    //     self.data_client.query(&self.asset, &TODAY)
+    // }
+}
+
+fn foo_handle_div(
+    calc: &CalculationDTO,
+    calc_data_lookup: &HashMap<String, TimeSeries1D>,
+    data_client: &MockDataClient,
+    asset: &Asset,
+    timestamp: &TimeStamp,
+) -> Result<TimeSeries1D, String> {
+    assert_eq!(*calc.operation(), Operation::DIV);
+    println!("TODO execute {}", calc.name());
+    let values = vec![5., 10., 15.];
+    let index = vec![1, 3, 4];
+    Ok(TimeSeries1D::new(index, values))
+}
+
+fn foo_handle_sma(
+    calc: &CalculationDTO,
+    calc_data_lookup: &HashMap<String, TimeSeries1D>,
+    data_client: &MockDataClient,
+    asset: &Asset,
+    timestamp: &TimeStamp,
+) -> Result<TimeSeries1D, String> {
+    assert_eq!(*calc.operation(), Operation::SMA);
+    println!("TODO execute {}", calc.name());
+    let values = vec![5., 10., 15.];
+    let index = vec![1, 3, 4];
+    Ok(TimeSeries1D::new(index, values))
+}
+
+fn foo_handle_sub(
+    calc: &CalculationDTO,
+    calc_data_lookup: &HashMap<String, TimeSeries1D>,
+    data_client: &MockDataClient,
+    asset: &Asset,
+    timestamp: &TimeStamp,
+) -> Result<TimeSeries1D, String> {
+    assert_eq!(*calc.operation(), Operation::SUB);
+    println!("TODO execute {}", calc.name());
+    let values = vec![5., 10., 15.];
+    let index = vec![1, 3, 4];
+    Ok(TimeSeries1D::new(index, values))
+}
+
+fn foo_handle_query(
+    calc: &CalculationDTO,
+    calc_data_lookup: &HashMap<String, TimeSeries1D>,
+    data_client: &MockDataClient,
+    asset: &Asset,
+    timestamp: &TimeStamp,
+) -> Result<TimeSeries1D, String> {
+    assert_eq!(*calc.operation(), Operation::QUERY);
+    println!("TODO execute {}", calc.name());
+    let name = "field";
+    // TODO parameterized query
+    let _field: &str = calc
+        .operands()
+        .iter()
+        .find(|o| o.name() == name)
+        .expect("symbol operand not found")
+        .value();
+    data_client.query(&asset, &timestamp)
 }
 
 #[derive(Debug, Clone)]
@@ -90,6 +187,7 @@ pub enum CalculationStatus {
     NotStarted,
     InProgress,
     Complete,
+    Error,
 }
 
 impl Bot {

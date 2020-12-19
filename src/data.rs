@@ -81,14 +81,15 @@ impl MockDataClient {
     pub fn assets(&self) -> &HashMap<Symbol, Asset> {
         &self.assets
     }
-    pub fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> TimeSeries1D {
+    // TODO learn how to use traits
+    pub(crate) fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, String> {
         assert!(
             self.assets.contains_key(&asset.symbol),
             "query for {} at {} failed",
             asset,
             timestamp
         );
-        TimeSeries1D::from_values(simulate_trig(DATA_SIZE))
+        Ok(TimeSeries1D::from_values(simulate_random(DATA_SIZE)))
     }
 }
 
@@ -256,7 +257,7 @@ mod tests {
         let client = MockDataClient::new();
         // println!("{:?}", client);
         let asset = client.assets.get("A").unwrap();
-        let ts = client.query(asset, &TODAY);
+        let ts = client.query(asset, &TODAY).unwrap();
         // println!("{:?}", ts);
         assert_eq!(ts.len(), DATA_SIZE);
     }
