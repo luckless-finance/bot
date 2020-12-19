@@ -7,6 +7,7 @@ use crate::data::{Asset, MockDataClient, TODAY};
 use crate::dto::{CalculationDTO, Operation, StrategyDTO};
 use crate::time_series::{TimeSeries1D, TimeStamp};
 
+/// Wraps several DTOs required traverse and consume a strategy
 #[derive(Debug, Clone)]
 pub struct Bot {
     strategy: StrategyDTO,
@@ -14,6 +15,7 @@ pub struct Bot {
     calc_lkup: HashMap<String, CalculationDTO>,
 }
 
+/// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
 #[derive(Debug)]
 pub struct ExecutableBot {
     bot: Bot,
@@ -121,7 +123,12 @@ impl Bot {
             .collect()
     }
 
-    pub fn as_executable(&self, asset: Asset, timestamp: TimeStamp, data_client: MockDataClient) -> ExecutableBot {
+    pub fn as_executable(
+        &self,
+        asset: Asset,
+        timestamp: TimeStamp,
+        data_client: MockDataClient,
+    ) -> ExecutableBot {
         ExecutableBot {
             asset,
             timestamp,
@@ -160,7 +167,7 @@ mod tests {
     use std::path::Path;
 
     use crate::bot::Bot;
-    use crate::data::{Asset, TODAY, MockDataClient};
+    use crate::data::{Asset, MockDataClient, TODAY};
     use crate::dto::{
         from_path, CalculationDTO, OperandDTO, OperandType, Operation, ScoreDTO, StrategyDTO,
     };
