@@ -3,6 +3,18 @@
 help:
 	@./utils/make-help.pl
 
+clean:
+	@echo "-------------------"
+	@echo "delete generated artifacts"
+	@echo "-------------------"
+	rm -fr target
+
+docs:
+	@echo "-------------------"
+	@echo "make and open docs"
+	@echo "-------------------"
+	cargo doc --open --no-deps
+
 format:
 	@echo "-------------------"
 	@echo "format source code"
