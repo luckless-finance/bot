@@ -121,12 +121,12 @@ impl Bot {
             .collect()
     }
 
-    pub fn as_executable(&self, asset: Asset, timestamp: TimeStamp) -> ExecutableBot {
+    pub fn as_executable(&self, asset: Asset, timestamp: TimeStamp, data_client: MockDataClient) -> ExecutableBot {
         ExecutableBot {
             asset,
             timestamp,
             bot: self.clone(),
-            data_client: MockDataClient::new(),
+            data_client,
             calc_status_lkup: self
                 .strategy
                 .calcs()
@@ -160,7 +160,7 @@ mod tests {
     use std::path::Path;
 
     use crate::bot::Bot;
-    use crate::data::{Asset, TODAY};
+    use crate::data::{Asset, TODAY, MockDataClient};
     use crate::dto::{
         from_path, CalculationDTO, OperandDTO, OperandType, Operation, ScoreDTO, StrategyDTO,
     };
@@ -191,7 +191,8 @@ mod tests {
         let bot = bot_fixture();
         let asset = Asset::new(String::from("A"));
         let timestamp = TODAY;
-        let mut executable_bot = bot.as_executable(asset, timestamp);
+        let data_client = MockDataClient::new();
+        let mut executable_bot = bot.as_executable(asset, timestamp, data_client);
         executable_bot.execute();
     }
 
