@@ -11,26 +11,27 @@ use gnuplot::Coordinate::Graph;
 use gnuplot::PlotOption::Caption;
 use gnuplot::{AxesCommon, Figure};
 use rand::thread_rng;
-use rand_distr::num_traits::Pow;
+use rand_distr::num_traits::{AsPrimitive, Pow};
 use rand_distr::{Distribution, Normal};
 
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
 static DATA_SIZE: usize = 10_000;
 pub static TODAY: usize = DATA_SIZE;
+pub type Symbol = String;
 
 pub trait DataClient {
-    fn asset(&self, symbol: String) -> Result<&Asset, &str>;
+    fn asset(&self, symbol: Symbol) -> Result<&Asset, &str>;
     fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> Result<TimeSeries1D, &str>;
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub struct Asset {
-    symbol: String,
+    symbol: Symbol,
 }
 
 impl Asset {
-    pub fn new(symbol: String) -> Self {
+    pub fn new(symbol: Symbol) -> Self {
         Asset { symbol }
     }
 }
@@ -43,14 +44,16 @@ impl Display for Asset {
 
 #[derive(Debug)]
 pub struct MockDataClient {
-    assets: HashMap<String, Asset>,
+    assets: HashMap<Symbol, Asset>,
 }
 
 impl DataClient for MockDataClient {
-    fn asset(&self, symbol: String) -> Result<&Asset, &str> {
+    fn asset(&self, symbol: Symbol) -> Result<&Asset, &str> {
         Ok(self.assets.index(symbol.as_str()))
     }
 
+    // FIXME this is not called.
+    // TODO learn how to use traits
     fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, &str> {
         assert!(
             self.assets.contains_key(&asset.symbol),
@@ -58,7 +61,7 @@ impl DataClient for MockDataClient {
             asset,
             timestamp
         );
-        Ok(TimeSeries1D::from_values(simulate(DATA_SIZE)))
+        Ok(TimeSeries1D::from_values(simulate_random(DATA_SIZE)))
     }
 }
 
@@ -66,16 +69,16 @@ impl MockDataClient {
     pub fn new() -> Self {
         MockDataClient {
             assets: vec![
-                (String::from("A"), Asset::new(String::from("A"))),
-                (String::from("B"), Asset::new(String::from("B"))),
-                (String::from("C"), Asset::new(String::from("C"))),
+                (Symbol::from("A"), Asset::new(Symbol::from("A"))),
+                (Symbol::from("B"), Asset::new(Symbol::from("B"))),
+                (Symbol::from("C"), Asset::new(Symbol::from("C"))),
             ]
             .into_iter()
             .collect(),
         }
     }
     // TODO make this private
-    pub fn assets(&self) -> &HashMap<String, Asset> {
+    pub fn assets(&self) -> &HashMap<Symbol, Asset> {
         &self.assets
     }
     pub fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> TimeSeries1D {
@@ -85,11 +88,11 @@ impl MockDataClient {
             asset,
             timestamp
         );
-        TimeSeries1D::from_values(simulate(DATA_SIZE))
+        TimeSeries1D::from_values(simulate_trig(DATA_SIZE))
     }
 }
 
-fn simulate(limit: usize) -> Vec<DataPointValue> {
+fn simulate_random(limit: usize) -> Vec<DataPointValue> {
     let mut x: DataPointValue = 100.0;
     let mut values: Vec<DataPointValue> = Vec::new();
     let mut ran = thread_rng();
@@ -99,6 +102,14 @@ fn simulate(limit: usize) -> Vec<DataPointValue> {
         values.push(x);
     }
     values
+}
+
+fn simulate_trig(limit: usize) -> Vec<DataPointValue> {
+    let x = x(limit);
+    let y1 = sin(&x, (0.5).as_(), 50.as_(), 0.as_());
+    let y2 = sin(&x, 4.as_(), 10.as_(), 0.as_());
+    let offset = polynomial(&x, &[100f64]);
+    sum(&[y1.as_slice(), y2.as_slice(), offset.as_slice()])
 }
 
 pub fn plots(x: Vec<f64>, ys: Vec<Vec<f64>>) {
@@ -191,9 +202,9 @@ fn sum(v: &[&[f64]]) -> Vec<f64> {
 // TODO proper linspace builder
 fn x(n: usize) -> Vec<f64> {
     let (xi, xf) = (0, n);
-    (xi..=xf)
+    (xi..xf)
         .into_iter()
-        .map(|x| x as f64 / xf as f64)
+        .map(|x| x as f64 / (xf - 1) as f64)
         .collect()
 }
 
@@ -221,7 +232,7 @@ mod tests {
     use rand_distr::num_traits::AsPrimitive;
 
     use crate::data::{
-        _polynomial, plot, plots, polynomial, sin, sum, x, MockDataClient, DATA_SIZE, TODAY,
+        _polynomial, plot, plots, polynomial, sin, sum, x, MockDataClient, Symbol, DATA_SIZE, TODAY,
     };
 
     const EPSILON: f64 = 1E-10;
@@ -230,11 +241,11 @@ mod tests {
     fn mock_data_client_assets() {
         let client = MockDataClient::new();
         // println!("{:?}", client);
-        let symbols: HashSet<&String> = client.assets().keys().collect();
+        let symbols: HashSet<&Symbol> = client.assets().keys().collect();
         // println!("{:?}", symbols);
         assert_eq!(
             symbols,
-            vec![String::from("A"), String::from("B"), String::from("C")]
+            vec![Symbol::from("A"), Symbol::from("B"), Symbol::from("C")]
                 .iter()
                 .collect()
         )
@@ -252,18 +263,16 @@ mod tests {
 
     #[test]
     fn lin_space_test() {
-        assert_eq!(x(1)[0], 0f64);
+        assert!(x(1)[0].is_nan());
         assert_eq!(x(2)[0], 0f64);
         assert_eq!(x(3)[0], 0f64);
-        assert_eq!(x(1).len(), 2);
-        assert_eq!(x(2).len(), 3);
-        assert_eq!(x(3).len(), 4);
-        assert_eq!(x(100).len(), 101);
-        assert_eq!(x(1)[1], 1f64);
-        assert_eq!(x(2)[2], 1f64);
-        assert_eq!(x(3)[3], 1f64);
-        assert_eq!(x(100)[100], 1f64);
-        assert_eq!(x(5), vec![0f64, 0.2f64, 0.4f64, 0.6f64, 0.8f64, 1.0f64])
+        assert_eq!(x(2).len(), 2);
+        assert_eq!(x(3).len(), 3);
+        assert_eq!(x(100).len(), 100);
+        assert_eq!(x(2)[1], 1f64);
+        assert_eq!(x(3)[2], 1f64);
+        assert_eq!(x(100)[99], 1f64);
+        assert_eq!(x(6), vec![0f64, 0.2f64, 0.4f64, 0.6f64, 0.8f64, 1.0f64])
     }
 
     #[test]
@@ -280,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_sin() {
-        let x = x(100);
+        let x = x(101);
         let y = sin(&x, 1.as_(), 1.as_(), 0.as_());
         assert_abs_diff_eq!(y[0], 0f64, epsilon = EPSILON);
         assert_abs_diff_eq!(y[25], 1f64, epsilon = EPSILON);
@@ -327,12 +336,11 @@ mod tests {
         let y11 = y1.clone();
         let y22 = y2.clone();
         let mut y: Vec<f64> = Vec::with_capacity(100);
-        for i in 0..=100 {
+        for i in 0..100 {
             y.insert(i, y1[i] + y2[i] + offset);
         }
         println!("{:?}", x);
         println!("{:?}", y);
-        // plot(x, y);
         plots(x, vec![y, y11, y22]);
     }
 
