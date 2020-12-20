@@ -16,7 +16,7 @@ use rand_distr::{Distribution, Normal};
 
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
-static DATA_SIZE: usize = 10_000;
+pub static DATA_SIZE: usize = 10_000;
 pub static TODAY: usize = DATA_SIZE;
 pub type Symbol = String;
 

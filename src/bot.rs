@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 
 use crate::dag::Dag;
-use crate::data::{Asset, MockDataClient, TODAY};
+use crate::data::{Asset, DataClient, MockDataClient, DATA_SIZE, TODAY};
 use crate::dto::{CalculationDTO, Operation, StrategyDTO};
-use crate::time_series::{TimeSeries1D, TimeStamp};
+use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
 /// Wraps several DTOs required traverse and consume a strategy
 #[derive(Debug, Clone)]
@@ -16,7 +16,7 @@ pub struct Bot {
 }
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct ExecutableBot {
     strategy: StrategyDTO,
     dag: Dag,
@@ -24,7 +24,7 @@ pub struct ExecutableBot {
     asset: Asset,
     timestamp: TimeStamp,
     // TODO replace type with trait DataClient
-    data_client: Box<MockDataClient>,
+    data_client: Box<dyn DataClient>,
     calc_status_lkup: HashMap<String, CalculationStatus>,
     calc_data_lkup: HashMap<String, TimeSeries1D>,
 }
@@ -68,24 +68,24 @@ impl ExecutableBot {
     fn handle_div(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::DIV);
         println!("TODO execute {}", calc.name());
-        let values = vec![5., 10., 15.];
-        let index = vec![1, 3, 4];
+        let index: Vec<TimeStamp> = (0..DATA_SIZE).collect();
+        let values: Vec<DataPointValue> = (0..DATA_SIZE).map(|x| x as f64).collect();
         Ok(TimeSeries1D::new(index, values))
     }
 
     fn handle_sma(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::SMA);
         println!("TODO execute {}", calc.name());
-        let values = vec![5., 10., 15.];
-        let index = vec![1, 3, 4];
+        let index: Vec<TimeStamp> = (0..DATA_SIZE).collect();
+        let values: Vec<DataPointValue> = (0..DATA_SIZE).map(|x| x as f64).collect();
         Ok(TimeSeries1D::new(index, values))
     }
 
     fn handle_sub(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::SUB);
         println!("TODO execute {}", calc.name());
-        let values = vec![5., 10., 15.];
-        let index = vec![1, 3, 4];
+        let index: Vec<TimeStamp> = (0..DATA_SIZE).collect();
+        let values: Vec<DataPointValue> = (0..DATA_SIZE).map(|x| x as f64).collect();
         Ok(TimeSeries1D::new(index, values))
     }
 
@@ -172,7 +172,7 @@ mod tests {
     use std::path::Path;
 
     use crate::bot::Bot;
-    use crate::data::{Asset, MockDataClient, TODAY};
+    use crate::data::{Asset, MockDataClient, DATA_SIZE, TODAY};
     use crate::dto::{
         from_path, CalculationDTO, OperandDTO, OperandType, Operation, ScoreDTO, StrategyDTO,
     };
@@ -206,6 +206,10 @@ mod tests {
         let data_client = MockDataClient::new();
         let mut executable_bot = bot.as_executable(asset, timestamp, Box::new(data_client));
         executable_bot.execute();
+        executable_bot
+            .calc_data_lkup
+            .values()
+            .for_each(|time_series| assert_eq!(time_series.len(), DATA_SIZE));
     }
 
     #[test]
