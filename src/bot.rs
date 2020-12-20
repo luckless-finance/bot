@@ -39,11 +39,11 @@ impl ExecutableBot {
 
     /// Traverse `Dag` executing each node for given `Asset` as of `Timestamp`
     fn execute(&mut self) -> Result<(), String> {
-        let calc_order = &self.dag.execution_order();
+        let calc_order = self.dag.execution_order().clone();
         for calc_name in calc_order {
             // println!("\nexecuting {}", calc_name);
-            self.set_status(calc_name, CalculationStatus::InProgress);
-            let calc = self.calc_lkup.get(calc_name).unwrap();
+            self.set_status(&calc_name, CalculationStatus::InProgress);
+            let calc = self.calc_lkup.get(&calc_name).unwrap();
             // println!("{:?}", calc?.operation());
 
             let calc_time_series = match calc.operation() {
@@ -78,7 +78,7 @@ impl ExecutableBot {
             };
 
             if calc_time_series.is_err() {
-                self.set_status(calc_name, CalculationStatus::Error);
+                self.set_status(&calc_name, CalculationStatus::Error);
             };
 
             self.calc_data_lkup

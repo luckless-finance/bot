@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+// #![allow(unused)]
 
 use std::collections::HashMap;
 use std::env::current_dir;
@@ -16,6 +17,7 @@ use crate::dto::{OperandType, StrategyDTO};
 pub struct Dag {
     dag_dto: DagDTO,
     node_lkup: HashMap<String, NodeIndex>,
+    execution_order: Vec<String>,
 }
 
 impl Dag {
@@ -26,7 +28,22 @@ impl Dag {
             .into_iter()
             .map(|idx| (dag_dto.node_weight(idx).expect("impossible").clone(), idx))
             .collect();
-        Dag { dag_dto, node_lkup }
+        let execution_order = Dag::compute_execution_order(&dag_dto);
+        Dag {
+            dag_dto,
+            node_lkup,
+            execution_order,
+        }
+    }
+    fn compute_execution_order(dag_dto: &DagDTO) -> Vec<String> {
+        toposort(&dag_dto, None)
+            .expect("unable to toposort")
+            .iter()
+            .map(|node_idx: &NodeIndex| dag_dto.node_weight(*node_idx).unwrap().clone())
+            .collect()
+    }
+    pub fn execution_order(&self) -> &Vec<String> {
+        &self.execution_order
     }
     pub fn upstream(&self, node: &String) -> Vec<String> {
         self.dag_dto
@@ -37,14 +54,7 @@ impl Dag {
             .map(|x| self.dag_dto.node_weight(x).expect("node not found").clone())
             .collect()
     }
-    pub fn execution_order(&self) -> Vec<String> {
-        toposort(&self.dag_dto, None)
-            .expect("unable to toposort")
-            .iter()
-            .map(|node_idx: &NodeIndex| self.dag_dto.node_weight(*node_idx).unwrap().clone())
-            .collect()
-    }
-    fn to_dot_file(&self) {
+    fn save_dot_file(&self) {
         let mut output_file = File::create(
             current_dir()
                 .expect("unable to find current_dir")
@@ -86,9 +96,9 @@ pub fn to_dag(strategy: &StrategyDTO) -> Result<DagDTO, &str> {
     match is_cyclic_directed(&dag) {
         true => Err("cyclic"),
         false => match connected_components(&dag) {
-            0 => Err("Invalid Dag, zero connected components found"),
+            0 => Err("zero connected components found"),
             1 => Ok(dag),
-            _ => Err("Invalid Dag, more than 1 connected component found"),
+            _ => Err("more than 1 connected component found"),
         },
     }
 }
@@ -114,7 +124,7 @@ mod tests {
     fn strategy_to_dag() {
         let strategy = strategy_fixture();
         let dag = Dag::new(strategy);
-        dag.to_dot_file();
+        dag.save_dot_file();
         let dag_dto = dag.dag_dto;
         assert_eq!(dag_dto.node_count(), 5);
         assert_eq!(dag_dto.edge_count(), 6);
@@ -157,7 +167,7 @@ mod tests {
     fn dag_to_dot_file() {
         let strategy = strategy_fixture();
         let dag = Dag::new(strategy);
-        dag.to_dot_file();
+        dag.save_dot_file();
         let expected_output =
             read_to_string("expected_output.dot").expect("expected_output.dot not found.");
         let output = read_to_string("output.dot").expect("output.dot not found.");
