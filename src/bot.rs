@@ -18,7 +18,9 @@ pub struct Bot {
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
 #[derive(Debug)]
 pub struct ExecutableBot {
-    bot: Bot,
+    strategy: StrategyDTO,
+    dag: Dag,
+    calc_lkup: HashMap<String, CalculationDTO>,
     asset: Asset,
     timestamp: TimeStamp,
     // TODO replace type with trait DataClient
@@ -37,11 +39,11 @@ impl ExecutableBot {
 
     /// Traverse `Dag` executing each node for given `Asset` as of `Timestamp`
     fn execute(&mut self) -> Result<(), String> {
-        let calc_order = &self.bot.dag.execution_order();
+        let calc_order = &self.dag.execution_order();
         for calc_name in calc_order {
             // println!("\nexecuting {}", calc_name);
             self.set_status(calc_name, CalculationStatus::InProgress);
-            let calc = self.bot.calc_lkup.get(calc_name).unwrap();
+            let calc = self.calc_lkup.get(calc_name).unwrap();
             // println!("{:?}", calc?.operation());
 
             let calc_time_series = match calc.operation() {
@@ -228,9 +230,11 @@ impl Bot {
         data_client: MockDataClient,
     ) -> ExecutableBot {
         ExecutableBot {
+            strategy: self.strategy.clone(),
+            dag: self.dag.clone(),
+            calc_lkup: self.calc_lkup.clone(),
             asset,
             timestamp,
-            bot: self.clone(),
             data_client,
             calc_status_lkup: self
                 .strategy

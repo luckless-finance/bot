@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-// #![allow(unused)]
 
 use std::collections::HashMap;
 use std::env::current_dir;
@@ -87,9 +86,9 @@ pub fn to_dag(strategy: &StrategyDTO) -> Result<DagDTO, &str> {
     match is_cyclic_directed(&dag) {
         true => Err("cyclic"),
         false => match connected_components(&dag) {
-            0 => Err("zero connected components found"),
+            0 => Err("Invalid Dag, zero connected components found"),
             1 => Ok(dag),
-            _ => Err("more than 1 connected component found"),
+            _ => Err("Invalid Dag, more than 1 connected component found"),
         },
     }
 }
