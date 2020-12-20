@@ -16,13 +16,13 @@ use rand_distr::{Distribution, Normal};
 
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
-static DATA_SIZE: usize = 10_000;
+pub static DATA_SIZE: usize = 10_000;
 pub static TODAY: usize = DATA_SIZE;
 pub type Symbol = String;
 
 pub trait DataClient {
     fn asset(&self, symbol: Symbol) -> Result<&Asset, &str>;
-    fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> Result<TimeSeries1D, &str>;
+    fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> Result<TimeSeries1D, String>;
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -54,7 +54,7 @@ impl DataClient for MockDataClient {
 
     // FIXME this is not called.
     // TODO learn how to use traits
-    fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, &str> {
+    fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, String> {
         assert!(
             self.assets.contains_key(&asset.symbol),
             "query for {} at {} failed",
@@ -81,14 +81,15 @@ impl MockDataClient {
     pub fn assets(&self) -> &HashMap<Symbol, Asset> {
         &self.assets
     }
-    pub fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> TimeSeries1D {
+    // TODO learn how to use traits
+    pub(crate) fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, String> {
         assert!(
             self.assets.contains_key(&asset.symbol),
             "query for {} at {} failed",
             asset,
             timestamp
         );
-        TimeSeries1D::from_values(simulate_trig(DATA_SIZE))
+        Ok(TimeSeries1D::from_values(simulate_random(DATA_SIZE)))
     }
 }
 
@@ -256,7 +257,7 @@ mod tests {
         let client = MockDataClient::new();
         // println!("{:?}", client);
         let asset = client.assets.get("A").unwrap();
-        let ts = client.query(asset, &TODAY);
+        let ts = client.query(asset, &TODAY).unwrap();
         // println!("{:?}", ts);
         assert_eq!(ts.len(), DATA_SIZE);
     }
