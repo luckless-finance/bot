@@ -9,7 +9,7 @@ use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
 /// Wraps several DTOs required traverse and consume a strategy
 #[derive(Debug, Clone)]
-pub struct Bot {
+pub(crate) struct Bot {
     strategy: StrategyDTO,
     dag: Dag,
     calc_lkup: HashMap<String, CalculationDTO>,
@@ -17,7 +17,7 @@ pub struct Bot {
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
 // #[derive(Debug)]
-pub struct ExecutableBot {
+pub(crate) struct ExecutableBot {
     strategy: StrategyDTO,
     dag: Dag,
     calc_lkup: HashMap<String, CalculationDTO>,
@@ -65,17 +65,47 @@ impl ExecutableBot {
         Ok(())
     }
 
+    // TODO enforce DTO constraints at parse time
+    // TODO handle alignment
     fn handle_div(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::DIV);
-        println!("TODO execute {}", calc.name());
-        let index: Vec<TimeStamp> = (0..DATA_SIZE).collect();
-        let values: Vec<DataPointValue> = (0..DATA_SIZE).map(|x| x as f64).collect();
-        Ok(TimeSeries1D::new(index, values))
+        assert_eq!(
+            calc.operands().len(),
+            2,
+            "DIV operation requires operands: 'numerator' and 'denominator'"
+        );
+        let numerator = calc
+            .operands()
+            .iter()
+            .find(|o| o.name() == "numerator")
+            .unwrap();
+        let denominator = calc
+            .operands()
+            .iter()
+            .find(|o| o.name() == "denominator")
+            .unwrap();
+        let numerator_ts = self.calc_data_lkup.get(numerator.value()).unwrap();
+        let denominator_ts = self.calc_data_lkup.get(denominator.value()).unwrap();
+        assert_eq!(
+            numerator_ts.index(),
+            denominator_ts.index(),
+            "DIV operation requires both operands be aligned"
+        );
+        // assert_eq!(numerator_ts.len(), denominator_ts.len(), "DIV operation requires both operands to have same length");
+        let index: Vec<TimeStamp> = numerator_ts.index().clone();
+        let quotient = numerator_ts
+            .values()
+            .iter()
+            .zip(denominator_ts.values())
+            .map(|pair| pair.0 / pair.1)
+            .collect();
+        Ok(TimeSeries1D::new(index, quotient))
     }
 
     fn handle_sma(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::SMA);
         println!("TODO execute {}", calc.name());
+        assert_eq!(calc.operands().len(), 2);
         let index: Vec<TimeStamp> = (0..DATA_SIZE).collect();
         let values: Vec<DataPointValue> = (0..DATA_SIZE).map(|x| x as f64).collect();
         Ok(TimeSeries1D::new(index, values))
@@ -84,6 +114,7 @@ impl ExecutableBot {
     fn handle_sub(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::SUB);
         println!("TODO execute {}", calc.name());
+        assert_eq!(calc.operands().len(), 2);
         let index: Vec<TimeStamp> = (0..DATA_SIZE).collect();
         let values: Vec<DataPointValue> = (0..DATA_SIZE).map(|x| x as f64).collect();
         Ok(TimeSeries1D::new(index, values))
@@ -105,7 +136,7 @@ impl ExecutableBot {
 }
 
 #[derive(Debug, Clone)]
-pub enum CalculationStatus {
+pub(crate) enum CalculationStatus {
     NotStarted,
     InProgress,
     Complete,

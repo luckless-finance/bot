@@ -16,17 +16,17 @@ use rand_distr::{Distribution, Normal};
 
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
-pub static DATA_SIZE: usize = 10_000;
-pub static TODAY: usize = DATA_SIZE;
-pub type Symbol = String;
+pub(crate) static DATA_SIZE: usize = 10_000;
+pub(crate) static TODAY: usize = DATA_SIZE;
+pub(crate) type Symbol = String;
 
-pub trait DataClient {
+pub(crate) trait DataClient {
     fn asset(&self, symbol: Symbol) -> Result<&Asset, &str>;
     fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> Result<TimeSeries1D, String>;
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
-pub struct Asset {
+pub(crate) struct Asset {
     symbol: Symbol,
 }
 
@@ -43,7 +43,7 @@ impl Display for Asset {
 }
 
 #[derive(Debug)]
-pub struct MockDataClient {
+pub(crate) struct MockDataClient {
     assets: HashMap<Symbol, Asset>,
 }
 
@@ -113,7 +113,7 @@ fn simulate_trig(limit: usize) -> Vec<DataPointValue> {
     sum(&[y1.as_slice(), y2.as_slice(), offset.as_slice()])
 }
 
-pub fn plots(x: Vec<f64>, ys: Vec<Vec<f64>>) {
+pub(crate) fn plots(x: Vec<f64>, ys: Vec<Vec<f64>>) {
     let mut fg = Figure::new();
     let y_max: f64 = ys
         .as_slice()
@@ -140,7 +140,7 @@ pub fn plots(x: Vec<f64>, ys: Vec<Vec<f64>>) {
     fg.show().unwrap();
 }
 
-pub fn plot(x: Vec<f64>, y: Vec<f64>) {
+pub(crate) fn plot(x: Vec<f64>, y: Vec<f64>) {
     let mut fg = Figure::new();
     let y_max: f64 = y
         .as_slice()
