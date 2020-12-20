@@ -314,21 +314,21 @@ mod tests {
         assert_eq!(xi, y);
     }
 
-    #[test]
+    // #[test]
     fn basic_sin_graph() {
         let i: Vec<f64> = x(100);
         let y = sin(&i, 1.as_(), 1.as_(), 0.as_());
         plot(i, y);
     }
 
-    #[test]
+    // #[test]
     fn sin_graph() {
         let i: Vec<f64> = x(100);
         let y = sin(&i, 2.as_(), 5.as_(), 10.as_());
         plot(i, y);
     }
 
-    #[test]
+    // #[test]
     fn multi_sin_graph() {
         let x = x(100);
         let offset = 100f64;
