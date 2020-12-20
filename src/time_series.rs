@@ -118,10 +118,22 @@ impl TimeSeries1D {
     // generic solution https://stackoverflow.com/a/41207820
     pub(crate) fn mul(&self, rhs: TimeSeries1D) -> Self {
         let (mut lhs, rhs) = self.align(rhs);
-        // println!("{:?}", lhs);
-        // println!("{:?}", rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l *= *r;
+        }
+        TimeSeries1D::new(lhs.index, lhs.values)
+    }
+    pub(crate) fn scalar_div(&self, rhs: DataPointValue) -> Self {
+        let product_idx: Index = self.index.clone();
+        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x / rhs).collect();
+        TimeSeries1D::new(product_idx, product_values)
+    }
+    // taken from https://stackoverflow.com/a/53825685
+    // generic solution https://stackoverflow.com/a/41207820
+    pub(crate) fn div(&self, rhs: TimeSeries1D) -> Self {
+        let (mut lhs, rhs) = self.align(rhs);
+        for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
+            *l /= *r;
         }
         TimeSeries1D::new(lhs.index, lhs.values)
     }
@@ -276,6 +288,38 @@ mod tests {
             values: vec![4., 9., 20., 40.],
         };
         let actual = lhs.mul(rhs);
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn scalar_div() {
+        let ts = TimeSeries1D {
+            index: vec![2, 4, 5, 6, 7, 9],
+            values: vec![1., 2., 3., 4., 5., 8.],
+        };
+        let expected = TimeSeries1D {
+            index: vec![2, 4, 5, 6, 7, 9],
+            values: vec![0.5, 1.0, 1.5, 2., 2.5, 4.],
+        };
+        let actual = ts.scalar_div(2.);
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn div() {
+        let lhs = TimeSeries1D {
+            index: vec![2, 4, 5, 6, 7, 9],
+            values: vec![1., 2., 3., 4., 5., 8.],
+        };
+        let rhs = TimeSeries1D {
+            index: vec![1, 4, 5, 7, 9],
+            values: vec![1., 2., 3., 4., 5.],
+        };
+        let expected = TimeSeries1D {
+            index: vec![4, 5, 7, 9],
+            values: vec![1., 1., 1.25, 1.6],
+        };
+        let actual = lhs.div(rhs);
         assert_eq!(actual, expected)
     }
 
