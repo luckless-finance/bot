@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crate::dag::Dag;
-use crate::data::{Asset, DataClient, MockDataClient, DATA_SIZE, TODAY};
+use crate::data::{Asset, DataClient, DATA_SIZE};
 use crate::dto::{CalculationDTO, Operation, StrategyDTO};
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
@@ -147,7 +147,7 @@ impl Bot {
         &self,
         asset: Asset,
         timestamp: TimeStamp,
-        data_client: Box<MockDataClient>,
+        data_client: Box<dyn DataClient>,
     ) -> ExecutableBot {
         ExecutableBot {
             strategy: self.strategy.clone(),
@@ -205,7 +205,7 @@ mod tests {
         let timestamp = TODAY;
         let data_client = MockDataClient::new();
         let mut executable_bot = bot.as_executable(asset, timestamp, Box::new(data_client));
-        executable_bot.execute();
+        executable_bot.execute().expect("unable to execute");
         executable_bot
             .calc_data_lkup
             .values()
