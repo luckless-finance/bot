@@ -66,7 +66,6 @@ impl ExecutableBot {
     }
 
     // TODO enforce DTO constraints at parse time
-    // TODO handle alignment
     fn handle_div(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::DIV);
         assert_eq!(
@@ -91,15 +90,7 @@ impl ExecutableBot {
             denominator_ts.index(),
             "DIV operation requires both operands be aligned"
         );
-        // assert_eq!(numerator_ts.len(), denominator_ts.len(), "DIV operation requires both operands to have same length");
-        let index: Vec<TimeStamp> = numerator_ts.index().clone();
-        let quotient = numerator_ts
-            .values()
-            .iter()
-            .zip(denominator_ts.values())
-            .map(|pair| pair.0 / pair.1)
-            .collect();
-        Ok(TimeSeries1D::new(index, quotient))
+        Ok(numerator_ts.div(denominator_ts.clone()))
     }
 
     fn handle_sma(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
