@@ -24,7 +24,7 @@ pub struct ExecutableBot {
     asset: Asset,
     timestamp: TimeStamp,
     // TODO replace type with trait DataClient
-    data_client: MockDataClient,
+    data_client: Box<MockDataClient>,
     calc_status_lkup: HashMap<String, CalculationStatus>,
     calc_data_lkup: HashMap<String, TimeSeries1D>,
 }
@@ -147,7 +147,7 @@ impl Bot {
         &self,
         asset: Asset,
         timestamp: TimeStamp,
-        data_client: MockDataClient,
+        data_client: Box<MockDataClient>,
     ) -> ExecutableBot {
         ExecutableBot {
             strategy: self.strategy.clone(),
@@ -204,7 +204,7 @@ mod tests {
         let asset = Asset::new(String::from("A"));
         let timestamp = TODAY;
         let data_client = MockDataClient::new();
-        let mut executable_bot = bot.as_executable(asset, timestamp, data_client);
+        let mut executable_bot = bot.as_executable(asset, timestamp, Box::new(data_client));
         executable_bot.execute();
     }
 

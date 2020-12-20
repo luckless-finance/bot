@@ -22,7 +22,7 @@ pub type Symbol = String;
 
 pub trait DataClient {
     fn asset(&self, symbol: Symbol) -> Result<&Asset, &str>;
-    fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> Result<TimeSeries1D, &str>;
+    fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> Result<TimeSeries1D, String>;
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -54,7 +54,7 @@ impl DataClient for MockDataClient {
 
     // FIXME this is not called.
     // TODO learn how to use traits
-    fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, &str> {
+    fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, String> {
         assert!(
             self.assets.contains_key(&asset.symbol),
             "query for {} at {} failed",
