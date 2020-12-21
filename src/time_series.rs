@@ -1,23 +1,20 @@
 #![allow(dead_code)]
 
 use std::cmp::Ordering;
-use std::ops::Div;
+use std::ops::{Div, Neg};
 
-pub type DataPointValue = f64;
-pub type TimeStamp = usize;
-pub type Index = Vec<TimeStamp>;
+pub(crate) type DataPointValue = f64;
+pub(crate) type TimeStamp = usize;
+pub(crate) type Index = Vec<TimeStamp>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TimeSeries1D {
+pub(crate) struct TimeSeries1D {
     index: Index,
     values: Vec<DataPointValue>,
 }
 
 impl TimeSeries1D {
-    pub fn from_values(values: Vec<DataPointValue>) -> Self {
-        TimeSeries1D::new((0..values.len()).map(|x| x as TimeStamp).collect(), values)
-    }
-    pub fn new(index: Index, values: Vec<DataPointValue>) -> Self {
+    pub(crate) fn new(index: Index, values: Vec<DataPointValue>) -> Self {
         assert_eq!(
             index.len(),
             values.len(),
@@ -27,13 +24,19 @@ impl TimeSeries1D {
         );
         TimeSeries1D { index, values }
     }
-    pub fn values(&self) -> &Vec<DataPointValue> {
+    pub(crate) fn from_values(values: Vec<DataPointValue>) -> Self {
+        TimeSeries1D::new((0..values.len()).map(|x| x as TimeStamp).collect(), values)
+    }
+    pub(crate) fn values(&self) -> &Vec<DataPointValue> {
         &self.values
     }
     pub(crate) fn index(&self) -> &Index {
         &self.index
     }
-    fn sma(&self, window_size: usize) -> Self {
+    pub(crate) fn len(&self) -> usize {
+        self.index.len()
+    }
+    pub(crate) fn sma(&self, window_size: usize) -> Self {
         let mut index = self.index.clone();
         index.truncate(self.len() - window_size + 1);
         // println!("index={:?}", index);
@@ -46,7 +49,9 @@ impl TimeSeries1D {
         // println!("values={:?}", values);
         TimeSeries1D::new(index, values)
     }
-    fn align(&self, rhs: TimeSeries1D) -> (Self, Self) {
+    /// Align the indices of 2 `TimeSeries`.
+    /// Creates 2 new `TimeSeries` instances.
+    pub(crate) fn align(&self, rhs: TimeSeries1D) -> (Self, Self) {
         let mut l_i = 0;
         let lhs_i = &self.index;
         let lhs_v = &self.values;
@@ -74,42 +79,63 @@ impl TimeSeries1D {
             };
         }
         (
-            TimeSeries1D::new(both_ri, both_l),
-            TimeSeries1D::new(both_li, both_r),
+            TimeSeries1D::new(both_li, both_l),
+            TimeSeries1D::new(both_ri, both_r),
         )
     }
-    fn scalar_mul(&self, rhs: DataPointValue) -> Self {
-        let product_idx: Index = self.index.clone();
-        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
-        TimeSeries1D::new(product_idx, product_values)
-    }
-    // taken from https://stackoverflow.com/a/53825685
-    // generic solution https://stackoverflow.com/a/41207820
-    fn mul(&self, rhs: TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.align(rhs);
-        // println!("{:?}", lhs);
-        // println!("{:?}", rhs);
-        for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
-            *l *= *r;
-        }
-        TimeSeries1D::new(lhs.index, lhs.values)
-    }
-    fn scalar_add(&self, rhs: DataPointValue) -> Self {
+    pub(crate) fn scalar_add(&self, rhs: DataPointValue) -> Self {
         let product_idx: Index = self.index.clone();
         let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x + rhs).collect();
         TimeSeries1D::new(product_idx, product_values)
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
-    fn add(&self, rhs: TimeSeries1D) -> Self {
+    pub(crate) fn add(&self, rhs: TimeSeries1D) -> Self {
         let (mut lhs, rhs) = self.align(rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l += *r;
         }
         TimeSeries1D::new(lhs.index, lhs.values)
     }
-    pub(crate) fn len(&self) -> usize {
-        self.index.len()
+    pub(crate) fn scalar_sub(&self, rhs: DataPointValue) -> Self {
+        self.scalar_add(rhs.neg())
+    }
+    // taken from https://stackoverflow.com/a/53825685
+    // generic solution https://stackoverflow.com/a/41207820
+    pub(crate) fn sub(&self, rhs: TimeSeries1D) -> Self {
+        let (mut lhs, rhs) = self.align(rhs);
+        for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
+            *l -= *r;
+        }
+        TimeSeries1D::new(lhs.index, lhs.values)
+    }
+    pub(crate) fn scalar_mul(&self, rhs: DataPointValue) -> Self {
+        let product_idx: Index = self.index.clone();
+        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
+        TimeSeries1D::new(product_idx, product_values)
+    }
+    // taken from https://stackoverflow.com/a/53825685
+    // generic solution https://stackoverflow.com/a/41207820
+    pub(crate) fn mul(&self, rhs: TimeSeries1D) -> Self {
+        let (mut lhs, rhs) = self.align(rhs);
+        for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
+            *l *= *r;
+        }
+        TimeSeries1D::new(lhs.index, lhs.values)
+    }
+    pub(crate) fn scalar_div(&self, rhs: DataPointValue) -> Self {
+        let product_idx: Index = self.index.clone();
+        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x / rhs).collect();
+        TimeSeries1D::new(product_idx, product_values)
+    }
+    // taken from https://stackoverflow.com/a/53825685
+    // generic solution https://stackoverflow.com/a/41207820
+    pub(crate) fn div(&self, rhs: TimeSeries1D) -> Self {
+        let (mut lhs, rhs) = self.align(rhs);
+        for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
+            *l /= *r;
+        }
+        TimeSeries1D::new(lhs.index, lhs.values)
     }
 }
 
@@ -170,6 +196,70 @@ mod tests {
     }
 
     #[test]
+    fn scalar_add() {
+        let ts = TimeSeries1D {
+            index: vec![2, 4, 5, 6, 7, 9],
+            values: vec![1., 2., 3., 4., 5., 8.],
+        };
+        let expected = TimeSeries1D {
+            index: vec![2, 4, 5, 6, 7, 9],
+            values: vec![-1., 0., 1., 2., 3., 6.],
+        };
+        let actual = ts.scalar_add(-2.);
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn add() {
+        let lhs = TimeSeries1D {
+            index: vec![2, 4, 5, 6, 7, 9],
+            values: vec![1., 2., 3., 4., 5., 8.],
+        };
+        let rhs = TimeSeries1D {
+            index: vec![1, 4, 5, 7, 9],
+            values: vec![1., 2., 3., 4., 5.],
+        };
+        let expected = TimeSeries1D {
+            index: vec![4, 5, 7, 9],
+            values: vec![4., 6., 9., 13.],
+        };
+        let actual = rhs.add(lhs);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn scalar_sub() {
+        let ts = TimeSeries1D {
+            index: vec![2, 4, 5, 6, 7, 9],
+            values: vec![1., 2., 3., 4., 5., 8.],
+        };
+        let expected = TimeSeries1D {
+            index: vec![2, 4, 5, 6, 7, 9],
+            values: vec![-1., 0., 1., 2., 3., 6.],
+        };
+        let actual = ts.scalar_sub(2.);
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn sub() {
+        let lhs = TimeSeries1D {
+            index: vec![2, 4, 5, 6, 7, 9],
+            values: vec![1., 2., 3., 4., 5., 8.],
+        };
+        let rhs = TimeSeries1D {
+            index: vec![1, 4, 5, 7, 9],
+            values: vec![1., 2., 3., 4., 5.],
+        };
+        let expected = TimeSeries1D {
+            index: vec![4, 5, 7, 9],
+            values: vec![0., 0., 1., 3.],
+        };
+        let actual = lhs.sub(rhs);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn scalar_mul() {
         let ts = TimeSeries1D {
             index: vec![2, 4, 5, 6, 7, 9],
@@ -202,21 +292,21 @@ mod tests {
     }
 
     #[test]
-    fn scalar_add() {
+    fn scalar_div() {
         let ts = TimeSeries1D {
             index: vec![2, 4, 5, 6, 7, 9],
             values: vec![1., 2., 3., 4., 5., 8.],
         };
         let expected = TimeSeries1D {
             index: vec![2, 4, 5, 6, 7, 9],
-            values: vec![-1., 0., 1., 2., 3., 6.],
+            values: vec![0.5, 1.0, 1.5, 2., 2.5, 4.],
         };
-        let actual = ts.scalar_add(-2.);
+        let actual = ts.scalar_div(2.);
         assert_eq!(actual, expected)
     }
 
     #[test]
-    fn add() {
+    fn div() {
         let lhs = TimeSeries1D {
             index: vec![2, 4, 5, 6, 7, 9],
             values: vec![1., 2., 3., 4., 5., 8.],
@@ -227,12 +317,10 @@ mod tests {
         };
         let expected = TimeSeries1D {
             index: vec![4, 5, 7, 9],
-            values: vec![4., 6., 9., 13.],
+            values: vec![1., 1., 1.25, 1.6],
         };
-        let actual = lhs.add(rhs.clone());
-        let actual2 = rhs.add(lhs);
-        assert_eq!(actual, actual2);
-        assert_eq!(actual, expected);
+        let actual = lhs.div(rhs);
+        assert_eq!(actual, expected)
     }
 
     #[test]

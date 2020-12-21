@@ -3,27 +3,25 @@
 use std::collections::HashMap;
 
 use crate::dag::Dag;
-use crate::data::{Asset, DataClient, DATA_SIZE};
+use crate::data::{Asset, DataClient};
 use crate::dto::{CalculationDTO, Operation, StrategyDTO};
-use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
+use crate::time_series::{TimeSeries1D, TimeStamp};
 
 /// Wraps several DTOs required traverse and consume a strategy
 #[derive(Debug, Clone)]
-pub struct Bot {
+pub(crate) struct Bot {
     strategy: StrategyDTO,
     dag: Dag,
     calc_lkup: HashMap<String, CalculationDTO>,
 }
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
-// #[derive(Debug)]
-pub struct ExecutableBot {
+pub(crate) struct ExecutableBot {
     strategy: StrategyDTO,
     dag: Dag,
     calc_lkup: HashMap<String, CalculationDTO>,
     asset: Asset,
     timestamp: TimeStamp,
-    // TODO replace type with trait DataClient
     data_client: Box<dyn DataClient>,
     calc_status_lkup: HashMap<String, CalculationStatus>,
     calc_data_lkup: HashMap<String, TimeSeries1D>,
@@ -45,6 +43,8 @@ impl ExecutableBot {
             self.set_status(&calc_name, CalculationStatus::InProgress);
             let calc = self.calc_lkup.get(&calc_name).expect("calc not found");
 
+            // TODO add ADD, MUL
+            // TODO align semantics with TimeSeries1D
             let calc_time_series = match calc.operation() {
                 Operation::DIV => self.handle_div(calc),
                 Operation::SMA => self.handle_sma(calc),
@@ -65,35 +65,98 @@ impl ExecutableBot {
         Ok(())
     }
 
+    // TODO enforce DTO constraints at parse time
     fn handle_div(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::DIV);
-        println!("TODO execute {}", calc.name());
-        let index: Vec<TimeStamp> = (0..DATA_SIZE).collect();
-        let values: Vec<DataPointValue> = (0..DATA_SIZE).map(|x| x as f64).collect();
-        Ok(TimeSeries1D::new(index, values))
+        // TODO replace magic strings
+        assert_eq!(
+            calc.operands().len(),
+            2,
+            "DIV operation requires operands: 'numerator' and 'denominator'"
+        );
+        let numerator_operand = calc
+            .operands()
+            .iter()
+            // TODO replace magic strings 'numerator'
+            .find(|o| o.name() == "numerator")
+            .unwrap();
+        let denominator_operand = calc
+            .operands()
+            .iter()
+            // TODO replace magic strings 'denominator'
+            .find(|o| o.name() == "denominator")
+            .unwrap();
+        let numerator_value = self.calc_data_lkup.get(numerator_operand.value()).unwrap();
+        let denominator_value = self
+            .calc_data_lkup
+            .get(denominator_operand.value())
+            .unwrap();
+        Ok(numerator_value.div(denominator_value.clone()))
     }
 
+    // TODO enforce DTO constraints at parse time
     fn handle_sma(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::SMA);
-        println!("TODO execute {}", calc.name());
-        let index: Vec<TimeStamp> = (0..DATA_SIZE).collect();
-        let values: Vec<DataPointValue> = (0..DATA_SIZE).map(|x| x as f64).collect();
-        Ok(TimeSeries1D::new(index, values))
+        assert_eq!(
+            calc.operands().len(),
+            2,
+            "SMA operation requires operands: 'window_size' and 'time_series'"
+        );
+        let window_size_operand = calc
+            .operands()
+            .iter()
+            // TODO replace magic strings 'window_size'
+            .find(|o| o.name() == "window_size")
+            .expect("SMA operation requires operand: 'window_size'");
+        let time_series_operand = calc
+            .operands()
+            .iter()
+            // TODO replace magic strings 'time_series'
+            .find(|o| o.name() == "time_series")
+            .expect("SMA operation requires operand: 'time_series'");
+        let time_series_value = self
+            .calc_data_lkup
+            .get(time_series_operand.value())
+            .expect("Upstream TimeSeries1D not found.");
+        let window_size_value: usize = window_size_operand
+            .value()
+            .parse()
+            .expect("'window_size' must be usize");
+        Ok(time_series_value.sma(window_size_value))
     }
 
+    // TODO enforce DTO constraints at parse time
     fn handle_sub(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::SUB);
-        println!("TODO execute {}", calc.name());
-        let index: Vec<TimeStamp> = (0..DATA_SIZE).collect();
-        let values: Vec<DataPointValue> = (0..DATA_SIZE).map(|x| x as f64).collect();
-        Ok(TimeSeries1D::new(index, values))
+        // TODO replace magic strings
+        assert_eq!(
+            calc.operands().len(),
+            2,
+            "SUB operation requires operands: 'left' and 'right'"
+        );
+        let left_operand = calc
+            .operands()
+            .iter()
+            // TODO replace magic strings 'left'
+            .find(|o| o.name() == "left")
+            .unwrap();
+        let right_operand = calc
+            .operands()
+            .iter()
+            // TODO replace magic strings 'right'
+            .find(|o| o.name() == "right")
+            .unwrap();
+        let left_value = self.calc_data_lkup.get(left_operand.value()).unwrap();
+        let right_value = self.calc_data_lkup.get(right_operand.value()).unwrap();
+        // TODO wasteful clone, sub calls aligns which clones
+        Ok(left_value.sub(right_value.clone()))
     }
 
+    // TODO parameterized query: generalize market data retrieval
     fn handle_query(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::QUERY);
         println!("TODO execute {}", calc.name());
         let name = "field";
-        // TODO parameterized query
         let _field: &str = calc
             .operands()
             .iter()
@@ -105,7 +168,7 @@ impl ExecutableBot {
 }
 
 #[derive(Debug, Clone)]
-pub enum CalculationStatus {
+pub(crate) enum CalculationStatus {
     NotStarted,
     InProgress,
     Complete,
@@ -172,7 +235,7 @@ mod tests {
     use std::path::Path;
 
     use crate::bot::Bot;
-    use crate::data::{Asset, MockDataClient, DATA_SIZE, TODAY};
+    use crate::data::{Asset, MockDataClient, TODAY};
     use crate::dto::{
         from_path, CalculationDTO, OperandDTO, OperandType, Operation, ScoreDTO, StrategyDTO,
     };
@@ -209,7 +272,7 @@ mod tests {
         executable_bot
             .calc_data_lkup
             .values()
-            .for_each(|time_series| assert_eq!(time_series.len(), DATA_SIZE));
+            .for_each(|time_series| assert!(time_series.len() > 0));
     }
 
     #[test]

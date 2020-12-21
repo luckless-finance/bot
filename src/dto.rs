@@ -8,7 +8,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub struct ScoreDTO {
+pub(crate) struct ScoreDTO {
     calc: String,
 }
 
@@ -22,7 +22,7 @@ impl ScoreDTO {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub enum OperandType {
+pub(crate) enum OperandType {
     Text,
     Integer,
     Decimal,
@@ -30,7 +30,7 @@ pub enum OperandType {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub struct OperandDTO {
+pub(crate) struct OperandDTO {
     name: String,
     #[serde(rename = "type")]
     _type: OperandType,
@@ -55,7 +55,7 @@ impl OperandDTO {
     }
 }
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub enum Operation {
+pub(crate) enum Operation {
     SMA,
     DIV,
     SUB,
@@ -63,7 +63,7 @@ pub enum Operation {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub struct CalculationDTO {
+pub(crate) struct CalculationDTO {
     name: String,
     operation: Operation,
     operands: Vec<OperandDTO>,
@@ -92,7 +92,7 @@ impl CalculationDTO {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub struct StrategyDTO {
+pub(crate) struct StrategyDTO {
     name: String,
     score: ScoreDTO,
     calcs: Vec<CalculationDTO>,
@@ -116,7 +116,7 @@ impl StrategyDTO {
     }
 }
 
-pub fn from_path(file_path: &Path) -> Result<StrategyDTO, serde_yaml::Error> {
+pub(crate) fn from_path(file_path: &Path) -> Result<StrategyDTO, serde_yaml::Error> {
     let mut strategy_file: File = File::open(file_path).expect("unable to open file");
     let mut strategy_yaml = String::new();
     strategy_file
