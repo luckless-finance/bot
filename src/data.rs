@@ -82,16 +82,6 @@ impl MockDataClient {
     pub fn assets(&self) -> &HashMap<Symbol, Asset> {
         &self.assets
     }
-    // TODO learn how to use traits
-    pub(crate) fn query(&self, asset: &Asset, timestamp: &usize) -> GenResult<TimeSeries1D> {
-        assert!(
-            self.assets.contains_key(&asset.symbol),
-            "query for {} at {} failed",
-            asset,
-            timestamp
-        );
-        Ok(TimeSeries1D::from_values(simulate_random(DATA_SIZE)))
-    }
 }
 
 fn simulate_random(limit: usize) -> Vec<DataPointValue> {
@@ -233,9 +223,7 @@ mod tests {
 
     use rand_distr::num_traits::AsPrimitive;
 
-    use crate::data::{
-        _polynomial, plot, plots, polynomial, sin, sum, x, MockDataClient, Symbol, DATA_SIZE, TODAY,
-    };
+    use crate::data::*;
 
     const EPSILON: f64 = 1E-10;
 
@@ -255,10 +243,10 @@ mod tests {
 
     #[test]
     fn mock_data_client_query() {
-        let client = MockDataClient::new();
+        let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         // println!("{:?}", client);
-        let asset = client.assets.get("A").unwrap();
-        let ts = client.query(asset, &TODAY).unwrap();
+        let asset = Asset::new(Symbol::from("A"));
+        let ts = client.query(&asset, &TODAY).unwrap();
         // println!("{:?}", ts);
         assert_eq!(ts.len(), DATA_SIZE);
     }
