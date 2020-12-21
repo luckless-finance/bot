@@ -4,7 +4,7 @@ score:
   calc: sma_gap
 calcs:
   - name: sma_gap
-    operation: DIV
+    operation: TS_DIV
     operands:
       - name: numerator
         type: Reference
@@ -13,7 +13,7 @@ calcs:
         type: Reference
         value: sma50
   - name: sma_diff
-    operation: SUB
+    operation: TS_SUB
     operands:
       - name: left
         type: Reference

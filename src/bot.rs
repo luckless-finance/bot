@@ -6,6 +6,7 @@ use crate::dag::Dag;
 use crate::data::{Asset, DataClient};
 use crate::dto::{CalculationDto, Operation, StrategyDto};
 use crate::time_series::{TimeSeries1D, TimeStamp};
+use std::convert::TryInto;
 
 /// Wraps several Dtos required traverse and consume a strategy
 #[derive(Debug, Clone)]
@@ -43,12 +44,16 @@ impl ExecutableBot {
             self.set_status(&calc_name, CalculationStatus::InProgress);
             let calc = self.calc_lkup.get(&calc_name).expect("calc not found");
 
-            // TODO add ADD, MUL
-            // TODO align semantics with TimeSeries1D
             let calc_time_series = match calc.operation() {
-                Operation::DIV => self.handle_div(calc),
-                Operation::SMA => self.handle_sma(calc),
+                Operation::ADD => self.handle_add(calc),
                 Operation::SUB => self.handle_sub(calc),
+                Operation::MUL => self.handle_mul(calc),
+                Operation::DIV => self.handle_div(calc),
+                Operation::TS_ADD => self.handle_ts_add(calc),
+                Operation::TS_SUB => self.handle_ts_sub(calc),
+                Operation::TS_MUL => self.handle_ts_mul(calc),
+                Operation::TS_DIV => self.handle_ts_div(calc),
+                Operation::SMA => self.handle_sma(calc),
                 Operation::QUERY => self.handle_query(calc),
             };
             self.set_status(
@@ -65,9 +70,8 @@ impl ExecutableBot {
         Ok(())
     }
 
-    // TODO enforce Dto constraints at parse time
-    fn handle_div(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
-        assert_eq!(*calc.operation(), Operation::DIV);
+    fn handle_ts_div(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
+        assert_eq!(*calc.operation(), Operation::TS_DIV);
         // TODO replace magic strings
         assert_eq!(
             calc.operands().len(),
@@ -91,7 +95,7 @@ impl ExecutableBot {
             .calc_data_lkup
             .get(denominator_operand.value())
             .unwrap();
-        Ok(numerator_value.div(denominator_value.clone()))
+        Ok(numerator_value.ts_div(denominator_value.clone()))
     }
 
     // TODO enforce Dto constraints at parse time
@@ -126,8 +130,8 @@ impl ExecutableBot {
     }
 
     // TODO enforce Dto constraints at parse time
-    fn handle_sub(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
-        assert_eq!(*calc.operation(), Operation::SUB);
+    fn handle_ts_sub(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
+        assert_eq!(*calc.operation(), Operation::TS_SUB);
         // TODO replace magic strings
         assert_eq!(
             calc.operands().len(),
@@ -149,7 +153,7 @@ impl ExecutableBot {
         let left_value = self.calc_data_lkup.get(left_operand.value()).unwrap();
         let right_value = self.calc_data_lkup.get(right_operand.value()).unwrap();
         // TODO wasteful clone, sub calls aligns which clones
-        Ok(left_value.sub(right_value.clone()))
+        Ok(left_value.ts_sub(right_value.clone()))
     }
 
     // TODO parameterized query: generalize market data retrieval
@@ -164,6 +168,24 @@ impl ExecutableBot {
             .expect("symbol operand not found")
             .value();
         self.data_client.query(&self.asset, &self.timestamp)
+    }
+    fn handle_add(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+        unimplemented!()
+    }
+    fn handle_sub(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+        unimplemented!()
+    }
+    fn handle_mul(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+        unimplemented!()
+    }
+    fn handle_div(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+        unimplemented!()
+    }
+    fn handle_ts_add(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+        unimplemented!()
+    }
+    fn handle_ts_mul(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+        unimplemented!()
     }
 }
 

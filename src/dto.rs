@@ -61,10 +61,16 @@ impl OperandDto {
 }
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub(crate) enum Operation {
-    SMA,
-    DIV,
-    SUB,
     QUERY,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    TS_ADD,
+    TS_SUB,
+    TS_MUL,
+    TS_DIV,
+    SMA,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -133,16 +139,16 @@ impl TryFrom<CalculationDto> for SmaCalculationDto {
     }
 }
 
-struct DivCalculationDto {
+struct TsDivCalculationDto {
     name: String,
     denominator: String,
     numerator: String,
 }
 
-impl TryFrom<CalculationDto> for DivCalculationDto {
+impl TryFrom<CalculationDto> for TsDivCalculationDto {
     type Error = GenError;
     fn try_from(calculation_dto: CalculationDto) -> GenResult<Self> {
-        if calculation_dto.operation != Operation::DIV {
+        if calculation_dto.operation != Operation::TS_DIV {
             Err(GenError::from("Conversion into DivDto failed")).into()
         } else {
             let local_calculation_dto = calculation_dto.clone();
@@ -221,7 +227,7 @@ mod tests {
             calcs: vec![
                 CalculationDto {
                     name: String::from("sma_gap"),
-                    operation: Operation::DIV,
+                    operation: Operation::TS_DIV,
                     operands: vec![
                         OperandDto {
                             name: String::from("numerator"),
@@ -237,7 +243,7 @@ mod tests {
                 },
                 CalculationDto {
                     name: String::from("sma_diff"),
-                    operation: Operation::SUB,
+                    operation: Operation::TS_SUB,
                     operands: vec![
                         OperandDto {
                             name: String::from("left"),
@@ -304,7 +310,7 @@ score:
   calc: sma_gap
 calcs:
   - name: sma_gap
-    operation: DIV
+    operation: TS_DIV
     operands:
       - name: numerator
         type: Reference
@@ -313,7 +319,7 @@ calcs:
         type: Reference
         value: sma50
   - name: sma_diff
-    operation: SUB
+    operation: TS_SUB
     operands:
       - name: left
         type: Reference
@@ -354,7 +360,7 @@ calcs:
         assert_eq!(s.name, "Example Strategy Document");
         assert_eq!(s.score.calc, "sma_gap");
         assert_eq!(s.calcs[0].name, "sma_gap");
-        assert_eq!(s.calcs[0].operation, Operation::DIV);
+        assert_eq!(s.calcs[0].operation, Operation::TS_DIV);
         assert_eq!(s.calcs[0].operands[0].name, "numerator");
     }
 
@@ -370,7 +376,6 @@ calcs:
     #[test]
     fn yaml_to_strategy() -> Result<(), serde_yaml::Error> {
         let expected_strategy_yaml = get_strategy_yaml();
-        // println!("{}", expected_strategy_yaml);
         let actual_strategy: StrategyDto =
             serde_yaml::from_str(&expected_strategy_yaml).expect("unable to parse yaml");
         let actual_strategy_yaml: String = serde_yaml::to_string(&actual_strategy)?;
@@ -412,7 +417,7 @@ operands:
     fn test_to_div_dto() -> GenResult<()> {
         let x = r#"
 name: sma200
-operation: DIV
+operation: TS_DIV
 operands:
   - name: denominator
     type: Reference
@@ -421,7 +426,7 @@ operands:
     type: Reference
     value: bar"#;
         let calc_dto: CalculationDto = serde_yaml::from_str(x)?;
-        let sma: DivCalculationDto = calc_dto.try_into()?;
+        let sma: TsDivCalculationDto = calc_dto.try_into()?;
         assert_eq!(sma.name, "sma200");
         assert_eq!(sma.denominator, "foo");
         assert_eq!(sma.numerator, "bar");
