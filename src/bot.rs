@@ -45,7 +45,7 @@ impl ExecutableBot {
         for calc_name in calc_order {
             println!("\nexecuting {}", calc_name);
             self.set_status(&calc_name, CalculationStatus::InProgress);
-            let calc = self.calc_lkup.get(&calc_name).expect("calc not found");
+            let calc = self.calc_lkup.get(&calc_name).ok_or("calc not found")?;
 
             let calc_time_series = match calc.operation() {
                 Operation::QUERY => self.handle_query(calc),
