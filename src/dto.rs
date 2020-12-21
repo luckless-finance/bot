@@ -8,13 +8,13 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub(crate) struct ScoreDTO {
+pub(crate) struct ScoreDto {
     calc: String,
 }
 
-impl ScoreDTO {
+impl ScoreDto {
     pub fn new(calc: String) -> Self {
-        ScoreDTO { calc }
+        ScoreDto { calc }
     }
     pub fn calc(&self) -> &str {
         &self.calc
@@ -30,14 +30,14 @@ pub(crate) enum OperandType {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub(crate) struct OperandDTO {
+pub(crate) struct OperandDto {
     name: String,
     #[serde(rename = "type")]
     _type: OperandType,
     value: String,
 }
 
-impl OperandDTO {
+impl OperandDto {
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -49,9 +49,9 @@ impl OperandDTO {
     }
 }
 
-impl OperandDTO {
+impl OperandDto {
     pub fn new(name: String, _type: OperandType, value: String) -> Self {
-        OperandDTO { name, _type, value }
+        OperandDto { name, _type, value }
     }
 }
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -63,27 +63,27 @@ pub(crate) enum Operation {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub(crate) struct CalculationDTO {
+pub(crate) struct CalculationDto {
     name: String,
     operation: Operation,
-    operands: Vec<OperandDTO>,
+    operands: Vec<OperandDto>,
 }
 
-impl CalculationDTO {
+impl CalculationDto {
     pub fn name(&self) -> &str {
         &self.name
     }
     pub fn operation(&self) -> &Operation {
         &self.operation
     }
-    pub fn operands(&self) -> &Vec<OperandDTO> {
+    pub fn operands(&self) -> &Vec<OperandDto> {
         &self.operands
     }
 }
 
-impl CalculationDTO {
-    pub fn new(name: String, operation: Operation, operands: Vec<OperandDTO>) -> Self {
-        CalculationDTO {
+impl CalculationDto {
+    pub fn new(name: String, operation: Operation, operands: Vec<OperandDto>) -> Self {
+        CalculationDto {
             name,
             operation,
             operands,
@@ -92,31 +92,31 @@ impl CalculationDTO {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub(crate) struct StrategyDTO {
+pub(crate) struct StrategyDto {
     name: String,
-    score: ScoreDTO,
-    calcs: Vec<CalculationDTO>,
+    score: ScoreDto,
+    calcs: Vec<CalculationDto>,
 }
 
-impl StrategyDTO {
+impl StrategyDto {
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn score(&self) -> &ScoreDTO {
+    pub fn score(&self) -> &ScoreDto {
         &self.score
     }
-    pub fn calcs(&self) -> &Vec<CalculationDTO> {
+    pub fn calcs(&self) -> &Vec<CalculationDto> {
         &self.calcs
     }
 }
 
-impl StrategyDTO {
-    pub fn new(name: String, score: ScoreDTO, calcs: Vec<CalculationDTO>) -> Self {
-        StrategyDTO { name, score, calcs }
+impl StrategyDto {
+    pub fn new(name: String, score: ScoreDto, calcs: Vec<CalculationDto>) -> Self {
+        StrategyDto { name, score, calcs }
     }
 }
 
-pub(crate) fn from_path(file_path: &Path) -> Result<StrategyDTO, serde_yaml::Error> {
+pub(crate) fn from_path(file_path: &Path) -> Result<StrategyDto, serde_yaml::Error> {
     let mut strategy_file: File = File::open(file_path).expect("unable to open file");
     let mut strategy_yaml = String::new();
     strategy_file
@@ -131,84 +131,84 @@ mod tests {
     use std::path::Path;
 
     use crate::dto::{
-        from_path, CalculationDTO, OperandDTO, OperandType, Operation, ScoreDTO, StrategyDTO,
+        from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto, StrategyDto,
     };
 
-    fn get_strategy() -> StrategyDTO {
-        StrategyDTO {
+    fn get_strategy() -> StrategyDto {
+        StrategyDto {
             name: String::from("Example Strategy Document"),
-            score: ScoreDTO {
+            score: ScoreDto {
                 calc: String::from("sma_gap"),
             },
             calcs: vec![
-                CalculationDTO {
+                CalculationDto {
                     name: String::from("sma_gap"),
                     operation: Operation::DIV,
                     operands: vec![
-                        OperandDTO {
+                        OperandDto {
                             name: String::from("numerator"),
                             _type: OperandType::Reference,
                             value: String::from("sma_diff"),
                         },
-                        OperandDTO {
+                        OperandDto {
                             name: String::from("denominator"),
                             _type: OperandType::Reference,
                             value: String::from("sma50"),
                         },
                     ],
                 },
-                CalculationDTO {
+                CalculationDto {
                     name: String::from("sma_diff"),
                     operation: Operation::SUB,
                     operands: vec![
-                        OperandDTO {
+                        OperandDto {
                             name: String::from("left"),
                             _type: OperandType::Reference,
                             value: String::from("sma50"),
                         },
-                        OperandDTO {
+                        OperandDto {
                             name: String::from("right"),
                             _type: OperandType::Reference,
                             value: String::from("sma200"),
                         },
                     ],
                 },
-                CalculationDTO {
+                CalculationDto {
                     name: String::from("sma50"),
                     operation: Operation::SMA,
                     operands: vec![
-                        OperandDTO {
+                        OperandDto {
                             name: String::from("window_size"),
                             _type: OperandType::Integer,
                             value: String::from("50"),
                         },
-                        OperandDTO {
+                        OperandDto {
                             name: String::from("time_series"),
                             _type: OperandType::Reference,
                             value: String::from("price"),
                         },
                     ],
                 },
-                CalculationDTO {
+                CalculationDto {
                     name: String::from("sma200"),
                     operation: Operation::SMA,
                     operands: vec![
-                        OperandDTO {
+                        OperandDto {
                             name: String::from("window_size"),
                             _type: OperandType::Integer,
                             value: String::from("200"),
                         },
-                        OperandDTO {
+                        OperandDto {
                             name: String::from("time_series"),
                             _type: OperandType::Reference,
                             value: String::from("price"),
                         },
                     ],
                 },
-                CalculationDTO {
+                CalculationDto {
                     name: String::from("price"),
                     operation: Operation::QUERY,
-                    operands: vec![OperandDTO {
+                    operands: vec![OperandDto {
                         name: String::from("field"),
                         _type: OperandType::Text,
                         value: String::from("close"),
@@ -284,7 +284,7 @@ calcs:
     fn strategy_to_yaml() -> Result<(), serde_yaml::Error> {
         let expected_strategy = get_strategy();
         let actual_strategy_yaml = serde_yaml::to_string(&expected_strategy)?;
-        let actual_strategy: StrategyDTO = serde_yaml::from_str(&actual_strategy_yaml)?;
+        let actual_strategy: StrategyDto = serde_yaml::from_str(&actual_strategy_yaml)?;
         assert_eq!(actual_strategy, expected_strategy);
         Ok(())
     }
@@ -293,7 +293,7 @@ calcs:
     fn yaml_to_strategy() -> Result<(), serde_yaml::Error> {
         let expected_strategy_yaml = get_strategy_yaml();
         // println!("{}", expected_strategy_yaml);
-        let actual_strategy: StrategyDTO =
+        let actual_strategy: StrategyDto =
             serde_yaml::from_str(&expected_strategy_yaml).expect("unable to parse yaml");
         let actual_strategy_yaml: String = serde_yaml::to_string(&actual_strategy)?;
         assert_eq!(actual_strategy_yaml, expected_strategy_yaml);

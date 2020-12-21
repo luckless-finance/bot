@@ -4,22 +4,22 @@ use std::collections::HashMap;
 
 use crate::dag::Dag;
 use crate::data::{Asset, DataClient};
-use crate::dto::{CalculationDTO, Operation, StrategyDTO};
+use crate::dto::{CalculationDto, Operation, StrategyDto};
 use crate::time_series::{TimeSeries1D, TimeStamp};
 
-/// Wraps several DTOs required traverse and consume a strategy
+/// Wraps several Dtos required traverse and consume a strategy
 #[derive(Debug, Clone)]
 pub(crate) struct Bot {
-    strategy: StrategyDTO,
+    strategy: StrategyDto,
     dag: Dag,
-    calc_lkup: HashMap<String, CalculationDTO>,
+    calc_lkup: HashMap<String, CalculationDto>,
 }
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
 pub(crate) struct ExecutableBot {
-    strategy: StrategyDTO,
+    strategy: StrategyDto,
     dag: Dag,
-    calc_lkup: HashMap<String, CalculationDTO>,
+    calc_lkup: HashMap<String, CalculationDto>,
     asset: Asset,
     timestamp: TimeStamp,
     data_client: Box<dyn DataClient>,
@@ -65,8 +65,8 @@ impl ExecutableBot {
         Ok(())
     }
 
-    // TODO enforce DTO constraints at parse time
-    fn handle_div(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
+    // TODO enforce Dto constraints at parse time
+    fn handle_div(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::DIV);
         // TODO replace magic strings
         assert_eq!(
@@ -94,8 +94,8 @@ impl ExecutableBot {
         Ok(numerator_value.div(denominator_value.clone()))
     }
 
-    // TODO enforce DTO constraints at parse time
-    fn handle_sma(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
+    // TODO enforce Dto constraints at parse time
+    fn handle_sma(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::SMA);
         assert_eq!(
             calc.operands().len(),
@@ -125,8 +125,8 @@ impl ExecutableBot {
         Ok(time_series_value.sma(window_size_value))
     }
 
-    // TODO enforce DTO constraints at parse time
-    fn handle_sub(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
+    // TODO enforce Dto constraints at parse time
+    fn handle_sub(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::SUB);
         // TODO replace magic strings
         assert_eq!(
@@ -153,7 +153,7 @@ impl ExecutableBot {
     }
 
     // TODO parameterized query: generalize market data retrieval
-    fn handle_query(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
+    fn handle_query(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::QUERY);
         println!("TODO execute {}", calc.name());
         let name = "field";
@@ -176,9 +176,9 @@ pub(crate) enum CalculationStatus {
 }
 
 impl Bot {
-    pub fn new(strategy: StrategyDTO) -> Box<Self> {
+    pub fn new(strategy: StrategyDto) -> Box<Self> {
         let dag = Dag::new(strategy.clone());
-        let calc_lkup: HashMap<String, CalculationDTO> = strategy
+        let calc_lkup: HashMap<String, CalculationDto> = strategy
             .calcs()
             .iter()
             .map(|calc| (calc.name().to_string(), calc.clone()))
@@ -192,13 +192,13 @@ impl Bot {
     fn dag(&self) -> &Dag {
         &self.dag
     }
-    fn strategy(&self) -> &StrategyDTO {
+    fn strategy(&self) -> &StrategyDto {
         &self.strategy
     }
-    pub fn calc(&self, name: &str) -> Result<&CalculationDTO, &str> {
+    pub fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
         self.calc_lkup.get(name).ok_or("not found")
     }
-    pub fn queries(&self) -> Vec<&CalculationDTO> {
+    pub fn queries(&self) -> Vec<&CalculationDto> {
         self.strategy
             .calcs()
             .iter()
@@ -237,17 +237,17 @@ mod tests {
     use crate::bot::Bot;
     use crate::data::{Asset, MockDataClient, TODAY};
     use crate::dto::{
-        from_path, CalculationDTO, OperandDTO, OperandType, Operation, ScoreDTO, StrategyDTO,
+        from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto, StrategyDto,
     };
 
-    fn strategy_fixture() -> StrategyDTO {
-        StrategyDTO::new(
+    fn strategy_fixture() -> StrategyDto {
+        StrategyDto::new(
             String::from("Small Strategy Document"),
-            ScoreDTO::new(String::from("price")),
-            vec![CalculationDTO::new(
+            ScoreDto::new(String::from("price")),
+            vec![CalculationDto::new(
                 String::from("price"),
                 Operation::QUERY,
-                vec![OperandDTO::new(
+                vec![OperandDto::new(
                     String::from("field"),
                     OperandType::Text,
                     String::from("close"),
