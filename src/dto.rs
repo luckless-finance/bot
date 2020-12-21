@@ -12,6 +12,7 @@ use std::convert::TryFrom;
 pub(crate) type GenError = Box<dyn std::error::Error>;
 pub(crate) type GenResult<T> = std::result::Result<T, GenError>;
 pub(crate) type TimeSeriesReference = String;
+pub(crate) type TimeSeriesName = String;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub(crate) struct ScoreDto {
@@ -125,7 +126,7 @@ impl TryFrom<CalculationDto> for SmaCalculationDto {
     type Error = GenError;
     fn try_from(calculation_dto: CalculationDto) -> GenResult<Self> {
         if calculation_dto.operation != Operation::SMA {
-            Err(GenError::from("Conversion into SmaDto failed")).into()
+            Err(GenError::from("Conversion into SmaCalculationDto failed")).into()
         } else {
             let name: String = calculation_dto.name.clone();
             let window_size: usize = calculation_dto
@@ -151,28 +152,39 @@ impl TryFrom<CalculationDto> for SmaCalculationDto {
     }
 }
 
-struct TsDivCalculationDto {
+pub(crate) struct TsDivCalculationDto {
     name: String,
-    denominator: String,
-    numerator: String,
+    denominator: TimeSeriesReference,
+    numerator: TimeSeriesReference,
+}
+
+impl TsDivCalculationDto {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn denominator(&self) -> &TimeSeriesReference {
+        &self.denominator
+    }
+    pub fn numerator(&self) -> &TimeSeriesReference {
+        &self.numerator
+    }
 }
 
 impl TryFrom<CalculationDto> for TsDivCalculationDto {
     type Error = GenError;
     fn try_from(calculation_dto: CalculationDto) -> GenResult<Self> {
         if calculation_dto.operation != Operation::TS_DIV {
-            Err(GenError::from("Conversion into DivDto failed")).into()
+            Err(GenError::from("Conversion into TsDivCalculationDto failed")).into()
         } else {
-            let local_calculation_dto = calculation_dto.clone();
-            let name: String = local_calculation_dto.name.clone();
-            let numerator: String = local_calculation_dto
+            let name: String = calculation_dto.name.clone();
+            let numerator: TimeSeriesReference = calculation_dto
                 .operands
                 .iter()
                 .find(|o| o.name == "numerator")
                 .ok_or("numerator is required")?
                 .value
                 .parse()?;
-            let denominator: String = local_calculation_dto
+            let denominator: TimeSeriesReference = calculation_dto
                 .operands
                 .iter()
                 .find(|o| o.name == "denominator")

@@ -4,7 +4,10 @@ use std::collections::HashMap;
 
 use crate::dag::Dag;
 use crate::data::{Asset, DataClient};
-use crate::dto::{CalculationDto, GenResult, Operation, SmaCalculationDto, StrategyDto};
+use crate::dto::{
+    CalculationDto, GenResult, Operation, SmaCalculationDto, StrategyDto, TimeSeriesName,
+    TsDivCalculationDto,
+};
 use crate::time_series::{TimeSeries1D, TimeStamp};
 use std::convert::TryInto;
 
@@ -13,19 +16,19 @@ use std::convert::TryInto;
 pub(crate) struct Bot {
     strategy: StrategyDto,
     dag: Dag,
-    calc_lkup: HashMap<String, CalculationDto>,
+    calc_lkup: HashMap<TimeSeriesName, CalculationDto>,
 }
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
 pub(crate) struct ExecutableBot {
     strategy: StrategyDto,
     dag: Dag,
-    calc_lkup: HashMap<String, CalculationDto>,
+    calc_lkup: HashMap<TimeSeriesName, CalculationDto>,
     asset: Asset,
     timestamp: TimeStamp,
     data_client: Box<dyn DataClient>,
-    calc_status_lkup: HashMap<String, CalculationStatus>,
-    calc_data_lkup: HashMap<String, TimeSeries1D>,
+    calc_status_lkup: HashMap<TimeSeriesName, CalculationStatus>,
+    calc_data_lkup: HashMap<TimeSeriesName, TimeSeries1D>,
 }
 
 // TODO implement handlers and result memoization
@@ -72,40 +75,29 @@ impl ExecutableBot {
 
     fn handle_ts_div(&self, calc: &CalculationDto) -> GenResult<TimeSeries1D> {
         assert_eq!(*calc.operation(), Operation::TS_DIV);
-        // TODO replace magic strings
-        assert_eq!(
-            calc.operands().len(),
-            2,
-            "DIV operation requires operands: 'numerator' and 'denominator'"
-        );
-        let numerator_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'numerator'
-            .find(|o| o.name() == "numerator")
-            .unwrap();
-        let denominator_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'denominator'
-            .find(|o| o.name() == "denominator")
-            .unwrap();
-        let numerator_value = self.calc_data_lkup.get(numerator_operand.value()).unwrap();
+        let ts_div_dto: TsDivCalculationDto = calc.clone().try_into()?;
+        // TODO replace with method and custom error
+        let numerator_value = self
+            .calc_data_lkup
+            .get(ts_div_dto.numerator())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        // TODO replace with method and custom error
         let denominator_value = self
             .calc_data_lkup
-            .get(denominator_operand.value())
-            .unwrap();
+            .get(ts_div_dto.denominator())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        // TODO TimeSeries methods should take references not values
         Ok(numerator_value.ts_div(denominator_value.clone()))
     }
 
-    // TODO enforce Dto constraints at parse time
     fn handle_sma(&self, calc: &CalculationDto) -> GenResult<TimeSeries1D> {
         assert_eq!(*calc.operation(), Operation::SMA);
         let sma_dto: SmaCalculationDto = calc.clone().try_into()?;
+        // TODO replace with method and custom error
         let time_series = self
             .calc_data_lkup
             .get(sma_dto.time_series())
-            .expect("Upstream TimeSeries1D not found.");
+            .ok_or("Upstream TimeSeries1D not found.")?;
         Ok(time_series.sma(sma_dto.window_size()))
     }
 
