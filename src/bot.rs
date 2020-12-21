@@ -16,7 +16,6 @@ pub(crate) struct Bot {
 }
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
-// #[derive(Debug)]
 pub(crate) struct ExecutableBot {
     strategy: StrategyDTO,
     dag: Dag,
@@ -92,14 +91,10 @@ impl ExecutableBot {
             .calc_data_lkup
             .get(denominator_operand.value())
             .unwrap();
-        // assert_eq!(
-        //     numerator_ts.index(),
-        //     denominator_ts.index(),
-        //     "DIV operation requires both operands be aligned"
-        // );
         Ok(numerator_value.div(denominator_value.clone()))
     }
 
+    // TODO enforce DTO constraints at parse time
     fn handle_sma(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::SMA);
         assert_eq!(
@@ -157,11 +152,11 @@ impl ExecutableBot {
         Ok(left_value.sub(right_value.clone()))
     }
 
+    // TODO parameterized query: generalize market data retrieval
     fn handle_query(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::QUERY);
         println!("TODO execute {}", calc.name());
         let name = "field";
-        // TODO parameterized query
         let _field: &str = calc
             .operands()
             .iter()
@@ -240,7 +235,7 @@ mod tests {
     use std::path::Path;
 
     use crate::bot::Bot;
-    use crate::data::{Asset, MockDataClient, DATA_SIZE, TODAY};
+    use crate::data::{Asset, MockDataClient, TODAY};
     use crate::dto::{
         from_path, CalculationDTO, OperandDTO, OperandType, Operation, ScoreDTO, StrategyDTO,
     };
