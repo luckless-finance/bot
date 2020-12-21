@@ -36,7 +36,7 @@ impl TimeSeries1D {
     pub(crate) fn len(&self) -> usize {
         self.index.len()
     }
-    fn sma(&self, window_size: usize) -> Self {
+    pub(crate) fn sma(&self, window_size: usize) -> Self {
         let mut index = self.index.clone();
         index.truncate(self.len() - window_size + 1);
         // println!("index={:?}", index);

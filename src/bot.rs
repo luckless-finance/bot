@@ -45,6 +45,8 @@ impl ExecutableBot {
             self.set_status(&calc_name, CalculationStatus::InProgress);
             let calc = self.calc_lkup.get(&calc_name).expect("calc not found");
 
+            // TODO add ADD, MUL
+            // TODO align semantics with TimeSeries1D
             let calc_time_series = match calc.operation() {
                 Operation::DIV => self.handle_div(calc),
                 Operation::SMA => self.handle_sma(calc),
@@ -68,6 +70,7 @@ impl ExecutableBot {
     // TODO enforce DTO constraints at parse time
     fn handle_div(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::DIV);
+        // TODO replace magic strings
         assert_eq!(
             calc.operands().len(),
             2,
@@ -76,30 +79,53 @@ impl ExecutableBot {
         let numerator = calc
             .operands()
             .iter()
+            // TODO replace magic strings 'numerator'
             .find(|o| o.name() == "numerator")
             .unwrap();
         let denominator = calc
             .operands()
             .iter()
+            // TODO replace magic strings 'denominator'
             .find(|o| o.name() == "denominator")
             .unwrap();
         let numerator_ts = self.calc_data_lkup.get(numerator.value()).unwrap();
         let denominator_ts = self.calc_data_lkup.get(denominator.value()).unwrap();
-        assert_eq!(
-            numerator_ts.index(),
-            denominator_ts.index(),
-            "DIV operation requires both operands be aligned"
-        );
+        // assert_eq!(
+        //     numerator_ts.index(),
+        //     denominator_ts.index(),
+        //     "DIV operation requires both operands be aligned"
+        // );
         Ok(numerator_ts.div(denominator_ts.clone()))
     }
 
     fn handle_sma(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::SMA);
-        println!("TODO execute {}", calc.name());
-        assert_eq!(calc.operands().len(), 2);
-        let index: Vec<TimeStamp> = (0..DATA_SIZE).collect();
-        let values: Vec<DataPointValue> = (0..DATA_SIZE).map(|x| x as f64).collect();
-        Ok(TimeSeries1D::new(index, values))
+        assert_eq!(
+            calc.operands().len(),
+            2,
+            "SMA operation requires operands: 'window_size' and 'time_series'"
+        );
+        let window_size = calc
+            .operands()
+            .iter()
+            // TODO replace magic strings 'window_size'
+            .find(|o| o.name() == "window_size")
+            .expect("SMA operation requires operand: 'window_size'");
+        let time_series = calc
+            .operands()
+            .iter()
+            // TODO replace magic strings 'time_series'
+            .find(|o| o.name() == "time_series")
+            .expect("SMA operation requires operand: 'time_series'");
+        let time_series_value = self
+            .calc_data_lkup
+            .get(time_series.value())
+            .expect("Upstream TimeSeries1D not found.");
+        let window_size_value: usize = window_size
+            .value()
+            .parse()
+            .expect("'window_size' must be usize");
+        Ok(time_series_value.sma(window_size_value))
     }
 
     fn handle_sub(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
@@ -231,7 +257,7 @@ mod tests {
         executable_bot
             .calc_data_lkup
             .values()
-            .for_each(|time_series| assert_eq!(time_series.len(), DATA_SIZE));
+            .for_each(|time_series| assert!(time_series.len() > 0));
     }
 
     #[test]
