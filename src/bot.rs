@@ -23,7 +23,6 @@ pub(crate) struct ExecutableBot {
     calc_lkup: HashMap<String, CalculationDTO>,
     asset: Asset,
     timestamp: TimeStamp,
-    // TODO replace type with trait DataClient
     data_client: Box<dyn DataClient>,
     calc_status_lkup: HashMap<String, CalculationStatus>,
     calc_data_lkup: HashMap<String, TimeSeries1D>,
@@ -76,26 +75,26 @@ impl ExecutableBot {
             2,
             "DIV operation requires operands: 'numerator' and 'denominator'"
         );
-        let numerator = calc
+        let numerator_operand = calc
             .operands()
             .iter()
             // TODO replace magic strings 'numerator'
             .find(|o| o.name() == "numerator")
             .unwrap();
-        let denominator = calc
+        let denominator_operand = calc
             .operands()
             .iter()
             // TODO replace magic strings 'denominator'
             .find(|o| o.name() == "denominator")
             .unwrap();
-        let numerator_ts = self.calc_data_lkup.get(numerator.value()).unwrap();
-        let denominator_ts = self.calc_data_lkup.get(denominator.value()).unwrap();
+        let numerator_value = self.calc_data_lkup.get(numerator_operand.value()).unwrap();
+        let denominator_value = self.calc_data_lkup.get(denominator_operand.value()).unwrap();
         // assert_eq!(
         //     numerator_ts.index(),
         //     denominator_ts.index(),
         //     "DIV operation requires both operands be aligned"
         // );
-        Ok(numerator_ts.div(denominator_ts.clone()))
+        Ok(numerator_value.div(denominator_value.clone()))
     }
 
     fn handle_sma(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
@@ -105,13 +104,13 @@ impl ExecutableBot {
             2,
             "SMA operation requires operands: 'window_size' and 'time_series'"
         );
-        let window_size = calc
+        let window_size_operand = calc
             .operands()
             .iter()
             // TODO replace magic strings 'window_size'
             .find(|o| o.name() == "window_size")
             .expect("SMA operation requires operand: 'window_size'");
-        let time_series = calc
+        let time_series_operand = calc
             .operands()
             .iter()
             // TODO replace magic strings 'time_series'
@@ -119,9 +118,9 @@ impl ExecutableBot {
             .expect("SMA operation requires operand: 'time_series'");
         let time_series_value = self
             .calc_data_lkup
-            .get(time_series.value())
+            .get(time_series_operand.value())
             .expect("Upstream TimeSeries1D not found.");
-        let window_size_value: usize = window_size
+        let window_size_value: usize = window_size_operand
             .value()
             .parse()
             .expect("'window_size' must be usize");
