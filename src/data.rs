@@ -14,7 +14,7 @@ use rand::thread_rng;
 use rand_distr::num_traits::{AsPrimitive, Pow};
 use rand_distr::{Distribution, Normal};
 
-use crate::dto::GenResult;
+use crate::dto::{GenResult, QueryCalculationDto};
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
 pub(crate) static DATA_SIZE: usize = 10_000;
@@ -23,7 +23,12 @@ pub(crate) type Symbol = String;
 
 pub(crate) trait DataClient {
     fn asset(&self, symbol: Symbol) -> Result<&Asset, &str>;
-    fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> GenResult<TimeSeries1D>;
+    fn query(
+        &self,
+        asset: &Asset,
+        timestamp: &TimeStamp,
+        query: Option<QueryCalculationDto>,
+    ) -> GenResult<TimeSeries1D>;
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -55,7 +60,13 @@ impl DataClient for MockDataClient {
 
     // FIXME this is not called.
     // TODO learn how to use traits
-    fn query(&self, asset: &Asset, timestamp: &usize) -> GenResult<TimeSeries1D> {
+    #[allow(unused_variables)]
+    fn query(
+        &self,
+        asset: &Asset,
+        timestamp: &usize,
+        query_dto: Option<QueryCalculationDto>,
+    ) -> GenResult<TimeSeries1D> {
         assert!(
             self.assets.contains_key(&asset.symbol),
             "query for {} at {} failed",
@@ -246,7 +257,7 @@ mod tests {
         let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         // println!("{:?}", client);
         let asset = Asset::new(Symbol::from("A"));
-        let ts = client.query(&asset, &TODAY).unwrap();
+        let ts = client.query(&asset, &TODAY, None).unwrap();
         // println!("{:?}", ts);
         assert_eq!(ts.len(), DATA_SIZE);
     }

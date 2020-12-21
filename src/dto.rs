@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+use crate::time_series::DataPointValue;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
@@ -13,6 +14,19 @@ pub(crate) type GenError = Box<dyn std::error::Error>;
 pub(crate) type GenResult<T> = std::result::Result<T, GenError>;
 pub(crate) type TimeSeriesReference = String;
 pub(crate) type TimeSeriesName = String;
+
+const DYADIC_TIME_SERIES_OPERATIONS: &[Operation] = &[
+    Operation::TS_ADD,
+    Operation::TS_SUB,
+    Operation::TS_MUL,
+    Operation::TS_DIV,
+];
+const DYADIC_SCALAR_OPERATIONS: &[Operation] = &[
+    Operation::ADD,
+    Operation::SUB,
+    Operation::MUL,
+    Operation::DIV,
+];
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub(crate) struct ScoreDto {
@@ -61,7 +75,9 @@ impl OperandDto {
         OperandDto { name, _type, value }
     }
 }
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[allow(non_camel_case_types)]
 pub(crate) enum Operation {
     QUERY,
     ADD,
@@ -100,6 +116,138 @@ impl CalculationDto {
             name,
             operation,
             operands,
+        }
+    }
+}
+
+// TODO parameterized query: generalize market data retrieval
+pub(crate) struct QueryCalculationDto {
+    name: String,
+    field: String,
+}
+
+impl QueryCalculationDto {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn field(&self) -> &str {
+        &self.field
+    }
+}
+
+impl TryFrom<CalculationDto> for QueryCalculationDto {
+    type Error = GenError;
+    fn try_from(calculation_dto: CalculationDto) -> GenResult<Self> {
+        if calculation_dto.operation != Operation::QUERY {
+            Err(GenError::from("Conversion into QueryCalculationDto failed")).into()
+        } else {
+            let name: String = calculation_dto.name.clone();
+            let field: String = calculation_dto
+                .operands
+                .iter()
+                .find(|o| o.name == "field")
+                .ok_or("field is required")?
+                .value
+                .clone();
+            Ok(Self { name, field })
+        }
+    }
+}
+
+pub(crate) struct DyadicTsCalculationDto {
+    name: String,
+    left: TimeSeriesReference,
+    right: TimeSeriesReference,
+}
+
+impl DyadicTsCalculationDto {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn left(&self) -> &TimeSeriesReference {
+        &self.left
+    }
+    pub fn right(&self) -> &TimeSeriesReference {
+        &self.right
+    }
+}
+
+impl TryFrom<CalculationDto> for DyadicTsCalculationDto {
+    type Error = GenError;
+    fn try_from(calculation_dto: CalculationDto) -> GenResult<Self> {
+        if !DYADIC_TIME_SERIES_OPERATIONS.contains(&calculation_dto.operation) {
+            Err(GenError::from(
+                "Conversion into DyadicTsCalculationDto failed",
+            ))
+            .into()
+        } else {
+            let name: String = calculation_dto.name.clone();
+            let left: TimeSeriesReference = calculation_dto
+                .operands
+                .iter()
+                .find(|o| o.name == "left")
+                .ok_or("left is required")?
+                .value
+                .clone();
+            let right: TimeSeriesReference = calculation_dto
+                .operands
+                .iter()
+                .find(|o| o.name == "right")
+                .ok_or("right is required")?
+                .value
+                .clone();
+            Ok(Self { name, left, right })
+        }
+    }
+}
+
+pub(crate) struct DyadicScalarCalculationDto {
+    name: String,
+    time_series: TimeSeriesReference,
+    scalar: DataPointValue,
+}
+
+impl DyadicScalarCalculationDto {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn time_series(&self) -> &TimeSeriesReference {
+        &self.time_series
+    }
+    pub fn scalar(&self) -> DataPointValue {
+        self.scalar
+    }
+}
+
+impl TryFrom<CalculationDto> for DyadicScalarCalculationDto {
+    type Error = GenError;
+    fn try_from(calculation_dto: CalculationDto) -> GenResult<Self> {
+        if !DYADIC_SCALAR_OPERATIONS.contains(&calculation_dto.operation) {
+            Err(GenError::from(
+                "Conversion into DyadicScalarCalculationDto failed",
+            ))
+            .into()
+        } else {
+            let name: String = calculation_dto.name.clone();
+            let time_series: TimeSeriesReference = calculation_dto
+                .operands
+                .iter()
+                .find(|o| o.name == "time_series")
+                .ok_or("time_series is required")?
+                .value
+                .clone();
+            let scalar: DataPointValue = calculation_dto
+                .operands
+                .iter()
+                .find(|o| o.name == "scalar")
+                .ok_or("scalar is required")?
+                .value
+                .parse()?;
+            Ok(Self {
+                name,
+                time_series,
+                scalar,
+            })
         }
     }
 }
@@ -147,54 +295,6 @@ impl TryFrom<CalculationDto> for SmaCalculationDto {
                 name,
                 window_size,
                 time_series,
-            })
-        }
-    }
-}
-
-pub(crate) struct TsDivCalculationDto {
-    name: String,
-    denominator: TimeSeriesReference,
-    numerator: TimeSeriesReference,
-}
-
-impl TsDivCalculationDto {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-    pub fn denominator(&self) -> &TimeSeriesReference {
-        &self.denominator
-    }
-    pub fn numerator(&self) -> &TimeSeriesReference {
-        &self.numerator
-    }
-}
-
-impl TryFrom<CalculationDto> for TsDivCalculationDto {
-    type Error = GenError;
-    fn try_from(calculation_dto: CalculationDto) -> GenResult<Self> {
-        if calculation_dto.operation != Operation::TS_DIV {
-            Err(GenError::from("Conversion into TsDivCalculationDto failed")).into()
-        } else {
-            let name: String = calculation_dto.name.clone();
-            let numerator: TimeSeriesReference = calculation_dto
-                .operands
-                .iter()
-                .find(|o| o.name == "numerator")
-                .ok_or("numerator is required")?
-                .value
-                .parse()?;
-            let denominator: TimeSeriesReference = calculation_dto
-                .operands
-                .iter()
-                .find(|o| o.name == "denominator")
-                .ok_or("denominator is required")?
-                .value
-                .clone();
-            Ok(Self {
-                name,
-                numerator,
-                denominator,
             })
         }
     }
@@ -254,12 +354,12 @@ mod tests {
                     operation: Operation::TS_DIV,
                     operands: vec![
                         OperandDto {
-                            name: String::from("numerator"),
+                            name: String::from("left"),
                             _type: OperandType::Reference,
                             value: String::from("sma_diff"),
                         },
                         OperandDto {
-                            name: String::from("denominator"),
+                            name: String::from("right"),
                             _type: OperandType::Reference,
                             value: String::from("sma50"),
                         },
@@ -336,10 +436,10 @@ calcs:
   - name: sma_gap
     operation: TS_DIV
     operands:
-      - name: numerator
+      - name: left
         type: Reference
         value: sma_diff
-      - name: denominator
+      - name: right
         type: Reference
         value: sma50
   - name: sma_diff
@@ -385,7 +485,7 @@ calcs:
         assert_eq!(s.score.calc, "sma_gap");
         assert_eq!(s.calcs[0].name, "sma_gap");
         assert_eq!(s.calcs[0].operation, Operation::TS_DIV);
-        assert_eq!(s.calcs[0].operands[0].name, "numerator");
+        assert_eq!(s.calcs[0].operands[0].name, "left");
     }
 
     #[test]
@@ -443,17 +543,17 @@ operands:
 name: sma200
 operation: TS_DIV
 operands:
-  - name: denominator
+  - name: left
     type: Reference
     value: foo
-  - name: numerator
+  - name: right
     type: Reference
     value: bar"#;
         let calc_dto: CalculationDto = serde_yaml::from_str(x)?;
-        let sma: TsDivCalculationDto = calc_dto.try_into()?;
+        let sma: DyadicTsCalculationDto = calc_dto.try_into()?;
         assert_eq!(sma.name, "sma200");
-        assert_eq!(sma.denominator, "foo");
-        assert_eq!(sma.numerator, "bar");
+        assert_eq!(sma.left, "foo");
+        assert_eq!(sma.right, "bar");
         Ok(())
     }
 }

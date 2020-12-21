@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use crate::dag::Dag;
 use crate::data::{Asset, DataClient};
 use crate::dto::{
-    CalculationDto, GenResult, Operation, SmaCalculationDto, StrategyDto, TimeSeriesName,
-    TsDivCalculationDto,
+    CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, GenResult, Operation,
+    QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
 };
 use crate::time_series::{TimeSeries1D, TimeStamp};
 use std::convert::TryInto;
@@ -48,6 +48,7 @@ impl ExecutableBot {
             let calc = self.calc_lkup.get(&calc_name).expect("calc not found");
 
             let calc_time_series = match calc.operation() {
+                Operation::QUERY => self.handle_query(calc),
                 Operation::ADD => self.handle_add(calc),
                 Operation::SUB => self.handle_sub(calc),
                 Operation::MUL => self.handle_mul(calc),
@@ -57,7 +58,6 @@ impl ExecutableBot {
                 Operation::TS_MUL => self.handle_ts_mul(calc),
                 Operation::TS_DIV => self.handle_ts_div(calc),
                 Operation::SMA => self.handle_sma(calc),
-                Operation::QUERY => self.handle_query(calc),
             };
             self.set_status(
                 &calc_name,
@@ -72,92 +72,130 @@ impl ExecutableBot {
         }
         Ok(())
     }
-
-    fn handle_ts_div(&self, calc: &CalculationDto) -> GenResult<TimeSeries1D> {
-        assert_eq!(*calc.operation(), Operation::TS_DIV);
-        let ts_div_dto: TsDivCalculationDto = calc.clone().try_into()?;
-        // TODO replace with method and custom error
-        let numerator_value = self
-            .calc_data_lkup
-            .get(ts_div_dto.numerator())
-            .ok_or("Upstream TimeSeries1D not found.")?;
-        // TODO replace with method and custom error
-        let denominator_value = self
-            .calc_data_lkup
-            .get(ts_div_dto.denominator())
-            .ok_or("Upstream TimeSeries1D not found.")?;
-        // TODO TimeSeries methods should take references not values
-        Ok(numerator_value.ts_div(denominator_value.clone()))
+    // TODO parameterized query: generalize market data retrieval
+    fn handle_query(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::QUERY);
+        let query_dto: QueryCalculationDto = calculation_dto.clone().try_into()?;
+        self.data_client
+            .query(&self.asset, &self.timestamp, Some(query_dto))
     }
-
-    fn handle_sma(&self, calc: &CalculationDto) -> GenResult<TimeSeries1D> {
-        assert_eq!(*calc.operation(), Operation::SMA);
-        let sma_dto: SmaCalculationDto = calc.clone().try_into()?;
+    fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::ADD);
+        let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+            calculation_dto.clone().try_into()?;
+        // TODO replace with method and custom error
+        let time_series = self
+            .calc_data_lkup
+            .get(dyadic_scalar_calc_dto.time_series())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        Ok(time_series.add(dyadic_scalar_calc_dto.scalar()))
+    }
+    fn handle_sub(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::SUB);
+        let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+            calculation_dto.clone().try_into()?;
+        // TODO replace with method and custom error
+        let time_series = self
+            .calc_data_lkup
+            .get(dyadic_scalar_calc_dto.time_series())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        Ok(time_series.sub(dyadic_scalar_calc_dto.scalar()))
+    }
+    fn handle_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::MUL);
+        let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+            calculation_dto.clone().try_into()?;
+        // TODO replace with method and custom error
+        let time_series = self
+            .calc_data_lkup
+            .get(dyadic_scalar_calc_dto.time_series())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        Ok(time_series.mul(dyadic_scalar_calc_dto.scalar()))
+    }
+    fn handle_div(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::DIV);
+        let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+            calculation_dto.clone().try_into()?;
+        // TODO replace with method and custom error
+        let time_series = self
+            .calc_data_lkup
+            .get(dyadic_scalar_calc_dto.time_series())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        Ok(time_series.div(dyadic_scalar_calc_dto.scalar()))
+    }
+    fn handle_ts_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::TS_ADD);
+        let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
+        // TODO replace with method and custom error
+        let left_value = self
+            .calc_data_lkup
+            .get(dyadic_ts_calc_dto.left())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        // TODO replace with method and custom error
+        let right_value = self
+            .calc_data_lkup
+            .get(dyadic_ts_calc_dto.right())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        // TODO wasteful clone, sub calls aligns which clones
+        Ok(left_value.ts_add(right_value.clone()))
+    }
+    fn handle_ts_sub(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::TS_SUB);
+        let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
+        // TODO replace with method and custom error
+        let left_value = self
+            .calc_data_lkup
+            .get(dyadic_ts_calc_dto.left())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        // TODO replace with method and custom error
+        let right_value = self
+            .calc_data_lkup
+            .get(dyadic_ts_calc_dto.right())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        // TODO wasteful clone, sub calls aligns which clones
+        Ok(left_value.ts_sub(right_value.clone()))
+    }
+    fn handle_ts_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::TS_MUL);
+        let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
+        // TODO replace with method and custom error
+        let left_value = self
+            .calc_data_lkup
+            .get(dyadic_ts_calc_dto.left())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        // TODO replace with method and custom error
+        let right_value = self
+            .calc_data_lkup
+            .get(dyadic_ts_calc_dto.right())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        // TODO wasteful clone, sub calls aligns which clones
+        Ok(left_value.ts_mul(right_value.clone()))
+    }
+    fn handle_ts_div(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::TS_DIV);
+        let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
+        // TODO replace with method and custom error
+        let left_value = self
+            .calc_data_lkup
+            .get(dyadic_ts_calc_dto.left())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        // TODO replace with method and custom error
+        let right_value = self
+            .calc_data_lkup
+            .get(dyadic_ts_calc_dto.right())
+            .ok_or("Upstream TimeSeries1D not found.")?;
+        // TODO wasteful clone, sub calls aligns which clones
+        Ok(left_value.ts_div(right_value.clone()))
+    }
+    fn handle_sma(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::SMA);
+        let sma_dto: SmaCalculationDto = calculation_dto.clone().try_into()?;
         // TODO replace with method and custom error
         let time_series = self
             .calc_data_lkup
             .get(sma_dto.time_series())
             .ok_or("Upstream TimeSeries1D not found.")?;
         Ok(time_series.sma(sma_dto.window_size()))
-    }
-
-    // TODO enforce Dto constraints at parse time
-    fn handle_ts_sub(&self, calc: &CalculationDto) -> GenResult<TimeSeries1D> {
-        assert_eq!(*calc.operation(), Operation::TS_SUB);
-        // TODO replace magic strings
-        assert_eq!(
-            calc.operands().len(),
-            2,
-            "SUB operation requires operands: 'left' and 'right'"
-        );
-        let left_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'left'
-            .find(|o| o.name() == "left")
-            .unwrap();
-        let right_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'right'
-            .find(|o| o.name() == "right")
-            .unwrap();
-        let left_value = self.calc_data_lkup.get(left_operand.value()).unwrap();
-        let right_value = self.calc_data_lkup.get(right_operand.value()).unwrap();
-        // TODO wasteful clone, sub calls aligns which clones
-        Ok(left_value.ts_sub(right_value.clone()))
-    }
-
-    // TODO parameterized query: generalize market data retrieval
-    fn handle_query(&self, calc: &CalculationDto) -> GenResult<TimeSeries1D> {
-        assert_eq!(*calc.operation(), Operation::QUERY);
-        println!("TODO execute {}", calc.name());
-        let name = "field";
-        let _field: &str = calc
-            .operands()
-            .iter()
-            .find(|o| o.name() == name)
-            .expect("symbol operand not found")
-            .value();
-        self.data_client.query(&self.asset, &self.timestamp)
-    }
-    fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-        unimplemented!()
-    }
-    fn handle_sub(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-        unimplemented!()
-    }
-    fn handle_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-        unimplemented!()
-    }
-    fn handle_div(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-        unimplemented!()
-    }
-    fn handle_ts_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-        unimplemented!()
-    }
-    fn handle_ts_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-        unimplemented!()
     }
 }
 

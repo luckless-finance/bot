@@ -6,10 +6,10 @@ calcs:
   - name: sma_gap
     operation: TS_DIV
     operands:
-      - name: numerator
+      - name: left
         type: Reference
         value: sma_diff
-      - name: denominator
+      - name: right
         type: Reference
         value: sma50
   - name: sma_diff
