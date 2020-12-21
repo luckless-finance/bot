@@ -6,6 +6,11 @@ use std::io::Read;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
+
+// https://doc.rust-lang.org/rust-by-example/error/multiple_error_types/boxing_errors.html
+type GenError = Box<dyn std::error::Error>;
+type GenResult<T> = std::result::Result<T, GenError>;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub(crate) struct ScoreDto {
@@ -91,6 +96,80 @@ impl CalculationDto {
     }
 }
 
+struct SmaCalculationDto {
+    name: String,
+    window_size: usize,
+    time_series: String,
+}
+
+impl TryFrom<CalculationDto> for SmaCalculationDto {
+    type Error = GenError;
+    fn try_from(calculation_dto: CalculationDto) -> GenResult<Self> {
+        if calculation_dto.operation != Operation::SMA {
+            Err(GenError::from("Conversion into SmaDto failed")).into()
+        } else {
+            let local_calculation_dto = calculation_dto.clone();
+            let name: String = local_calculation_dto.name.clone();
+            let window_size: usize = local_calculation_dto
+                .operands
+                .iter()
+                .find(|o| o.name == "window_size")
+                .ok_or("window_size is required")?
+                .value
+                .parse()?;
+            let time_series: String = local_calculation_dto
+                .operands
+                .iter()
+                .find(|o| o.name == "time_series")
+                .ok_or("time_series is required")?
+                .value
+                .clone();
+            Ok(Self {
+                name,
+                window_size,
+                time_series,
+            })
+        }
+    }
+}
+
+struct DivCalculationDto {
+    name: String,
+    denominator: String,
+    numerator: String,
+}
+
+impl TryFrom<CalculationDto> for DivCalculationDto {
+    type Error = GenError;
+    fn try_from(calculation_dto: CalculationDto) -> GenResult<Self> {
+        if calculation_dto.operation != Operation::DIV {
+            Err(GenError::from("Conversion into DivDto failed")).into()
+        } else {
+            let local_calculation_dto = calculation_dto.clone();
+            let name: String = local_calculation_dto.name.clone();
+            let numerator: String = local_calculation_dto
+                .operands
+                .iter()
+                .find(|o| o.name == "numerator")
+                .ok_or("numerator is required")?
+                .value
+                .parse()?;
+            let denominator: String = local_calculation_dto
+                .operands
+                .iter()
+                .find(|o| o.name == "denominator")
+                .ok_or("denominator is required")?
+                .value
+                .clone();
+            Ok(Self {
+                name,
+                numerator,
+                denominator,
+            })
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub(crate) struct StrategyDto {
     name: String,
@@ -130,9 +209,8 @@ mod tests {
     use std::env::current_dir;
     use std::path::Path;
 
-    use crate::dto::{
-        from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto, StrategyDto,
-    };
+    use crate::dto::*;
+    use std::convert::TryInto;
 
     fn get_strategy() -> StrategyDto {
         StrategyDto {
@@ -308,5 +386,45 @@ calcs:
         let strategy =
             from_path(strategy_path.as_path()).expect("unable to load strategy from path");
         assert_eq!(strategy, get_strategy());
+    }
+
+    #[test]
+    fn test_to_sma_dto() -> GenResult<()> {
+        let x = r#"
+name: sma200
+operation: SMA
+operands:
+  - name: time_series
+    type: Reference
+    value: price
+  - name: window_size
+    type: Integer
+    value: '200'"#;
+        let calc_dto: CalculationDto = serde_yaml::from_str(x)?;
+        let sma: SmaCalculationDto = calc_dto.try_into()?;
+        assert_eq!(sma.name, "sma200");
+        assert_eq!(sma.window_size, 200);
+        assert_eq!(sma.time_series, "price");
+        Ok(())
+    }
+
+    #[test]
+    fn test_to_div_dto() -> GenResult<()> {
+        let x = r#"
+name: sma200
+operation: DIV
+operands:
+  - name: denominator
+    type: Reference
+    value: foo
+  - name: numerator
+    type: Reference
+    value: bar"#;
+        let calc_dto: CalculationDto = serde_yaml::from_str(x)?;
+        let sma: DivCalculationDto = calc_dto.try_into()?;
+        assert_eq!(sma.name, "sma200");
+        assert_eq!(sma.denominator, "foo");
+        assert_eq!(sma.numerator, "bar");
+        Ok(())
     }
 }
