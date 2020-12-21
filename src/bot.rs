@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::dag::Dag;
 use crate::data::{Asset, DataClient};
-use crate::dto::{CalculationDto, Operation, StrategyDto};
+use crate::dto::{CalculationDto, GenResult, Operation, SmaCalculationDto, StrategyDto};
 use crate::time_series::{TimeSeries1D, TimeStamp};
 use std::convert::TryInto;
 
@@ -37,7 +37,7 @@ impl ExecutableBot {
     }
 
     /// Traverse `Dag` executing each node for given `Asset` as of `Timestamp`
-    fn execute(&mut self) -> Result<(), String> {
+    fn execute(&mut self) -> GenResult<()> {
         let calc_order = self.dag.execution_order().clone();
         for calc_name in calc_order {
             println!("\nexecuting {}", calc_name);
@@ -70,7 +70,7 @@ impl ExecutableBot {
         Ok(())
     }
 
-    fn handle_ts_div(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
+    fn handle_ts_div(&self, calc: &CalculationDto) -> GenResult<TimeSeries1D> {
         assert_eq!(*calc.operation(), Operation::TS_DIV);
         // TODO replace magic strings
         assert_eq!(
@@ -99,38 +99,18 @@ impl ExecutableBot {
     }
 
     // TODO enforce Dto constraints at parse time
-    fn handle_sma(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
+    fn handle_sma(&self, calc: &CalculationDto) -> GenResult<TimeSeries1D> {
         assert_eq!(*calc.operation(), Operation::SMA);
-        assert_eq!(
-            calc.operands().len(),
-            2,
-            "SMA operation requires operands: 'window_size' and 'time_series'"
-        );
-        let window_size_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'window_size'
-            .find(|o| o.name() == "window_size")
-            .expect("SMA operation requires operand: 'window_size'");
-        let time_series_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'time_series'
-            .find(|o| o.name() == "time_series")
-            .expect("SMA operation requires operand: 'time_series'");
-        let time_series_value = self
+        let sma_dto: SmaCalculationDto = calc.clone().try_into()?;
+        let time_series = self
             .calc_data_lkup
-            .get(time_series_operand.value())
+            .get(sma_dto.time_series())
             .expect("Upstream TimeSeries1D not found.");
-        let window_size_value: usize = window_size_operand
-            .value()
-            .parse()
-            .expect("'window_size' must be usize");
-        Ok(time_series_value.sma(window_size_value))
+        Ok(time_series.sma(sma_dto.window_size()))
     }
 
     // TODO enforce Dto constraints at parse time
-    fn handle_ts_sub(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
+    fn handle_ts_sub(&self, calc: &CalculationDto) -> GenResult<TimeSeries1D> {
         assert_eq!(*calc.operation(), Operation::TS_SUB);
         // TODO replace magic strings
         assert_eq!(
@@ -157,7 +137,7 @@ impl ExecutableBot {
     }
 
     // TODO parameterized query: generalize market data retrieval
-    fn handle_query(&self, calc: &CalculationDto) -> Result<TimeSeries1D, String> {
+    fn handle_query(&self, calc: &CalculationDto) -> GenResult<TimeSeries1D> {
         assert_eq!(*calc.operation(), Operation::QUERY);
         println!("TODO execute {}", calc.name());
         let name = "field";
@@ -169,22 +149,22 @@ impl ExecutableBot {
             .value();
         self.data_client.query(&self.asset, &self.timestamp)
     }
-    fn handle_add(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+    fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
         unimplemented!()
     }
-    fn handle_sub(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+    fn handle_sub(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
         unimplemented!()
     }
-    fn handle_mul(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+    fn handle_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
         unimplemented!()
     }
-    fn handle_div(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+    fn handle_div(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
         unimplemented!()
     }
-    fn handle_ts_add(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+    fn handle_ts_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
         unimplemented!()
     }
-    fn handle_ts_mul(&self, calculation_dto: &CalculationDto) -> Result<TimeSeries1D, String> {
+    fn handle_ts_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
         unimplemented!()
     }
 }

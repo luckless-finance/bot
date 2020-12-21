@@ -9,8 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
 // https://doc.rust-lang.org/rust-by-example/error/multiple_error_types/boxing_errors.html
-type GenError = Box<dyn std::error::Error>;
-type GenResult<T> = std::result::Result<T, GenError>;
+pub(crate) type GenError = Box<dyn std::error::Error>;
+pub(crate) type GenResult<T> = std::result::Result<T, GenError>;
+pub(crate) type TimeSeriesReference = String;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub(crate) struct ScoreDto {
@@ -102,10 +103,22 @@ impl CalculationDto {
     }
 }
 
-struct SmaCalculationDto {
+pub(crate) struct SmaCalculationDto {
     name: String,
     window_size: usize,
-    time_series: String,
+    time_series: TimeSeriesReference,
+}
+
+impl SmaCalculationDto {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn window_size(&self) -> usize {
+        self.window_size
+    }
+    pub fn time_series(&self) -> &TimeSeriesReference {
+        &self.time_series
+    }
 }
 
 impl TryFrom<CalculationDto> for SmaCalculationDto {
@@ -114,16 +127,15 @@ impl TryFrom<CalculationDto> for SmaCalculationDto {
         if calculation_dto.operation != Operation::SMA {
             Err(GenError::from("Conversion into SmaDto failed")).into()
         } else {
-            let local_calculation_dto = calculation_dto.clone();
-            let name: String = local_calculation_dto.name.clone();
-            let window_size: usize = local_calculation_dto
+            let name: String = calculation_dto.name.clone();
+            let window_size: usize = calculation_dto
                 .operands
                 .iter()
                 .find(|o| o.name == "window_size")
                 .ok_or("window_size is required")?
                 .value
                 .parse()?;
-            let time_series: String = local_calculation_dto
+            let time_series: String = calculation_dto
                 .operands
                 .iter()
                 .find(|o| o.name == "time_series")

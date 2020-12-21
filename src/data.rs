@@ -14,6 +14,7 @@ use rand::thread_rng;
 use rand_distr::num_traits::{AsPrimitive, Pow};
 use rand_distr::{Distribution, Normal};
 
+use crate::dto::GenResult;
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
 pub(crate) static DATA_SIZE: usize = 10_000;
@@ -22,7 +23,7 @@ pub(crate) type Symbol = String;
 
 pub(crate) trait DataClient {
     fn asset(&self, symbol: Symbol) -> Result<&Asset, &str>;
-    fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> Result<TimeSeries1D, String>;
+    fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> GenResult<TimeSeries1D>;
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -54,7 +55,7 @@ impl DataClient for MockDataClient {
 
     // FIXME this is not called.
     // TODO learn how to use traits
-    fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, String> {
+    fn query(&self, asset: &Asset, timestamp: &usize) -> GenResult<TimeSeries1D> {
         assert!(
             self.assets.contains_key(&asset.symbol),
             "query for {} at {} failed",
@@ -82,7 +83,7 @@ impl MockDataClient {
         &self.assets
     }
     // TODO learn how to use traits
-    pub(crate) fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, String> {
+    pub(crate) fn query(&self, asset: &Asset, timestamp: &usize) -> GenResult<TimeSeries1D> {
         assert!(
             self.assets.contains_key(&asset.symbol),
             "query for {} at {} failed",
