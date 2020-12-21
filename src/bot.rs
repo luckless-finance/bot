@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 
 use crate::dag::Dag;
-use crate::data::{Asset, DataClient, DATA_SIZE};
+use crate::data::{Asset, DataClient};
 use crate::dto::{CalculationDTO, Operation, StrategyDTO};
-use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
+use crate::time_series::{TimeSeries1D, TimeStamp};
 
 /// Wraps several DTOs required traverse and consume a strategy
 #[derive(Debug, Clone)]
@@ -88,7 +88,10 @@ impl ExecutableBot {
             .find(|o| o.name() == "denominator")
             .unwrap();
         let numerator_value = self.calc_data_lkup.get(numerator_operand.value()).unwrap();
-        let denominator_value = self.calc_data_lkup.get(denominator_operand.value()).unwrap();
+        let denominator_value = self
+            .calc_data_lkup
+            .get(denominator_operand.value())
+            .unwrap();
         // assert_eq!(
         //     numerator_ts.index(),
         //     denominator_ts.index(),
@@ -127,13 +130,31 @@ impl ExecutableBot {
         Ok(time_series_value.sma(window_size_value))
     }
 
+    // TODO enforce DTO constraints at parse time
     fn handle_sub(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
         assert_eq!(*calc.operation(), Operation::SUB);
-        println!("TODO execute {}", calc.name());
-        assert_eq!(calc.operands().len(), 2);
-        let index: Vec<TimeStamp> = (0..DATA_SIZE).collect();
-        let values: Vec<DataPointValue> = (0..DATA_SIZE).map(|x| x as f64).collect();
-        Ok(TimeSeries1D::new(index, values))
+        // TODO replace magic strings
+        assert_eq!(
+            calc.operands().len(),
+            2,
+            "SUB operation requires operands: 'left' and 'right'"
+        );
+        let left_operand = calc
+            .operands()
+            .iter()
+            // TODO replace magic strings 'left'
+            .find(|o| o.name() == "left")
+            .unwrap();
+        let right_operand = calc
+            .operands()
+            .iter()
+            // TODO replace magic strings 'right'
+            .find(|o| o.name() == "right")
+            .unwrap();
+        let left_value = self.calc_data_lkup.get(left_operand.value()).unwrap();
+        let right_value = self.calc_data_lkup.get(right_operand.value()).unwrap();
+        // TODO wasteful clone, sub calls aligns which clones
+        Ok(left_value.sub(right_value.clone()))
     }
 
     fn handle_query(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
