@@ -10,7 +10,7 @@ use gnuplot::PlotOption::Caption;
 use gnuplot::{AxesCommon, Figure};
 
 use crate::dag::to_dag;
-use crate::dto::{from_path, StrategyDTO};
+use crate::dto::{from_path, StrategyDto};
 
 mod bot;
 mod dag;
@@ -18,7 +18,7 @@ mod data;
 mod dto;
 mod time_series;
 
-fn load_strategy() -> StrategyDTO {
+fn load_strategy() -> StrategyDto {
     let strategy_path = current_dir()
         .expect("unable to get working directory")
         .join(Path::new("strategy.yaml"));

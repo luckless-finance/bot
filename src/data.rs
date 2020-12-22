@@ -14,6 +14,7 @@ use rand::thread_rng;
 use rand_distr::num_traits::{AsPrimitive, Pow};
 use rand_distr::{Distribution, Normal};
 
+use crate::dto::{GenResult, QueryCalculationDto};
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
 pub(crate) static DATA_SIZE: usize = 10_000;
@@ -22,7 +23,12 @@ pub(crate) type Symbol = String;
 
 pub(crate) trait DataClient {
     fn asset(&self, symbol: Symbol) -> Result<&Asset, &str>;
-    fn query(&self, asset: &Asset, timestamp: &TimeStamp) -> Result<TimeSeries1D, String>;
+    fn query(
+        &self,
+        asset: &Asset,
+        timestamp: &TimeStamp,
+        query: Option<QueryCalculationDto>,
+    ) -> GenResult<TimeSeries1D>;
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -52,9 +58,13 @@ impl DataClient for MockDataClient {
         Ok(self.assets.index(symbol.as_str()))
     }
 
-    // FIXME this is not called.
-    // TODO learn how to use traits
-    fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, String> {
+    #[allow(unused_variables)]
+    fn query(
+        &self,
+        asset: &Asset,
+        timestamp: &usize,
+        query_dto: Option<QueryCalculationDto>,
+    ) -> GenResult<TimeSeries1D> {
         assert!(
             self.assets.contains_key(&asset.symbol),
             "query for {} at {} failed",
@@ -80,16 +90,6 @@ impl MockDataClient {
     // TODO make this private
     pub fn assets(&self) -> &HashMap<Symbol, Asset> {
         &self.assets
-    }
-    // TODO learn how to use traits
-    pub(crate) fn query(&self, asset: &Asset, timestamp: &usize) -> Result<TimeSeries1D, String> {
-        assert!(
-            self.assets.contains_key(&asset.symbol),
-            "query for {} at {} failed",
-            asset,
-            timestamp
-        );
-        Ok(TimeSeries1D::from_values(simulate_random(DATA_SIZE)))
     }
 }
 
@@ -232,9 +232,7 @@ mod tests {
 
     use rand_distr::num_traits::AsPrimitive;
 
-    use crate::data::{
-        _polynomial, plot, plots, polynomial, sin, sum, x, MockDataClient, Symbol, DATA_SIZE, TODAY,
-    };
+    use crate::data::*;
 
     const EPSILON: f64 = 1E-10;
 
@@ -254,10 +252,10 @@ mod tests {
 
     #[test]
     fn mock_data_client_query() {
-        let client = MockDataClient::new();
+        let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         // println!("{:?}", client);
-        let asset = client.assets.get("A").unwrap();
-        let ts = client.query(asset, &TODAY).unwrap();
+        let asset = Asset::new(Symbol::from("A"));
+        let ts = client.query(&asset, &TODAY, None).unwrap();
         // println!("{:?}", ts);
         assert_eq!(ts.len(), DATA_SIZE);
     }

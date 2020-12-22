@@ -11,17 +11,17 @@ use petgraph::dot::{Config, Dot};
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::Direction;
 
-use crate::dto::{OperandType, StrategyDTO};
+use crate::dto::{OperandType, StrategyDto};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Dag {
-    dag_dto: DagDTO,
+    dag_dto: DagDto,
     node_lkup: HashMap<String, NodeIndex>,
     execution_order: Vec<String>,
 }
 
 impl Dag {
-    pub fn new(strategy_dto: StrategyDTO) -> Self {
+    pub fn new(strategy_dto: StrategyDto) -> Self {
         let dag_dto = to_dag(&strategy_dto).expect("unable to build dag from strategy");
         let node_lkup: HashMap<String, NodeIndex<u32>> = dag_dto
             .node_indices()
@@ -35,7 +35,7 @@ impl Dag {
             execution_order,
         }
     }
-    fn compute_execution_order(dag_dto: &DagDTO) -> Vec<String> {
+    fn compute_execution_order(dag_dto: &DagDto) -> Vec<String> {
         toposort(&dag_dto, None)
             .expect("unable to toposort")
             .iter()
@@ -71,10 +71,10 @@ impl Dag {
     }
 }
 
-type DagDTO = DiGraph<String, String>;
+type DagDto = DiGraph<String, String>;
 
-pub(crate) fn to_dag(strategy: &StrategyDTO) -> Result<DagDTO, &str> {
-    let mut dag: DagDTO = DiGraph::new();
+pub(crate) fn to_dag(strategy: &StrategyDto) -> Result<DagDto, &str> {
+    let mut dag: DagDto = DiGraph::new();
     let mut node_lookup = HashMap::new();
 
     // add nodes
@@ -110,9 +110,9 @@ mod tests {
     use std::path::Path;
 
     use crate::dag::Dag;
-    use crate::dto::{from_path, StrategyDTO};
+    use crate::dto::{from_path, StrategyDto};
 
-    fn strategy_fixture() -> StrategyDTO {
+    fn strategy_fixture() -> StrategyDto {
         from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
     }
 
@@ -196,10 +196,10 @@ mod learn_library {
     use petgraph::algo::toposort;
     use petgraph::prelude::*;
 
-    use crate::dag::{to_dag, Dag, DagDTO};
-    use crate::dto::{from_path, StrategyDTO};
+    use crate::dag::{to_dag, Dag, DagDto};
+    use crate::dto::{from_path, StrategyDto};
 
-    fn strategy_fixture() -> StrategyDTO {
+    fn strategy_fixture() -> StrategyDto {
         from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
     }
 
@@ -210,7 +210,7 @@ mod learn_library {
     #[test]
     fn topo() {
         // dag = C -> B <- A
-        let mut dag: DagDTO = DiGraph::new();
+        let mut dag: DagDto = DiGraph::new();
         let b = dag.add_node(String::from("B"));
         let c = dag.add_node(String::from("C"));
         let a = dag.add_node(String::from("A"));
@@ -232,7 +232,7 @@ mod learn_library {
     #[test]
     fn dfs_post_order() {
         let strategy = strategy_fixture();
-        let dag: DagDTO = to_dag(&strategy).expect("unable to convert to bot");
+        let dag: DagDto = to_dag(&strategy).expect("unable to convert to bot");
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
 
         let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
@@ -251,7 +251,7 @@ mod learn_library {
     #[test]
     fn bfs() {
         let strategy = strategy_fixture();
-        let dag: DagDTO = to_dag(&strategy).expect("unable to convert to bot");
+        let dag: DagDto = to_dag(&strategy).expect("unable to convert to bot");
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
 
         let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");

@@ -4,54 +4,97 @@ use std::collections::HashMap;
 
 use crate::dag::Dag;
 use crate::data::{Asset, DataClient};
-use crate::dto::{CalculationDTO, Operation, StrategyDTO};
+use crate::dto::{
+    CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, GenResult, Operation,
+    QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
+};
 use crate::time_series::{TimeSeries1D, TimeStamp};
+use serde::export::Formatter;
+use std;
+use std::convert::TryInto;
+use std::fmt;
 
-/// Wraps several DTOs required traverse and consume a strategy
+/// Wraps several Dtos required traverse and consume a strategy
 #[derive(Debug, Clone)]
 pub(crate) struct Bot {
-    strategy: StrategyDTO,
+    strategy: StrategyDto,
     dag: Dag,
-    calc_lkup: HashMap<String, CalculationDTO>,
+    calc_lkup: HashMap<TimeSeriesName, CalculationDto>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct UpstreamNotFoundError {
+    upstream_name: String,
+    calculation_name: String,
+}
+
+impl fmt::Display for UpstreamNotFoundError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(
+            f,
+            "upstream time series not found {} for calculation: {}\n",
+            self.calculation_name, self.upstream_name
+        )
+    }
+}
+
+impl std::error::Error for UpstreamNotFoundError {
+    fn description(&self) -> &str {
+        "Upstream time series not found."
+    }
 }
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
 pub(crate) struct ExecutableBot {
-    strategy: StrategyDTO,
+    strategy: StrategyDto,
     dag: Dag,
-    calc_lkup: HashMap<String, CalculationDTO>,
+    calc_lkup: HashMap<TimeSeriesName, CalculationDto>,
     asset: Asset,
     timestamp: TimeStamp,
     data_client: Box<dyn DataClient>,
-    calc_status_lkup: HashMap<String, CalculationStatus>,
-    calc_data_lkup: HashMap<String, TimeSeries1D>,
+    calc_status_lkup: HashMap<TimeSeriesName, CalculationStatus>,
+    calc_data_lkup: HashMap<TimeSeriesName, TimeSeries1D>,
 }
 
 // TODO implement handlers and result memoization
 impl ExecutableBot {
-    fn set_status(&mut self, calc_name: &str, new_calc_status: CalculationStatus) {
+    fn status(&mut self, calc_name: &str, new_calc_status: CalculationStatus) {
         if let Some(calc_status) = self.calc_status_lkup.get_mut(calc_name) {
             *calc_status = new_calc_status;
         }
     }
 
+    fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
+        match self.calc_data_lkup.get(calc_name) {
+            Some(time_series_) => Ok(time_series_),
+            None => Err(Box::new(UpstreamNotFoundError {
+                upstream_name: "".to_string(),
+                calculation_name: "".to_string(),
+            })),
+        }
+    }
+
     /// Traverse `Dag` executing each node for given `Asset` as of `Timestamp`
-    fn execute(&mut self) -> Result<(), String> {
+    fn execute(&mut self) -> GenResult<()> {
         let calc_order = self.dag.execution_order().clone();
         for calc_name in calc_order {
             println!("\nexecuting {}", calc_name);
-            self.set_status(&calc_name, CalculationStatus::InProgress);
-            let calc = self.calc_lkup.get(&calc_name).expect("calc not found");
+            self.status(&calc_name, CalculationStatus::InProgress);
+            let calc = self.calc_lkup.get(&calc_name).ok_or("calc not found")?;
 
-            // TODO add ADD, MUL
-            // TODO align semantics with TimeSeries1D
             let calc_time_series = match calc.operation() {
-                Operation::DIV => self.handle_div(calc),
-                Operation::SMA => self.handle_sma(calc),
-                Operation::SUB => self.handle_sub(calc),
                 Operation::QUERY => self.handle_query(calc),
+                Operation::ADD => self.handle_add(calc),
+                Operation::SUB => self.handle_sub(calc),
+                Operation::MUL => self.handle_mul(calc),
+                Operation::DIV => self.handle_div(calc),
+                Operation::TS_ADD => self.handle_ts_add(calc),
+                Operation::TS_SUB => self.handle_ts_sub(calc),
+                Operation::TS_MUL => self.handle_ts_mul(calc),
+                Operation::TS_DIV => self.handle_ts_div(calc),
+                Operation::SMA => self.handle_sma(calc),
             };
-            self.set_status(
+            self.status(
                 &calc_name,
                 match calc_time_series.is_ok() {
                     true => CalculationStatus::Complete,
@@ -64,106 +107,74 @@ impl ExecutableBot {
         }
         Ok(())
     }
-
-    // TODO enforce DTO constraints at parse time
-    fn handle_div(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
-        assert_eq!(*calc.operation(), Operation::DIV);
-        // TODO replace magic strings
-        assert_eq!(
-            calc.operands().len(),
-            2,
-            "DIV operation requires operands: 'numerator' and 'denominator'"
-        );
-        let numerator_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'numerator'
-            .find(|o| o.name() == "numerator")
-            .unwrap();
-        let denominator_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'denominator'
-            .find(|o| o.name() == "denominator")
-            .unwrap();
-        let numerator_value = self.calc_data_lkup.get(numerator_operand.value()).unwrap();
-        let denominator_value = self
-            .calc_data_lkup
-            .get(denominator_operand.value())
-            .unwrap();
-        Ok(numerator_value.div(denominator_value.clone()))
-    }
-
-    // TODO enforce DTO constraints at parse time
-    fn handle_sma(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
-        assert_eq!(*calc.operation(), Operation::SMA);
-        assert_eq!(
-            calc.operands().len(),
-            2,
-            "SMA operation requires operands: 'window_size' and 'time_series'"
-        );
-        let window_size_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'window_size'
-            .find(|o| o.name() == "window_size")
-            .expect("SMA operation requires operand: 'window_size'");
-        let time_series_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'time_series'
-            .find(|o| o.name() == "time_series")
-            .expect("SMA operation requires operand: 'time_series'");
-        let time_series_value = self
-            .calc_data_lkup
-            .get(time_series_operand.value())
-            .expect("Upstream TimeSeries1D not found.");
-        let window_size_value: usize = window_size_operand
-            .value()
-            .parse()
-            .expect("'window_size' must be usize");
-        Ok(time_series_value.sma(window_size_value))
-    }
-
-    // TODO enforce DTO constraints at parse time
-    fn handle_sub(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
-        assert_eq!(*calc.operation(), Operation::SUB);
-        // TODO replace magic strings
-        assert_eq!(
-            calc.operands().len(),
-            2,
-            "SUB operation requires operands: 'left' and 'right'"
-        );
-        let left_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'left'
-            .find(|o| o.name() == "left")
-            .unwrap();
-        let right_operand = calc
-            .operands()
-            .iter()
-            // TODO replace magic strings 'right'
-            .find(|o| o.name() == "right")
-            .unwrap();
-        let left_value = self.calc_data_lkup.get(left_operand.value()).unwrap();
-        let right_value = self.calc_data_lkup.get(right_operand.value()).unwrap();
-        // TODO wasteful clone, sub calls aligns which clones
-        Ok(left_value.sub(right_value.clone()))
-    }
-
     // TODO parameterized query: generalize market data retrieval
-    fn handle_query(&self, calc: &CalculationDTO) -> Result<TimeSeries1D, String> {
-        assert_eq!(*calc.operation(), Operation::QUERY);
-        println!("TODO execute {}", calc.name());
-        let name = "field";
-        let _field: &str = calc
-            .operands()
-            .iter()
-            .find(|o| o.name() == name)
-            .expect("symbol operand not found")
-            .value();
-        self.data_client.query(&self.asset, &self.timestamp)
+    fn handle_query(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::QUERY);
+        let query_dto: QueryCalculationDto = calculation_dto.clone().try_into()?;
+        self.data_client
+            .query(&self.asset, &self.timestamp, Some(query_dto))
+    }
+    fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::ADD);
+        let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+            calculation_dto.clone().try_into()?;
+        let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
+        Ok(time_series.add(dyadic_scalar_calc_dto.scalar()))
+    }
+    fn handle_sub(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::SUB);
+        let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+            calculation_dto.clone().try_into()?;
+        let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
+        Ok(time_series.sub(dyadic_scalar_calc_dto.scalar()))
+    }
+    fn handle_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::MUL);
+        let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+            calculation_dto.clone().try_into()?;
+        let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
+        Ok(time_series.mul(dyadic_scalar_calc_dto.scalar()))
+    }
+    fn handle_div(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::DIV);
+        let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+            calculation_dto.clone().try_into()?;
+        let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
+        Ok(time_series.div(dyadic_scalar_calc_dto.scalar()))
+    }
+    fn handle_ts_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::TS_ADD);
+        let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
+        let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
+        let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
+        Ok(left_value.ts_add(right_value))
+    }
+    fn handle_ts_sub(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::TS_SUB);
+        let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
+        let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
+        let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
+        Ok(left_value.ts_sub(right_value))
+    }
+    fn handle_ts_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::TS_MUL);
+        let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
+        let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
+        let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
+        Ok(left_value.ts_mul(right_value))
+    }
+    fn handle_ts_div(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::TS_DIV);
+        let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
+        let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
+        let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
+        Ok(left_value.ts_div(right_value))
+    }
+    fn handle_sma(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+        assert_eq!(*calculation_dto.operation(), Operation::SMA);
+        let sma_dto: SmaCalculationDto = calculation_dto.clone().try_into()?;
+        let time_series = self.upstream(sma_dto.time_series())?;
+        Ok(time_series.sma(sma_dto.window_size()))
     }
 }
 
@@ -176,9 +187,9 @@ pub(crate) enum CalculationStatus {
 }
 
 impl Bot {
-    pub fn new(strategy: StrategyDTO) -> Box<Self> {
+    pub fn new(strategy: StrategyDto) -> Box<Self> {
         let dag = Dag::new(strategy.clone());
-        let calc_lkup: HashMap<String, CalculationDTO> = strategy
+        let calc_lkup: HashMap<String, CalculationDto> = strategy
             .calcs()
             .iter()
             .map(|calc| (calc.name().to_string(), calc.clone()))
@@ -192,13 +203,13 @@ impl Bot {
     fn dag(&self) -> &Dag {
         &self.dag
     }
-    fn strategy(&self) -> &StrategyDTO {
+    fn strategy(&self) -> &StrategyDto {
         &self.strategy
     }
-    pub fn calc(&self, name: &str) -> Result<&CalculationDTO, &str> {
+    pub fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
         self.calc_lkup.get(name).ok_or("not found")
     }
-    pub fn queries(&self) -> Vec<&CalculationDTO> {
+    pub fn queries(&self) -> Vec<&CalculationDto> {
         self.strategy
             .calcs()
             .iter()
@@ -237,17 +248,17 @@ mod tests {
     use crate::bot::Bot;
     use crate::data::{Asset, MockDataClient, TODAY};
     use crate::dto::{
-        from_path, CalculationDTO, OperandDTO, OperandType, Operation, ScoreDTO, StrategyDTO,
+        from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto, StrategyDto,
     };
 
-    fn strategy_fixture() -> StrategyDTO {
-        StrategyDTO::new(
+    fn strategy_fixture() -> StrategyDto {
+        StrategyDto::new(
             String::from("Small Strategy Document"),
-            ScoreDTO::new(String::from("price")),
-            vec![CalculationDTO::new(
+            ScoreDto::new(String::from("price")),
+            vec![CalculationDto::new(
                 String::from("price"),
                 Operation::QUERY,
-                vec![OperandDTO::new(
+                vec![OperandDto::new(
                     String::from("field"),
                     OperandType::Text,
                     String::from("close"),
