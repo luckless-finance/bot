@@ -36,19 +36,6 @@ impl TimeSeries1D {
     pub(crate) fn len(&self) -> usize {
         self.index.len()
     }
-    pub(crate) fn sma(&self, window_size: usize) -> Self {
-        let mut index = self.index.clone();
-        index.truncate(self.len() - window_size + 1);
-        // println!("index={:?}", index);
-        let values = self
-            .values
-            .windows(window_size)
-            .map(|x| x.iter().sum::<DataPointValue>())
-            .map(|x| x.div(window_size as DataPointValue))
-            .collect();
-        // println!("values={:?}", values);
-        TimeSeries1D::new(index, values)
-    }
     /// Align the indices of 2 `TimeSeries`.
     /// Creates 2 new `TimeSeries` instances.
     pub(crate) fn align(&self, rhs: TimeSeries1D) -> (Self, Self) {
@@ -88,6 +75,19 @@ impl TimeSeries1D {
         let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x + rhs).collect();
         TimeSeries1D::new(product_idx, product_values)
     }
+    pub(crate) fn sub(&self, rhs: DataPointValue) -> Self {
+        self.add(rhs.neg())
+    }
+    pub(crate) fn mul(&self, rhs: DataPointValue) -> Self {
+        let product_idx: Index = self.index.clone();
+        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
+        TimeSeries1D::new(product_idx, product_values)
+    }
+    pub(crate) fn div(&self, rhs: DataPointValue) -> Self {
+        let product_idx: Index = self.index.clone();
+        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x / rhs).collect();
+        TimeSeries1D::new(product_idx, product_values)
+    }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     pub(crate) fn ts_add(&self, rhs: TimeSeries1D) -> Self {
@@ -96,9 +96,6 @@ impl TimeSeries1D {
             *l += *r;
         }
         TimeSeries1D::new(lhs.index, lhs.values)
-    }
-    pub(crate) fn sub(&self, rhs: DataPointValue) -> Self {
-        self.add(rhs.neg())
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
@@ -109,11 +106,6 @@ impl TimeSeries1D {
         }
         TimeSeries1D::new(lhs.index, lhs.values)
     }
-    pub(crate) fn mul(&self, rhs: DataPointValue) -> Self {
-        let product_idx: Index = self.index.clone();
-        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
-        TimeSeries1D::new(product_idx, product_values)
-    }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     pub(crate) fn ts_mul(&self, rhs: TimeSeries1D) -> Self {
@@ -123,11 +115,6 @@ impl TimeSeries1D {
         }
         TimeSeries1D::new(lhs.index, lhs.values)
     }
-    pub(crate) fn div(&self, rhs: DataPointValue) -> Self {
-        let product_idx: Index = self.index.clone();
-        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x / rhs).collect();
-        TimeSeries1D::new(product_idx, product_values)
-    }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     pub(crate) fn ts_div(&self, rhs: TimeSeries1D) -> Self {
@@ -136,6 +123,19 @@ impl TimeSeries1D {
             *l /= *r;
         }
         TimeSeries1D::new(lhs.index, lhs.values)
+    }
+    pub(crate) fn sma(&self, window_size: usize) -> Self {
+        let mut index = self.index.clone();
+        index.truncate(self.len() - window_size + 1);
+        // println!("index={:?}", index);
+        let values = self
+            .values
+            .windows(window_size)
+            .map(|x| x.iter().sum::<DataPointValue>())
+            .map(|x| x.div(window_size as DataPointValue))
+            .collect();
+        // println!("values={:?}", values);
+        TimeSeries1D::new(index, values)
     }
 }
 
