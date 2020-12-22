@@ -38,7 +38,7 @@ impl TimeSeries1D {
     }
     /// Align the indices of 2 `TimeSeries`.
     /// Creates 2 new `TimeSeries` instances.
-    pub(crate) fn align(&self, rhs: TimeSeries1D) -> (Self, Self) {
+    pub(crate) fn align(&self, rhs: &TimeSeries1D) -> (Self, Self) {
         let mut l_i = 0;
         let lhs_i = &self.index;
         let lhs_v = &self.values;
@@ -90,8 +90,8 @@ impl TimeSeries1D {
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
-    pub(crate) fn ts_add(&self, rhs: TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.align(rhs);
+    pub(crate) fn ts_add(&self, rhs: &TimeSeries1D) -> Self {
+        let (mut lhs, rhs) = self.align(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l += *r;
         }
@@ -99,8 +99,8 @@ impl TimeSeries1D {
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
-    pub(crate) fn ts_sub(&self, rhs: TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.align(rhs);
+    pub(crate) fn ts_sub(&self, rhs: &TimeSeries1D) -> Self {
+        let (mut lhs, rhs) = self.align(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l -= *r;
         }
@@ -108,8 +108,8 @@ impl TimeSeries1D {
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
-    pub(crate) fn ts_mul(&self, rhs: TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.align(rhs);
+    pub(crate) fn ts_mul(&self, rhs: &TimeSeries1D) -> Self {
+        let (mut lhs, rhs) = self.align(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l *= *r;
         }
@@ -117,8 +117,8 @@ impl TimeSeries1D {
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
-    pub(crate) fn ts_div(&self, rhs: TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.align(rhs);
+    pub(crate) fn ts_div(&self, rhs: &TimeSeries1D) -> Self {
+        let (mut lhs, rhs) = self.align(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l /= *r;
         }
@@ -187,7 +187,7 @@ mod tests {
             index: vec![1, 2, 4, 5, 7],
             values: vec![1., 2., 3., 4., 8.],
         };
-        let (l_out, r_out) = l_in.align(r_in);
+        let (l_out, r_out) = l_in.align(&r_in);
 
         assert_eq!(r_out.index, &[2, 4, 7]);
         assert_eq!(l_out.index, &[2, 4, 7]);
@@ -223,7 +223,7 @@ mod tests {
             index: vec![4, 5, 7, 9],
             values: vec![4., 6., 9., 13.],
         };
-        let actual = rhs.ts_add(lhs);
+        let actual = rhs.ts_add(&lhs);
         assert_eq!(actual, expected);
     }
 
@@ -255,7 +255,7 @@ mod tests {
             index: vec![4, 5, 7, 9],
             values: vec![0., 0., 1., 3.],
         };
-        let actual = lhs.ts_sub(rhs);
+        let actual = lhs.ts_sub(&rhs);
         assert_eq!(actual, expected);
     }
 
@@ -287,7 +287,7 @@ mod tests {
             index: vec![4, 5, 7, 9],
             values: vec![4., 9., 20., 40.],
         };
-        let actual = lhs.ts_mul(rhs);
+        let actual = lhs.ts_mul(&rhs);
         assert_eq!(actual, expected)
     }
 
@@ -319,7 +319,7 @@ mod tests {
             index: vec![4, 5, 7, 9],
             values: vec![1., 1., 1.25, 1.6],
         };
-        let actual = lhs.ts_div(rhs);
+        let actual = lhs.ts_div(&rhs);
         assert_eq!(actual, expected)
     }
 

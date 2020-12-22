@@ -58,8 +58,6 @@ impl DataClient for MockDataClient {
         Ok(self.assets.index(symbol.as_str()))
     }
 
-    // FIXME this is not called.
-    // TODO learn how to use traits
     #[allow(unused_variables)]
     fn query(
         &self,
