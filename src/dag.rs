@@ -11,7 +11,7 @@ use petgraph::dot::{Config, Dot};
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::Direction;
 
-use crate::dto::{OperandType, StrategyDto};
+use crate::strategy::{OperandType, StrategyDto};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Dag {
@@ -110,7 +110,7 @@ mod tests {
     use std::path::Path;
 
     use crate::dag::Dag;
-    use crate::dto::{from_path, StrategyDto};
+    use crate::strategy::{from_path, StrategyDto};
 
     fn strategy_fixture() -> StrategyDto {
         from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
@@ -197,7 +197,7 @@ mod learn_library {
     use petgraph::prelude::*;
 
     use crate::dag::{to_dag, Dag, DagDto};
-    use crate::dto::{from_path, StrategyDto};
+    use crate::strategy::{from_path, StrategyDto};
 
     fn strategy_fixture() -> StrategyDto {
         from_path(Path::new("strategy.yaml")).expect("unable to load strategy")

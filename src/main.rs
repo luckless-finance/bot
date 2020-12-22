@@ -10,12 +10,12 @@ use gnuplot::PlotOption::Caption;
 use gnuplot::{AxesCommon, Figure};
 
 use crate::dag::to_dag;
-use crate::dto::{from_path, StrategyDto};
+use crate::strategy::{from_path, StrategyDto};
 
 mod bot;
 mod dag;
 mod data;
-mod dto;
+mod strategy;
 mod time_series;
 
 fn load_strategy() -> StrategyDto {

@@ -339,7 +339,7 @@ mod tests {
     use std::env::current_dir;
     use std::path::Path;
 
-    use crate::dto::*;
+    use crate::strategy::*;
     use std::convert::TryInto;
 
     fn get_strategy() -> StrategyDto {

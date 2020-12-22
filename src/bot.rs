@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::dag::Dag;
 use crate::data::{Asset, DataClient};
-use crate::dto::{
+use crate::strategy::{
     CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, GenResult, Operation,
     QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
 };
@@ -247,7 +247,7 @@ mod tests {
 
     use crate::bot::Bot;
     use crate::data::{Asset, MockDataClient, TODAY};
-    use crate::dto::{
+    use crate::strategy::{
         from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto, StrategyDto,
     };
 

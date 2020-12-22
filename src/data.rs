@@ -14,7 +14,7 @@ use rand::thread_rng;
 use rand_distr::num_traits::{AsPrimitive, Pow};
 use rand_distr::{Distribution, Normal};
 
-use crate::dto::{GenResult, QueryCalculationDto};
+use crate::strategy::{GenResult, QueryCalculationDto};
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
 pub(crate) static DATA_SIZE: usize = 10_000;
