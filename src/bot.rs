@@ -111,8 +111,10 @@ impl ExecutableBot {
     fn handle_query(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
         assert_eq!(*calculation_dto.operation(), Operation::QUERY);
         let query_dto: QueryCalculationDto = calculation_dto.clone().try_into()?;
-        self.data_client
-            .query(&self.asset, &self.timestamp, Some(query_dto))
+        Ok(self
+            .data_client
+            .query(&self.asset, &self.timestamp, Some(query_dto))?
+            .clone())
     }
     fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
         assert_eq!(*calculation_dto.operation(), Operation::ADD);

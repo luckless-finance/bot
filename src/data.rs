@@ -50,7 +50,7 @@ pub trait DataClient {
         asset: &Asset,
         timestamp: &TimeStamp,
         query: Option<QueryCalculationDto>,
-    ) -> GenResult<TimeSeries1D>;
+    ) -> GenResult<&TimeSeries1D>;
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -179,9 +179,7 @@ mod tests {
         // println!("{:?}", symbols);
         assert_eq!(
             symbols,
-            vec![Symbol::from("A"), Symbol::from("B"), Symbol::from("C")]
-                .iter()
-                .collect()
+            vec![Symbol::from("A"), Symbol::from("B")].iter().collect()
         )
     }
 

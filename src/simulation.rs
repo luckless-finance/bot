@@ -3,13 +3,15 @@ use crate::strategy::{GenResult, QueryCalculationDto};
 use crate::time_series::TimeSeries1D;
 use std::collections::HashMap;
 use std::f64::consts::PI;
+use std::io::{Error, ErrorKind};
 
-pub static DATA_SIZE: usize = 10_000;
+pub static DATA_SIZE: usize = 900;
 pub static TODAY: usize = DATA_SIZE;
 
 #[derive(Debug)]
 pub struct MockDataClient {
     assets: HashMap<Symbol, Asset>,
+    data: HashMap<Symbol, TimeSeries1D>,
 }
 
 fn simulate_time_series(n: usize) -> TimeSeries1D {
@@ -34,30 +36,43 @@ impl DataClient for MockDataClient {
         asset: &Asset,
         timestamp: &usize,
         query_dto: Option<QueryCalculationDto>,
-    ) -> GenResult<TimeSeries1D> {
-        assert!(
-            self.assets.contains_key(&asset.symbol().to_string()),
-            "query for {} at {} failed",
-            asset,
-            timestamp
-        );
-        Ok(simulate_time_series(DATA_SIZE))
+    ) -> GenResult<&TimeSeries1D> {
+        match self.data.get(&asset.symbol().to_string()) {
+            Some(ts) => Ok(ts),
+            None => Err(Box::new(Error::new(ErrorKind::NotFound, "Asset not found"))),
+        }
     }
 }
 
 impl MockDataClient {
+    /// Create 2 `Asset` mock market
     pub fn new() -> Self {
-        MockDataClient {
-            assets: vec![
-                (Symbol::from("A"), Asset::new(Symbol::from("A"))),
-                (Symbol::from("B"), Asset::new(Symbol::from("B"))),
-                (Symbol::from("C"), Asset::new(Symbol::from("C"))),
-            ]
+        let n: usize = DATA_SIZE;
+        let (a_x0, a_xf) = (0f64, 6f64 * PI);
+        let a_x = linspace(n, a_x0, a_xf);
+        let amplitude = 0.5f64;
+        let a_y0 = 10f64;
+        let a_y = TimeSeries1D::sin(&a_x, amplitude).vertical_shift(a_y0);
+
+        let (b_x0, b_xf) = (PI, 7f64 * PI);
+        let b_x = linspace(n, b_x0, b_xf);
+        let amplitude = 0.5f64;
+        let b_y0 = 5f64;
+        let b_y = TimeSeries1D::sin(&b_x, amplitude).vertical_shift(b_y0);
+
+        let data: HashMap<Symbol, TimeSeries1D> =
+            vec![(Symbol::from("A"), a_y), (Symbol::from("B"), b_y)]
+                .into_iter()
+                .collect();
+        let assets: HashMap<Symbol, Asset> = data
+            .keys()
+            // .clone()
+            // .iter()
+            .map(|x| (x.clone(), Asset::new(x.clone())))
             .into_iter()
-            .collect(),
-        }
+            .collect();
+        MockDataClient { assets, data }
     }
-    // TODO make this private
     pub fn assets(&self) -> &HashMap<Symbol, Asset> {
         &self.assets
     }
@@ -252,6 +267,8 @@ mod tests {
         let z_sma200 = z.sma(200);
         let z_sma300 = z.sma(300);
 
-        plot_ts(vec![&y, &y_sma100, &y_sma200, &z]);
+        plot_ts(vec![
+            &y, &y_sma100, &y_sma200, &y_sma300, &z, &z_sma100, &z_sma200, &z_sma300,
+        ]);
     }
 }
