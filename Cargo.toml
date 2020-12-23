@@ -1,5 +1,5 @@
 [package]
-name = "yafa-bot"
+name = "yafa"
 version = "0.1.0"
 authors = ["grahamcrowell <graham.crowell@gmail.com>"]
 edition = "2018"
@@ -14,3 +14,7 @@ rand = "0.7.3"
 rand_distr = "0.3.0"
 gnuplot = "0.0.37"
 approx = "0.4.0"
+
+[dependencies.chrono]
+version = "0.4"
+features = ["serde"]
