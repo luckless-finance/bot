@@ -66,8 +66,6 @@ impl MockDataClient {
                 .collect();
         let assets: HashMap<Symbol, Asset> = data
             .keys()
-            // .clone()
-            // .iter()
             .map(|x| (x.clone(), Asset::new(x.clone())))
             .into_iter()
             .collect();

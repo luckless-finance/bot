@@ -220,12 +220,10 @@ mod learn_library {
 
         let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
         let node = dag.node_weight(*leaf_node_idx).unwrap();
-        // println!("{:?}", node);
         assert_eq!(node, "A");
 
         let leaf_node_idx = sorted_node_ids.get(1).expect("unable to get leaf");
         let node = dag.node_weight(*leaf_node_idx).unwrap();
-        // println!("{:?}", node);
         assert_eq!(node, "C");
     }
 
