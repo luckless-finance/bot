@@ -3,18 +3,19 @@
 use std::cmp::Ordering;
 use std::ops::{Div, Neg};
 
-pub(crate) type DataPointValue = f64;
-pub(crate) type TimeStamp = usize;
-pub(crate) type Index = Vec<TimeStamp>;
+pub type DataPointValue = f64;
+pub type TimeStamp = usize;
+pub type Index = Vec<TimeStamp>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct TimeSeries1D {
+pub struct TimeSeries1D {
     index: Index,
     values: Vec<DataPointValue>,
 }
 
 impl TimeSeries1D {
-    pub(crate) fn new(index: Index, values: Vec<DataPointValue>) -> Self {
+    /// Create new `TimeSeries` from given `index` and `values` vectors
+    pub fn new(index: Index, values: Vec<DataPointValue>) -> Self {
         assert_eq!(
             index.len(),
             values.len(),
@@ -24,21 +25,23 @@ impl TimeSeries1D {
         );
         TimeSeries1D { index, values }
     }
-    pub(crate) fn from_values(values: Vec<DataPointValue>) -> Self {
+    /// Create new `TimeSeries` with given `values` and an index containing `(0..values.len())`
+    pub fn from_values(values: Vec<DataPointValue>) -> Self {
         TimeSeries1D::new((0..values.len()).map(|x| x as TimeStamp).collect(), values)
     }
-    pub(crate) fn values(&self) -> &Vec<DataPointValue> {
+    /// Borrow `values`
+    pub fn values(&self) -> &Vec<DataPointValue> {
         &self.values
     }
-    pub(crate) fn index(&self) -> &Index {
+    pub fn index(&self) -> &Index {
         &self.index
     }
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.index.len()
     }
     /// Align the indices of 2 `TimeSeries`.
     /// Creates 2 new `TimeSeries` instances.
-    pub(crate) fn align(&self, rhs: &TimeSeries1D) -> (Self, Self) {
+    pub fn align(&self, rhs: &TimeSeries1D) -> (Self, Self) {
         let mut l_i = 0;
         let lhs_i = &self.index;
         let lhs_v = &self.values;
@@ -70,27 +73,27 @@ impl TimeSeries1D {
             TimeSeries1D::new(both_ri, both_r),
         )
     }
-    pub(crate) fn add(&self, rhs: DataPointValue) -> Self {
+    pub fn add(&self, rhs: DataPointValue) -> Self {
         let product_idx: Index = self.index.clone();
         let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x + rhs).collect();
         TimeSeries1D::new(product_idx, product_values)
     }
-    pub(crate) fn sub(&self, rhs: DataPointValue) -> Self {
+    pub fn sub(&self, rhs: DataPointValue) -> Self {
         self.add(rhs.neg())
     }
-    pub(crate) fn mul(&self, rhs: DataPointValue) -> Self {
+    pub fn mul(&self, rhs: DataPointValue) -> Self {
         let product_idx: Index = self.index.clone();
         let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
         TimeSeries1D::new(product_idx, product_values)
     }
-    pub(crate) fn div(&self, rhs: DataPointValue) -> Self {
+    pub fn div(&self, rhs: DataPointValue) -> Self {
         let product_idx: Index = self.index.clone();
         let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x / rhs).collect();
         TimeSeries1D::new(product_idx, product_values)
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
-    pub(crate) fn ts_add(&self, rhs: &TimeSeries1D) -> Self {
+    pub fn ts_add(&self, rhs: &TimeSeries1D) -> Self {
         let (mut lhs, rhs) = self.align(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l += *r;
@@ -99,7 +102,7 @@ impl TimeSeries1D {
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
-    pub(crate) fn ts_sub(&self, rhs: &TimeSeries1D) -> Self {
+    pub fn ts_sub(&self, rhs: &TimeSeries1D) -> Self {
         let (mut lhs, rhs) = self.align(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l -= *r;
@@ -108,7 +111,7 @@ impl TimeSeries1D {
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
-    pub(crate) fn ts_mul(&self, rhs: &TimeSeries1D) -> Self {
+    pub fn ts_mul(&self, rhs: &TimeSeries1D) -> Self {
         let (mut lhs, rhs) = self.align(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l *= *r;
@@ -117,24 +120,24 @@ impl TimeSeries1D {
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
-    pub(crate) fn ts_div(&self, rhs: &TimeSeries1D) -> Self {
+    pub fn ts_div(&self, rhs: &TimeSeries1D) -> Self {
         let (mut lhs, rhs) = self.align(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l /= *r;
         }
         TimeSeries1D::new(lhs.index, lhs.values)
     }
-    pub(crate) fn sma(&self, window_size: usize) -> Self {
+    pub fn sma(&self, window_size: usize) -> Self {
         let mut index = self.index.clone();
+        index.reverse();
         index.truncate(self.len() - window_size + 1);
-        // println!("index={:?}", index);
+        index.reverse();
         let values = self
             .values
             .windows(window_size)
             .map(|x| x.iter().sum::<DataPointValue>())
             .map(|x| x.div(window_size as DataPointValue))
             .collect();
-        // println!("values={:?}", values);
         TimeSeries1D::new(index, values)
     }
 }
@@ -165,7 +168,7 @@ mod tests {
     }
 
     #[test]
-    fn sma2() {
+    fn sma() {
         let ts = TimeSeries1D {
             index: vec![2, 4, 5, 6, 7, 9],
             values: vec![1., 2., 3., 4., 5., 8.],
@@ -174,7 +177,7 @@ mod tests {
 
         assert_eq!(sma.len(), 5);
         assert_eq!(sma.values, &[1.5, 2.5, 3.5, 4.5, 6.5]);
-        assert_eq!(sma.index, &[2, 4, 5, 6, 7]);
+        assert_eq!(sma.index, &[4, 5, 6, 7, 9]);
     }
 
     #[test]

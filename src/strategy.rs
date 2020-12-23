@@ -10,10 +10,10 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
 // https://doc.rust-lang.org/rust-by-example/error/multiple_error_types/boxing_errors.html
-pub(crate) type GenError = Box<dyn std::error::Error>;
-pub(crate) type GenResult<T> = std::result::Result<T, GenError>;
-pub(crate) type TimeSeriesReference = String;
-pub(crate) type TimeSeriesName = String;
+pub type GenError = Box<dyn std::error::Error>;
+pub type GenResult<T> = std::result::Result<T, GenError>;
+pub type TimeSeriesReference = String;
+pub type TimeSeriesName = String;
 
 const DYADIC_TIME_SERIES_OPERATIONS: &[Operation] = &[
     Operation::TS_ADD,
@@ -29,7 +29,7 @@ const DYADIC_SCALAR_OPERATIONS: &[Operation] = &[
 ];
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub(crate) struct ScoreDto {
+pub struct ScoreDto {
     calc: String,
 }
 
@@ -43,7 +43,7 @@ impl ScoreDto {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub(crate) enum OperandType {
+pub enum OperandType {
     Text,
     Integer,
     Decimal,
@@ -51,7 +51,7 @@ pub(crate) enum OperandType {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub(crate) struct OperandDto {
+pub struct OperandDto {
     name: String,
     #[serde(rename = "type")]
     _type: OperandType,
@@ -78,7 +78,7 @@ impl OperandDto {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[allow(non_camel_case_types)]
-pub(crate) enum Operation {
+pub enum Operation {
     QUERY,
     ADD,
     SUB,
@@ -92,7 +92,7 @@ pub(crate) enum Operation {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub(crate) struct CalculationDto {
+pub struct CalculationDto {
     name: String,
     operation: Operation,
     operands: Vec<OperandDto>,
@@ -121,7 +121,7 @@ impl CalculationDto {
 }
 
 // TODO parameterized query: generalize market data retrieval
-pub(crate) struct QueryCalculationDto {
+pub struct QueryCalculationDto {
     name: String,
     field: String,
 }
@@ -154,7 +154,7 @@ impl TryFrom<CalculationDto> for QueryCalculationDto {
     }
 }
 
-pub(crate) struct DyadicTsCalculationDto {
+pub struct DyadicTsCalculationDto {
     name: String,
     left: TimeSeriesReference,
     right: TimeSeriesReference,
@@ -201,7 +201,7 @@ impl TryFrom<CalculationDto> for DyadicTsCalculationDto {
     }
 }
 
-pub(crate) struct DyadicScalarCalculationDto {
+pub struct DyadicScalarCalculationDto {
     name: String,
     time_series: TimeSeriesReference,
     scalar: DataPointValue,
@@ -252,7 +252,7 @@ impl TryFrom<CalculationDto> for DyadicScalarCalculationDto {
     }
 }
 
-pub(crate) struct SmaCalculationDto {
+pub struct SmaCalculationDto {
     name: String,
     window_size: usize,
     time_series: TimeSeriesReference,
@@ -301,7 +301,7 @@ impl TryFrom<CalculationDto> for SmaCalculationDto {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub(crate) struct StrategyDto {
+pub struct StrategyDto {
     name: String,
     score: ScoreDto,
     calcs: Vec<CalculationDto>,
@@ -325,7 +325,7 @@ impl StrategyDto {
     }
 }
 
-pub(crate) fn from_path(file_path: &Path) -> Result<StrategyDto, serde_yaml::Error> {
+pub fn from_path(file_path: &Path) -> Result<StrategyDto, serde_yaml::Error> {
     let mut strategy_file: File = File::open(file_path).expect("unable to open file");
     let mut strategy_yaml = String::new();
     strategy_file

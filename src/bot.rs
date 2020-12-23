@@ -16,14 +16,14 @@ use std::fmt;
 
 /// Wraps several Dtos required traverse and consume a strategy
 #[derive(Debug, Clone)]
-pub(crate) struct Bot {
+pub struct Bot {
     strategy: StrategyDto,
     dag: Dag,
     calc_lkup: HashMap<TimeSeriesName, CalculationDto>,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct UpstreamNotFoundError {
+pub struct UpstreamNotFoundError {
     upstream_name: String,
     calculation_name: String,
 }
@@ -45,7 +45,7 @@ impl std::error::Error for UpstreamNotFoundError {
 }
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
-pub(crate) struct ExecutableBot {
+pub struct ExecutableBot {
     strategy: StrategyDto,
     dag: Dag,
     calc_lkup: HashMap<TimeSeriesName, CalculationDto>,
@@ -56,7 +56,6 @@ pub(crate) struct ExecutableBot {
     calc_data_lkup: HashMap<TimeSeriesName, TimeSeries1D>,
 }
 
-// TODO implement handlers and result memoization
 impl ExecutableBot {
     fn status(&mut self, calc_name: &str, new_calc_status: CalculationStatus) {
         if let Some(calc_status) = self.calc_status_lkup.get_mut(calc_name) {
@@ -67,6 +66,7 @@ impl ExecutableBot {
     fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
         match self.calc_data_lkup.get(calc_name) {
             Some(time_series_) => Ok(time_series_),
+            // TODO add error info
             None => Err(Box::new(UpstreamNotFoundError {
                 upstream_name: "".to_string(),
                 calculation_name: "".to_string(),
@@ -179,7 +179,7 @@ impl ExecutableBot {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum CalculationStatus {
+pub enum CalculationStatus {
     NotStarted,
     InProgress,
     Complete,
@@ -246,7 +246,8 @@ mod tests {
     use std::path::Path;
 
     use crate::bot::Bot;
-    use crate::data::{Asset, MockDataClient, TODAY};
+    use crate::data::Asset;
+    use crate::simulation::{MockDataClient, TODAY};
     use crate::strategy::{
         from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto, StrategyDto,
     };

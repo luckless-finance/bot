@@ -14,7 +14,7 @@ use petgraph::Direction;
 use crate::strategy::{OperandType, StrategyDto};
 
 #[derive(Debug, Clone)]
-pub(crate) struct Dag {
+pub struct Dag {
     dag_dto: DagDto,
     node_lkup: HashMap<String, NodeIndex>,
     execution_order: Vec<String>,
@@ -73,7 +73,7 @@ impl Dag {
 
 type DagDto = DiGraph<String, String>;
 
-pub(crate) fn to_dag(strategy: &StrategyDto) -> Result<DagDto, &str> {
+pub fn to_dag(strategy: &StrategyDto) -> Result<DagDto, &str> {
     let mut dag: DagDto = DiGraph::new();
     let mut node_lookup = HashMap::new();
 

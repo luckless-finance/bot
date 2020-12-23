@@ -1,4 +1,5 @@
-#[allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 #[macro_use]
 extern crate approx;
 
@@ -12,11 +13,12 @@ use gnuplot::{AxesCommon, Figure};
 use crate::dag::to_dag;
 use crate::strategy::{from_path, StrategyDto};
 
-mod bot;
-mod dag;
-mod data;
-mod strategy;
-mod time_series;
+pub mod bot;
+pub mod dag;
+pub mod data;
+pub mod simulation;
+pub mod strategy;
+pub mod time_series;
 
 fn load_strategy() -> StrategyDto {
     let strategy_path = current_dir()
@@ -52,8 +54,8 @@ fn demo_gnuplot() {
         );
     fg.show().unwrap();
 }
-
-fn main() {
-    demo_strategy();
-    demo_gnuplot();
-}
+//
+// fn main() {
+//     demo_strategy();
+//     demo_gnuplot();
+// }
