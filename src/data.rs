@@ -157,39 +157,3 @@ pub fn plot(x: &Vec<f64>, y: &Vec<f64>) {
         .lines(x.clone(), y.clone(), &[Caption("Price")]);
     fg.show().unwrap();
 }
-#[cfg(test)]
-mod tests {
-    // silence approx lib warnings
-    #![allow(unused_must_use)]
-
-    use std::collections::HashSet;
-
-    use rand_distr::num_traits::AsPrimitive;
-
-    use crate::data::*;
-    use crate::simulation::{MockDataClient, DATA_SIZE, TODAY};
-
-    const EPSILON: f64 = 1E-10;
-
-    #[test]
-    fn mock_data_client_assets() {
-        let client = MockDataClient::new();
-        // println!("{:?}", client);
-        let symbols: HashSet<&Symbol> = client.assets().keys().collect();
-        // println!("{:?}", symbols);
-        assert_eq!(
-            symbols,
-            vec![Symbol::from("A"), Symbol::from("B")].iter().collect()
-        )
-    }
-
-    #[test]
-    fn mock_data_client_query() {
-        let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
-        // println!("{:?}", client);
-        let asset = Asset::new(Symbol::from("A"));
-        let ts = client.query(&asset, &TODAY, None).unwrap();
-        // println!("{:?}", ts);
-        assert_eq!(ts.len(), DATA_SIZE);
-    }
-}

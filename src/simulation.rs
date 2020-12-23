@@ -160,6 +160,7 @@ mod tests {
     use crate::strategy::GenResult;
     use crate::time_series::TimeSeries1D;
     use rand_distr::num_traits::{AsPrimitive, Pow};
+    use std::collections::HashSet;
     use std::f64::consts::PI;
 
     const EPSILON: f64 = 1E-10;
@@ -268,5 +269,27 @@ mod tests {
         plot_ts(vec![
             &y, &y_sma100, &y_sma200, &y_sma300, &z, &z_sma100, &z_sma200, &z_sma300,
         ]);
+    }
+
+    #[test]
+    fn mock_data_client_assets() {
+        let client = MockDataClient::new();
+        // println!("{:?}", client);
+        let symbols: HashSet<&Symbol> = client.assets().keys().collect();
+        // println!("{:?}", symbols);
+        assert_eq!(
+            symbols,
+            vec![Symbol::from("A"), Symbol::from("B")].iter().collect()
+        )
+    }
+
+    #[test]
+    fn mock_data_client_query() {
+        let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
+        // println!("{:?}", client);
+        let asset = Asset::new(Symbol::from("A"));
+        let ts = client.query(&asset, &TODAY, None).unwrap();
+        // println!("{:?}", ts);
+        assert_eq!(ts.len(), DATA_SIZE);
     }
 }
