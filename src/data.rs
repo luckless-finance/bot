@@ -10,9 +10,6 @@ use gnuplot::AutoOption::Fix;
 use gnuplot::Coordinate::Graph;
 use gnuplot::PlotOption::Caption;
 use gnuplot::{AxesCommon, Figure};
-use rand::thread_rng;
-use rand_distr::num_traits::{AsPrimitive, Pow};
-use rand_distr::{Distribution, Normal};
 
 use crate::strategy::{GenResult, QueryCalculationDto};
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
@@ -44,6 +41,7 @@ impl std::error::Error for AssetNotFoundError {
 
 // TODO query memoization/caching
 pub trait DataClient {
+    fn assets(&self) -> &HashMap<Symbol, Asset>;
     fn asset(&self, symbol: &Symbol) -> GenResult<&Asset>;
     fn query(
         &self,
@@ -52,8 +50,14 @@ pub trait DataClient {
         query: Option<QueryCalculationDto>,
     ) -> GenResult<&TimeSeries1D>;
 }
-
-#[derive(Debug, Eq, PartialEq, Hash)]
+impl fmt::Debug for dyn DataClient {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DataClient")
+            .field("assets", &self.assets().len())
+            .finish()
+    }
+}
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct Asset {
     symbol: Symbol,
 }

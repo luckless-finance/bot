@@ -23,6 +23,10 @@ fn simulate_time_series(n: usize) -> TimeSeries1D {
 }
 
 impl DataClient for MockDataClient {
+    fn assets(&self) -> &HashMap<Symbol, Asset> {
+        &self.assets
+    }
+
     fn asset(&self, symbol: &Symbol) -> GenResult<&Asset> {
         match self.assets.get(symbol) {
             Some(asset) => Ok(asset),
@@ -163,7 +167,7 @@ mod tests {
     use std::collections::HashSet;
     use std::f64::consts::PI;
 
-    const EPSILON: f64 = 1E-10;
+    const EPSILON: f64 = 1E-3;
 
     #[test]
     fn linspace_0_10() -> GenResult<()> {
@@ -258,6 +262,11 @@ mod tests {
         let y_sma100 = y.sma(100);
         let y_sma200 = y.sma(200);
         let y_sma300 = y.sma(300);
+        y_sma300
+            .values()
+            .iter()
+            .for_each(|v| assert_abs_diff_eq!(v, &y0, epsilon = EPSILON));
+        // assert!(y_sma300.values().iter().all(|v| v == &y0));
 
         let x2 = x.clone().iter().map(|x| x + PI).collect();
         let z0 = 5f64;
@@ -265,10 +274,11 @@ mod tests {
         let z_sma100 = z.sma(100);
         let z_sma200 = z.sma(200);
         let z_sma300 = z.sma(300);
-
-        plot_ts(vec![
-            &y, &y_sma100, &y_sma200, &y_sma300, &z, &z_sma100, &z_sma200, &z_sma300,
-        ]);
+        z_sma300
+            .values()
+            .iter()
+            .for_each(|v| assert_abs_diff_eq!(v, &z0, epsilon = EPSILON));
+        // assert!(z_sma300.values().iter().all(|v| v == &z0));
     }
 
     #[test]

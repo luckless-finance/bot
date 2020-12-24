@@ -10,10 +10,13 @@ edition = "2018"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 petgraph = "0.5.1"
+gnuplot = "0.0.37" # sudo apt-get install -y gnuplot
+
+[dev-dependencies]
 rand = "0.7.3"
 rand_distr = "0.3.0"
-gnuplot = "0.0.37"
 approx = "0.4.0"
+cargo-watch = "7.5.0"
 
 [dependencies.chrono]
 version = "0.4"

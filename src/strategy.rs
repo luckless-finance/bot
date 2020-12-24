@@ -342,7 +342,7 @@ mod tests {
     use crate::strategy::*;
     use std::convert::TryInto;
 
-    fn get_strategy() -> StrategyDto {
+    pub fn get_strategy() -> StrategyDto {
         StrategyDto {
             name: String::from("Example Strategy Document"),
             score: ScoreDto {

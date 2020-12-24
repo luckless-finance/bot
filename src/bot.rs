@@ -8,7 +8,7 @@ use crate::strategy::{
     CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, GenResult, Operation,
     QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
 };
-use crate::time_series::{TimeSeries1D, TimeStamp};
+use crate::time_series::{TimeSeries1D, TimeStamp, DataPointValue};
 use serde::export::Formatter;
 use std;
 use std::convert::TryInto;
@@ -24,27 +24,28 @@ pub struct Bot {
 
 #[derive(Debug, Clone)]
 pub struct UpstreamNotFoundError {
-    upstream_name: String,
-    calculation_name: String,
+    upstream_name: String
 }
 
 impl fmt::Display for UpstreamNotFoundError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         write!(
             f,
-            "upstream time series not found {} for calculation: {}\n",
-            self.calculation_name, self.upstream_name
+            "upstream not found {}\n",
+            self.upstream_name
         )
+
     }
 }
 
 impl std::error::Error for UpstreamNotFoundError {
     fn description(&self) -> &str {
-        "Upstream time series not found."
+        "Upstream not found."
     }
 }
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
+#[derive(Debug)]
 pub struct ExecutableBot {
     strategy: StrategyDto,
     dag: Dag,
@@ -63,19 +64,26 @@ impl ExecutableBot {
         }
     }
 
-    fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
+    pub fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
         match self.calc_data_lkup.get(calc_name) {
             Some(time_series_) => Ok(time_series_),
-            // TODO add error info
             None => Err(Box::new(UpstreamNotFoundError {
-                upstream_name: "".to_string(),
-                calculation_name: "".to_string(),
+                upstream_name: calc_name.to_string(),
+            })),
+        }
+    }
+
+    pub fn score(&self) -> GenResult<&DataPointValue> {
+        match self.upstream(self.strategy.score().calc())?.values().last() {
+            Some(score) => Ok(score),
+            None => Err(Box::new(UpstreamNotFoundError {
+                upstream_name: format!("score calc: {}", self.strategy.score().calc()),
             })),
         }
     }
 
     /// Traverse `Dag` executing each node for given `Asset` as of `Timestamp`
-    fn execute(&mut self) -> GenResult<()> {
+    pub fn execute(&mut self) -> GenResult<()> {
         let calc_order = self.dag.execution_order().clone();
         for calc_name in calc_order {
             println!("\nexecuting {}", calc_name);

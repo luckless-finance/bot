@@ -44,5 +44,5 @@ watch-test:
 	@echo "-------------------"
 	@echo "start infinite test loop"
 	@echo "-------------------"
-	./utils/watch-test.sh;
+	cargo watch -x test
 

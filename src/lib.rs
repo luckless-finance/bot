@@ -1,14 +1,11 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#[cfg(test)]
 #[macro_use]
 extern crate approx;
 
 use std::env::current_dir;
 use std::path::Path;
-
-use gnuplot::Coordinate::Graph;
-use gnuplot::PlotOption::Caption;
-use gnuplot::{AxesCommon, Figure};
 
 use crate::dag::to_dag;
 use crate::strategy::{from_path, StrategyDto};
@@ -40,20 +37,20 @@ fn demo_strategy() {
 }
 
 // sudo apt-get install -y gnuplot
-fn demo_gnuplot() {
-    let mut fg = Figure::new();
-    fg.axes2d()
-        .set_title("A plot", &[])
-        .set_legend(Graph(0.5), Graph(0.9), &[], &[])
-        .set_x_label("x", &[])
-        .set_y_label("y^2", &[])
-        .lines(
-            &[-3., -2., -1., 0., 1., 2., 3.],
-            &[9., 4., 1., 0., 1., 4., 9.],
-            &[Caption("Parabola")],
-        );
-    fg.show().unwrap();
-}
+// fn demo_gnuplot() {
+//     let mut fg = Figure::new();
+//     fg.axes2d()
+//         .set_title("A plot", &[])
+//         .set_legend(Graph(0.5), Graph(0.9), &[], &[])
+//         .set_x_label("x", &[])
+//         .set_y_label("y^2", &[])
+//         .lines(
+//             &[-3., -2., -1., 0., 1., 2., 3.],
+//             &[9., 4., 1., 0., 1., 4., 9.],
+//             &[Caption("Parabola")],
+//         );
+//     fg.show().unwrap();
+// }
 //
 // fn main() {
 //     demo_strategy();
