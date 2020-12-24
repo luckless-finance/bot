@@ -321,6 +321,10 @@ impl StrategyDto {
 
 impl StrategyDto {
     pub fn new(name: String, score: ScoreDto, calcs: Vec<CalculationDto>) -> Self {
+        &calcs
+            .iter()
+            .find(|c| c.name == score.calc)
+            .expect("Invalid strategy, score calc not found");
         StrategyDto { name, score, calcs }
     }
 }

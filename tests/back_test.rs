@@ -38,7 +38,7 @@ mod tests {
         let ts: Vec<&TimeSeries1D> = bots.iter()
             .map(|b| b.upstream(strategy.score().calc()).unwrap())
             .collect();
-        plot_ts(ts);
+        // plot_ts(ts);
         let scores: Vec<&DataPointValue> = bots.iter()
             .flat_map(|b| b.score())
             .collect();

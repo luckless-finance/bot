@@ -8,7 +8,7 @@ use crate::strategy::{
     CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, GenResult, Operation,
     QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
 };
-use crate::time_series::{TimeSeries1D, TimeStamp, DataPointValue};
+use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 use serde::export::Formatter;
 use std;
 use std::convert::TryInto;
@@ -24,17 +24,12 @@ pub struct Bot {
 
 #[derive(Debug, Clone)]
 pub struct UpstreamNotFoundError {
-    upstream_name: String
+    upstream_name: String,
 }
 
 impl fmt::Display for UpstreamNotFoundError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "upstream not found {}\n",
-            self.upstream_name
-        )
-
+        write!(f, "upstream not found {}\n", self.upstream_name)
     }
 }
 
@@ -47,8 +42,7 @@ impl std::error::Error for UpstreamNotFoundError {
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
 #[derive(Debug)]
 pub struct ExecutableBot {
-    strategy: StrategyDto,
-    dag: Dag,
+    execution_order: Vec<TimeSeriesName>,
     calc_lkup: HashMap<TimeSeriesName, CalculationDto>,
     asset: Asset,
     timestamp: TimeStamp,
@@ -74,17 +68,24 @@ impl ExecutableBot {
     }
 
     pub fn score(&self) -> GenResult<&DataPointValue> {
-        match self.upstream(self.strategy.score().calc())?.values().last() {
+        match self
+            .upstream(self.execution_order.last().expect("impossible"))?
+            .values()
+            .last()
+        {
             Some(score) => Ok(score),
             None => Err(Box::new(UpstreamNotFoundError {
-                upstream_name: format!("score calc: {}", self.strategy.score().calc()),
+                upstream_name: format!(
+                    "score calc: {}",
+                    self.execution_order.last().expect("impossible")
+                ),
             })),
         }
     }
 
     /// Traverse `Dag` executing each node for given `Asset` as of `Timestamp`
     pub fn execute(&mut self) -> GenResult<()> {
-        let calc_order = self.dag.execution_order().clone();
+        let calc_order = self.execution_order.clone();
         for calc_name in calc_order {
             println!("\nexecuting {}", calc_name);
             self.status(&calc_name, CalculationStatus::InProgress);
@@ -210,9 +211,6 @@ impl Bot {
             calc_lkup,
         })
     }
-    fn dag(&self) -> &Dag {
-        &self.dag
-    }
     fn strategy(&self) -> &StrategyDto {
         &self.strategy
     }
@@ -226,7 +224,6 @@ impl Bot {
             .filter(|c| (c.operation()) == &Operation::QUERY)
             .collect()
     }
-
     pub fn as_executable(
         &self,
         asset: Asset,
@@ -234,8 +231,7 @@ impl Bot {
         data_client: Box<dyn DataClient>,
     ) -> ExecutableBot {
         ExecutableBot {
-            strategy: self.strategy.clone(),
-            dag: self.dag.clone(),
+            execution_order: self.dag.execution_order().clone(),
             calc_lkup: self.calc_lkup.clone(),
             asset,
             timestamp,
