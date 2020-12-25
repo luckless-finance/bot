@@ -29,7 +29,7 @@ mod tests {
     #[test]
     fn back_test() -> GenResult<()> {
         let strategy = get_strategy();
-        let bot = Bot::new(strategy.clone());
+        let bot = Bot::new(strategy.clone())?;
         let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         let mut bots: Vec<ExecutableBot> = data_client.assets().values()
             .map(|a| bot.as_executable(a.clone(), TODAY, Box::new(MockDataClient::new())))

@@ -198,14 +198,14 @@ pub enum CalculationStatus {
 }
 
 impl Bot {
-    pub fn new(strategy: StrategyDto) -> Box<Self> {
-        let dag = Dag::new(strategy.clone());
+    pub fn new(strategy: StrategyDto) -> GenResult<Self> {
+        let dag = Dag::new(strategy.clone())?;
         let calc_lkup: HashMap<String, CalculationDto> = strategy
             .calcs()
             .iter()
             .map(|calc| (calc.name().to_string(), calc.clone()))
             .collect();
-        Box::from(Bot {
+        Ok(Bot {
             strategy,
             dag,
             calc_lkup,
@@ -255,7 +255,8 @@ mod tests {
     use crate::data::Asset;
     use crate::simulation::{MockDataClient, TODAY};
     use crate::strategy::{
-        from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto, StrategyDto,
+        from_path, CalculationDto, GenResult, OperandDto, OperandType, Operation, ScoreDto,
+        StrategyDto,
     };
 
     fn strategy_fixture() -> StrategyDto {
@@ -274,14 +275,14 @@ mod tests {
         )
     }
 
-    fn bot_fixture() -> Box<Bot> {
+    fn bot_fixture() -> GenResult<Bot> {
         let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
         Bot::new(strategy)
     }
 
     #[test]
-    fn execute() {
-        let bot = bot_fixture();
+    fn execute() -> GenResult<()> {
+        let bot = bot_fixture()?;
         let asset = Asset::new(String::from("A"));
         let timestamp = TODAY;
         let data_client = MockDataClient::new();
@@ -291,16 +292,18 @@ mod tests {
             .calc_data_lkup
             .values()
             .for_each(|time_series| assert!(time_series.len() > 0));
+        Ok(())
     }
 
     #[test]
-    fn queries() {
-        let bot = bot_fixture();
+    fn queries() -> GenResult<()> {
+        let bot = bot_fixture()?;
         let close_queries = bot
             .queries()
             .iter()
             .filter(|calc| (**calc).name() == "price")
             .count();
         assert_eq!(close_queries, 1);
+        Ok(())
     }
 }
