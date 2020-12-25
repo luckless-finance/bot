@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 extern crate yafa;
 
 use yafa::bot::*;
