@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-// #![allow(unused)]
 
 use std::collections::HashMap;
 use std::env::current_dir;
@@ -141,36 +140,6 @@ impl std::error::Error for InvalidStrategyError {
     }
 }
 
-pub fn to_dag(strategy: &StrategyDto) -> Result<DagDto, &str> {
-    let mut dag: DagDto = DiGraph::new();
-    let mut node_lookup = HashMap::new();
-
-    // add nodes
-    for calc in strategy.calcs() {
-        // println!("{}", calc.name());
-        let index = dag.add_node(calc.name().to_string());
-        node_lookup.insert(calc.name(), index);
-    }
-    // add edges
-    for calc in strategy.calcs() {
-        for op in calc.operands() {
-            if node_lookup.contains_key(op.value()) && op._type() == &OperandType::Reference {
-                let operand = node_lookup.get(op.value()).expect("operand not found");
-                let calc = node_lookup.get(calc.name()).expect("calc not found");
-                dag.add_edge(*operand, *calc, String::new());
-            }
-        }
-    }
-    match is_cyclic_directed(&dag) {
-        true => Err("cyclic"),
-        false => match connected_components(&dag) {
-            0 => Err("zero connected components found"),
-            1 => Ok(dag),
-            _ => Err("more than 1 connected component found"),
-        },
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -268,8 +237,9 @@ mod learn_library {
     use petgraph::algo::toposort;
     use petgraph::prelude::*;
 
-    use crate::dag::{to_dag, Dag, DagDto};
+    use crate::dag::{Dag, DagDto};
     use crate::strategy::{from_path, GenResult, StrategyDto};
+    use std::convert::TryInto;
 
     fn strategy_fixture() -> StrategyDto {
         from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
@@ -300,9 +270,9 @@ mod learn_library {
     }
 
     #[test]
-    fn dfs_post_order() {
+    fn dfs_post_order() -> GenResult<()> {
         let strategy = strategy_fixture();
-        let dag: DagDto = to_dag(&strategy).expect("unable to convert to bot");
+        let dag: DagDto = strategy.clone().try_into()?;
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
 
         let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
@@ -316,12 +286,13 @@ mod learn_library {
         let root_node: &String = dag.node_weight(root_node_id).expect("unable to find root");
         // println!("{:?}", root_node);
         assert_eq!(root_node, strategy.score().calc());
+        Ok(())
     }
 
     #[test]
-    fn bfs() {
+    fn bfs() -> GenResult<()> {
         let strategy = strategy_fixture();
-        let dag: DagDto = to_dag(&strategy).expect("unable to convert to bot");
+        let dag: DagDto = strategy.clone().try_into()?;
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
 
         let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
@@ -342,5 +313,6 @@ mod learn_library {
             }
         }
         assert_eq!(node, strategy.score().calc());
+        Ok(())
     }
 }

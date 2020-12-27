@@ -216,7 +216,7 @@ impl Bot {
     fn strategy(&self) -> &StrategyDto {
         &self.strategy
     }
-    pub fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
+    fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
         self.calc_lkup.get(name).ok_or("not found")
     }
     pub fn as_executable(
