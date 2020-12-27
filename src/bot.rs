@@ -23,6 +23,48 @@ pub struct Bot {
     calc_lkup: HashMap<TimeSeriesName, CalculationDto>,
 }
 
+impl Bot {
+    pub fn new(strategy: StrategyDto) -> GenResult<Self> {
+        let dag = Dag::new(strategy.clone())?;
+        let calc_lkup: HashMap<String, CalculationDto> = strategy
+            .calcs()
+            .iter()
+            .map(|calc| (calc.name().to_string(), calc.clone()))
+            .collect();
+        Ok(Bot {
+            strategy,
+            dag,
+            calc_lkup,
+        })
+    }
+    fn strategy(&self) -> &StrategyDto {
+        &self.strategy
+    }
+    fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
+        self.calc_lkup.get(name).ok_or("not found")
+    }
+    pub fn as_executable(
+        &self,
+        asset: Asset,
+        timestamp: TimeStamp,
+        data_client: Box<dyn DataClient>,
+    ) -> ExecutableBot {
+        ExecutableBot {
+            execution_order: self.dag.execution_order().clone(),
+            calc_lkup: self.calc_lkup.clone(),
+            asset,
+            timestamp,
+            data_client,
+            calc_status_lkup: self
+                .calc_lkup
+                .keys()
+                .map(|c| (c.clone(), CalculationStatus::NotStarted))
+                .collect(),
+            calc_data_lkup: HashMap::new(),
+        }
+    }
+}
+
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
 #[derive(Debug)]
 pub struct ExecutableBot {
@@ -175,48 +217,6 @@ pub enum CalculationStatus {
     InProgress,
     Complete,
     Error,
-}
-
-impl Bot {
-    pub fn new(strategy: StrategyDto) -> GenResult<Self> {
-        let dag = Dag::new(strategy.clone())?;
-        let calc_lkup: HashMap<String, CalculationDto> = strategy
-            .calcs()
-            .iter()
-            .map(|calc| (calc.name().to_string(), calc.clone()))
-            .collect();
-        Ok(Bot {
-            strategy,
-            dag,
-            calc_lkup,
-        })
-    }
-    fn strategy(&self) -> &StrategyDto {
-        &self.strategy
-    }
-    fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
-        self.calc_lkup.get(name).ok_or("not found")
-    }
-    pub fn as_executable(
-        &self,
-        asset: Asset,
-        timestamp: TimeStamp,
-        data_client: Box<dyn DataClient>,
-    ) -> ExecutableBot {
-        ExecutableBot {
-            execution_order: self.dag.execution_order().clone(),
-            calc_lkup: self.calc_lkup.clone(),
-            asset,
-            timestamp,
-            data_client,
-            calc_status_lkup: self
-                .calc_lkup
-                .keys()
-                .map(|c| (c.clone(), CalculationStatus::NotStarted))
-                .collect(),
-            calc_data_lkup: HashMap::new(),
-        }
-    }
 }
 
 #[cfg(test)]
