@@ -13,18 +13,42 @@ use std::convert::TryFrom;
 pub type TimeSeriesReference = String;
 pub type TimeSeriesName = String;
 
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[allow(non_camel_case_types)]
+pub enum Operation {
+    QUERY,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    TS_ADD,
+    TS_SUB,
+    TS_MUL,
+    TS_DIV,
+    SMA,
+}
+
 const DYADIC_TIME_SERIES_OPERATIONS: &[Operation] = &[
     Operation::TS_ADD,
     Operation::TS_SUB,
     Operation::TS_MUL,
     Operation::TS_DIV,
 ];
+
 const DYADIC_SCALAR_OPERATIONS: &[Operation] = &[
     Operation::ADD,
     Operation::SUB,
     Operation::MUL,
     Operation::DIV,
 ];
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub enum OperandType {
+    Text,
+    Integer,
+    Decimal,
+    Reference,
+}
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct ScoreDto {
@@ -38,14 +62,6 @@ impl ScoreDto {
     pub fn calc(&self) -> &str {
         &self.calc
     }
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub enum OperandType {
-    Text,
-    Integer,
-    Decimal,
-    Reference,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -72,21 +88,6 @@ impl OperandDto {
     pub fn new(name: String, _type: OperandType, value: String) -> Self {
         OperandDto { name, _type, value }
     }
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-#[allow(non_camel_case_types)]
-pub enum Operation {
-    QUERY,
-    ADD,
-    SUB,
-    MUL,
-    DIV,
-    TS_ADD,
-    TS_SUB,
-    TS_MUL,
-    TS_DIV,
-    SMA,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
