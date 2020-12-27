@@ -19,13 +19,13 @@ use std::fmt::Formatter;
 /// Directed acyclic graph where vertices/nodes represent calculations and edges represent dependencies.
 #[derive(Debug, Clone)]
 pub struct Dag {
-    dag_dto: DagDto,
+    dag_dto: DiGraph<String, String>,
     node_lkup: HashMap<String, NodeIndex>,
 }
 
 impl Dag {
     pub fn new(strategy_dto: StrategyDto) -> GenResult<Self> {
-        let dag_dto: DagDto = strategy_dto.try_into()?;
+        let dag_dto: DiGraph<String, String> = strategy_dto.try_into()?;
         let node_lkup: HashMap<String, NodeIndex<u32>> = dag_dto
             .node_indices()
             .into_iter()
@@ -66,12 +66,10 @@ impl Dag {
     }
 }
 
-type DagDto = DiGraph<String, String>;
-
-impl TryFrom<StrategyDto> for DagDto {
+impl TryFrom<StrategyDto> for DiGraph<String, String> {
     type Error = GenError;
     fn try_from(strategy: StrategyDto) -> GenResult<Self> {
-        let mut dag: DagDto = DiGraph::new();
+        let mut dag: DiGraph<String, String> = DiGraph::new();
         let mut node_lookup = HashMap::new();
 
         // add nodes
@@ -208,7 +206,7 @@ mod learn_library {
     use petgraph::algo::toposort;
     use petgraph::prelude::*;
 
-    use crate::dag::{Dag, DagDto};
+    use crate::dag::{Dag, DiGraph};
     use crate::errors::GenResult;
     use crate::strategy::{from_path, StrategyDto};
     use std::convert::TryInto;
@@ -224,7 +222,7 @@ mod learn_library {
     #[test]
     fn topo() {
         // dag = C -> B <- A
-        let mut dag: DagDto = DiGraph::new();
+        let mut dag: DiGraph<String, String> = DiGraph::new();
         let b = dag.add_node(String::from("B"));
         let c = dag.add_node(String::from("C"));
         let a = dag.add_node(String::from("A"));
@@ -244,7 +242,7 @@ mod learn_library {
     #[test]
     fn dfs_post_order() -> GenResult<()> {
         let strategy = strategy_fixture();
-        let dag: DagDto = strategy.clone().try_into()?;
+        let dag: DiGraph<String, String> = strategy.clone().try_into()?;
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
 
         let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
@@ -264,7 +262,7 @@ mod learn_library {
     #[test]
     fn bfs() -> GenResult<()> {
         let strategy = strategy_fixture();
-        let dag: DagDto = strategy.clone().try_into()?;
+        let dag: DiGraph<String, String> = strategy.clone().try_into()?;
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
 
         let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");

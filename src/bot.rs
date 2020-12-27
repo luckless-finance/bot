@@ -20,13 +20,13 @@ use std::fmt;
 pub struct Bot {
     strategy: StrategyDto,
     dag: Dag,
-    calc_lkup: HashMap<TimeSeriesName, CalculationDto>,
+    calcs: HashMap<TimeSeriesName, CalculationDto>,
 }
 
 impl Bot {
     pub fn new(strategy: StrategyDto) -> GenResult<Self> {
         let dag = Dag::new(strategy.clone())?;
-        let calc_lkup: HashMap<String, CalculationDto> = strategy
+        let calcs: HashMap<String, CalculationDto> = strategy
             .calcs()
             .iter()
             .map(|calc| (calc.name().to_string(), calc.clone()))
@@ -34,14 +34,14 @@ impl Bot {
         Ok(Bot {
             strategy,
             dag,
-            calc_lkup,
+            calcs,
         })
     }
     fn strategy(&self) -> &StrategyDto {
         &self.strategy
     }
     fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
-        self.calc_lkup.get(name).ok_or("not found")
+        self.calcs.get(name).ok_or("not found")
     }
     pub fn as_executable(
         &self,
@@ -50,42 +50,50 @@ impl Bot {
         data_client: Box<dyn DataClient>,
     ) -> ExecutableBot {
         ExecutableBot {
-            execution_order: self.dag.execution_order().clone(),
-            calc_lkup: self.calc_lkup.clone(),
             asset,
             timestamp,
+            execution_order: self.dag.execution_order().clone(),
+            calcs: self.calcs.clone(),
             data_client,
-            calc_status_lkup: self
-                .calc_lkup
+            calc_status: self
+                .calcs
                 .keys()
                 .map(|c| (c.clone(), CalculationStatus::NotStarted))
                 .collect(),
-            calc_data_lkup: HashMap::new(),
+            calc_time_series: HashMap::new(),
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum CalculationStatus {
+    NotStarted,
+    InProgress,
+    Complete,
+    Error,
 }
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
 #[derive(Debug)]
 pub struct ExecutableBot {
-    execution_order: Vec<TimeSeriesName>,
-    calc_lkup: HashMap<TimeSeriesName, CalculationDto>,
     asset: Asset,
     timestamp: TimeStamp,
+    execution_order: Vec<TimeSeriesName>,
+    calcs: HashMap<TimeSeriesName, CalculationDto>,
     data_client: Box<dyn DataClient>,
-    calc_status_lkup: HashMap<TimeSeriesName, CalculationStatus>,
-    calc_data_lkup: HashMap<TimeSeriesName, TimeSeries1D>,
+    calc_status: HashMap<TimeSeriesName, CalculationStatus>,
+    calc_time_series: HashMap<TimeSeriesName, TimeSeries1D>,
 }
 
 impl ExecutableBot {
     fn status(&mut self, calc_name: &str, new_calc_status: CalculationStatus) {
-        if let Some(calc_status) = self.calc_status_lkup.get_mut(calc_name) {
+        if let Some(calc_status) = self.calc_status.get_mut(calc_name) {
             *calc_status = new_calc_status;
         }
     }
 
     pub fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
-        match self.calc_data_lkup.get(calc_name) {
+        match self.calc_time_series.get(calc_name) {
             Some(time_series_) => Ok(time_series_),
             None => Err(UpstreamNotFoundError::new(calc_name.to_string())),
         }
@@ -111,7 +119,7 @@ impl ExecutableBot {
         for calc_name in calc_order {
             println!("\nexecuting {}", calc_name);
             self.status(&calc_name, CalculationStatus::InProgress);
-            let calc = self.calc_lkup.get(&calc_name).ok_or("calc not found")?;
+            let calc = self.calcs.get(&calc_name).ok_or("calc not found")?;
 
             let calc_time_series = match calc.operation() {
                 Operation::QUERY => self.handle_query(calc),
@@ -133,7 +141,7 @@ impl ExecutableBot {
                 },
             );
 
-            self.calc_data_lkup
+            self.calc_time_series
                 .insert(calc_name.clone(), calc_time_series?);
         }
         Ok(())
@@ -211,12 +219,12 @@ impl ExecutableBot {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum CalculationStatus {
-    NotStarted,
-    InProgress,
-    Complete,
-    Error,
+struct AssetScore {
+    asset: Asset,
+    timestamp: TimeStamp,
+    status: CalculationStatus,
+    calc_status: HashMap<TimeSeriesName, CalculationStatus>,
+    calc_time_series: HashMap<TimeSeriesName, TimeSeries1D>,
 }
 
 #[cfg(test)]
@@ -261,7 +269,7 @@ mod tests {
         let mut executable_bot = bot.as_executable(asset, timestamp, Box::new(data_client));
         executable_bot.execute().expect("unable to execute");
         executable_bot
-            .calc_data_lkup
+            .calc_time_series
             .values()
             .for_each(|time_series| assert!(time_series.len() > 0));
         Ok(())
