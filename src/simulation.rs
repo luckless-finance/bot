@@ -1,5 +1,6 @@
-use crate::data::{Asset, AssetNotFoundError, DataClient, Symbol};
-use crate::strategy::{GenResult, QueryCalculationDto};
+use crate::data::{Asset, DataClient, Symbol};
+use crate::errors::{AssetNotFoundError, GenResult};
+use crate::strategy::QueryCalculationDto;
 use crate::time_series::TimeSeries1D;
 use std::collections::HashMap;
 use std::f64::consts::PI;
@@ -30,7 +31,7 @@ impl DataClient for MockDataClient {
     fn asset(&self, symbol: &Symbol) -> GenResult<&Asset> {
         match self.assets.get(symbol) {
             Some(asset) => Ok(asset),
-            None => Err(Box::new(AssetNotFoundError::new(symbol.clone()))),
+            None => Err(AssetNotFoundError::new(symbol.clone())),
         }
     }
 
@@ -161,7 +162,6 @@ impl TimeSeriesGenerators for TimeSeries1D {
 mod tests {
     use crate::data::{plot_ts, plots};
     use crate::simulation::*;
-    use crate::strategy::GenResult;
     use crate::time_series::TimeSeries1D;
     use rand_distr::num_traits::{AsPrimitive, Pow};
     use std::collections::HashSet;
@@ -259,8 +259,8 @@ mod tests {
         let amplitude = 0.5f64;
         let y0 = 10f64;
         let y = TimeSeries1D::sin(&x, amplitude).vertical_shift(y0);
-        let y_sma100 = y.sma(100);
-        let y_sma200 = y.sma(200);
+        // let y_sma100 = y.sma(100);
+        // let y_sma200 = y.sma(200);
         let y_sma300 = y.sma(300);
         y_sma300
             .values()
@@ -271,8 +271,8 @@ mod tests {
         let x2 = x.clone().iter().map(|x| x + PI).collect();
         let z0 = 5f64;
         let z = TimeSeries1D::sin(&x2, amplitude).vertical_shift(z0);
-        let z_sma100 = z.sma(100);
-        let z_sma200 = z.sma(200);
+        // let z_sma100 = z.sma(100);
+        // let z_sma200 = z.sma(200);
         let z_sma300 = z.sma(300);
         z_sma300
             .values()

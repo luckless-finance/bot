@@ -5,13 +5,11 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+use crate::errors::{GenError, GenResult};
 use crate::time_series::DataPointValue;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
-// https://doc.rust-lang.org/rust-by-example/error/multiple_error_types/boxing_errors.html
-pub type GenError = Box<dyn std::error::Error>;
-pub type GenResult<T> = std::result::Result<T, GenError>;
 pub type TimeSeriesReference = String;
 pub type TimeSeriesName = String;
 
@@ -343,6 +341,7 @@ mod tests {
     use std::env::current_dir;
     use std::path::Path;
 
+    use crate::errors::GenResult;
     use crate::strategy::*;
     use std::convert::TryInto;
 

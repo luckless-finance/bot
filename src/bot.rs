@@ -4,8 +4,9 @@ use std::collections::HashMap;
 
 use crate::dag::Dag;
 use crate::data::{Asset, DataClient};
+use crate::errors::{GenResult, UpstreamNotFoundError};
 use crate::strategy::{
-    CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, GenResult, Operation,
+    CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, Operation,
     QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
 };
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
@@ -20,29 +21,6 @@ pub struct Bot {
     strategy: StrategyDto,
     dag: Dag,
     calc_lkup: HashMap<TimeSeriesName, CalculationDto>,
-}
-
-#[derive(Debug, Clone)]
-pub struct UpstreamNotFoundError {
-    upstream_name: TimeSeriesName,
-}
-
-impl UpstreamNotFoundError {
-    pub fn new(upstream_name: TimeSeriesName) -> Box<Self> {
-        Box::new(UpstreamNotFoundError { upstream_name })
-    }
-}
-
-impl fmt::Display for UpstreamNotFoundError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "upstream not found {}\n", self.upstream_name)
-    }
-}
-
-impl std::error::Error for UpstreamNotFoundError {
-    fn description(&self) -> &str {
-        "Upstream not found."
-    }
 }
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
@@ -247,10 +225,10 @@ mod tests {
 
     use crate::bot::Bot;
     use crate::data::Asset;
+    use crate::errors::GenResult;
     use crate::simulation::{MockDataClient, TODAY};
     use crate::strategy::{
-        from_path, CalculationDto, GenResult, OperandDto, OperandType, Operation, ScoreDto,
-        StrategyDto,
+        from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto, StrategyDto,
     };
 
     fn strategy_fixture() -> StrategyDto {

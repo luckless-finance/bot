@@ -11,33 +11,11 @@ use gnuplot::Coordinate::Graph;
 use gnuplot::PlotOption::Caption;
 use gnuplot::{AxesCommon, Figure};
 
-use crate::strategy::{GenResult, QueryCalculationDto};
+use crate::errors::GenResult;
+use crate::strategy::QueryCalculationDto;
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
 pub type Symbol = String;
-
-#[derive(Debug, Clone)]
-pub struct AssetNotFoundError {
-    symbol: Symbol,
-}
-
-impl AssetNotFoundError {
-    pub fn new(symbol: Symbol) -> Self {
-        AssetNotFoundError { symbol }
-    }
-}
-
-impl fmt::Display for AssetNotFoundError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "asset with symbol {} not found\n", self.symbol)
-    }
-}
-
-impl std::error::Error for AssetNotFoundError {
-    fn description(&self) -> &str {
-        "Asset not found."
-    }
-}
 
 // TODO query memoization/caching
 pub trait DataClient {

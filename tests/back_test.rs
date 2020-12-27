@@ -22,8 +22,8 @@ mod tests {
     use yafa::simulation::{MockDataClient, TODAY};
     use yafa::data::{DataClient, plot_ts};
     use yafa::bot::*;
-    use yafa::strategy::GenResult;
     use yafa::time_series::{DataPointValue, TimeSeries1D};
+    use yafa::errors::GenResult;
 
 
     #[test]
@@ -36,7 +36,7 @@ mod tests {
             .collect();
         bots.iter_mut().for_each(|b| b.execute().unwrap());
         println!("{:?}", bots);
-        let ts: Vec<&TimeSeries1D> = bots.iter()
+        let _ts: Vec<&TimeSeries1D> = bots.iter()
             .map(|b| b.upstream(strategy.score().calc()).unwrap())
             .collect();
         // plot_ts(ts);

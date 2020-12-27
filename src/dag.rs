@@ -10,7 +10,8 @@ use petgraph::dot::{Config, Dot};
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::Direction;
 
-use crate::strategy::{GenError, GenResult, OperandType, StrategyDto};
+use crate::errors::{GenError, GenResult, InvalidStrategyError};
+use crate::strategy::{OperandType, StrategyDto};
 use core::fmt;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Formatter;
@@ -109,37 +110,6 @@ impl TryFrom<StrategyDto> for DagDto {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct InvalidStrategyError {
-    strategy_name: String,
-    reason: String,
-}
-
-impl InvalidStrategyError {
-    pub fn new(strategy_name: String, reason: String) -> Box<Self> {
-        Box::new(InvalidStrategyError {
-            strategy_name,
-            reason,
-        })
-    }
-}
-
-impl fmt::Display for InvalidStrategyError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "Invalid strategy: {}\n{}\n",
-            self.strategy_name, self.reason
-        )
-    }
-}
-
-impl std::error::Error for InvalidStrategyError {
-    fn description(&self) -> &str {
-        "Invalid strategy"
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -147,7 +117,8 @@ mod tests {
     use std::path::Path;
 
     use crate::dag::Dag;
-    use crate::strategy::{from_path, GenResult, StrategyDto};
+    use crate::errors::GenResult;
+    use crate::strategy::{from_path, StrategyDto};
 
     fn strategy_fixture() -> StrategyDto {
         from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
@@ -238,7 +209,8 @@ mod learn_library {
     use petgraph::prelude::*;
 
     use crate::dag::{Dag, DagDto};
-    use crate::strategy::{from_path, GenResult, StrategyDto};
+    use crate::errors::GenResult;
+    use crate::strategy::{from_path, StrategyDto};
     use std::convert::TryInto;
 
     fn strategy_fixture() -> StrategyDto {
