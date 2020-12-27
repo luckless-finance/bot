@@ -16,6 +16,7 @@ use core::fmt;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Formatter;
 
+/// Directed acyclic graph where vertices/nodes represent calculations and edges represent dependencies.
 #[derive(Debug, Clone)]
 pub struct Dag {
     dag_dto: DagDto,

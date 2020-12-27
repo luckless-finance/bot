@@ -24,7 +24,13 @@ pub struct Bot {
 
 #[derive(Debug, Clone)]
 pub struct UpstreamNotFoundError {
-    upstream_name: String,
+    upstream_name: TimeSeriesName,
+}
+
+impl UpstreamNotFoundError {
+    pub fn new(upstream_name: TimeSeriesName) -> Box<Self> {
+        Box::new(UpstreamNotFoundError { upstream_name })
+    }
 }
 
 impl fmt::Display for UpstreamNotFoundError {
@@ -61,9 +67,7 @@ impl ExecutableBot {
     pub fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
         match self.calc_data_lkup.get(calc_name) {
             Some(time_series_) => Ok(time_series_),
-            None => Err(Box::new(UpstreamNotFoundError {
-                upstream_name: calc_name.to_string(),
-            })),
+            None => Err(UpstreamNotFoundError::new(calc_name.to_string())),
         }
     }
 
@@ -74,12 +78,10 @@ impl ExecutableBot {
             .last()
         {
             Some(score) => Ok(score),
-            None => Err(Box::new(UpstreamNotFoundError {
-                upstream_name: format!(
-                    "score calc: {}",
-                    self.execution_order.last().expect("impossible")
-                ),
-            })),
+            None => Err(UpstreamNotFoundError::new(format!(
+                "score calc: {}",
+                self.execution_order.last().expect("impossible")
+            ))),
         }
     }
 
@@ -217,13 +219,6 @@ impl Bot {
     pub fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
         self.calc_lkup.get(name).ok_or("not found")
     }
-    pub fn queries(&self) -> Vec<&CalculationDto> {
-        self.strategy
-            .calcs()
-            .iter()
-            .filter(|c| (c.operation()) == &Operation::QUERY)
-            .collect()
-    }
     pub fn as_executable(
         &self,
         asset: Asset,
@@ -237,10 +232,9 @@ impl Bot {
             timestamp,
             data_client,
             calc_status_lkup: self
-                .strategy
-                .calcs()
-                .iter()
-                .map(|c| (c.name().to_string(), CalculationStatus::NotStarted))
+                .calc_lkup
+                .keys()
+                .map(|c| (c.clone(), CalculationStatus::NotStarted))
                 .collect(),
             calc_data_lkup: HashMap::new(),
         }
@@ -292,18 +286,6 @@ mod tests {
             .calc_data_lkup
             .values()
             .for_each(|time_series| assert!(time_series.len() > 0));
-        Ok(())
-    }
-
-    #[test]
-    fn queries() -> GenResult<()> {
-        let bot = bot_fixture()?;
-        let close_queries = bot
-            .queries()
-            .iter()
-            .filter(|calc| (**calc).name() == "price")
-            .count();
-        assert_eq!(close_queries, 1);
         Ok(())
     }
 }
