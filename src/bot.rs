@@ -15,6 +15,14 @@ use std;
 use std::convert::TryInto;
 use std::fmt;
 
+#[derive(Debug, Clone)]
+pub enum CalculationStatus {
+    NotStarted,
+    InProgress,
+    Complete,
+    Error,
+}
+
 /// Wraps several Dtos required traverse and consume a strategy
 #[derive(Debug, Clone)]
 pub struct Bot {
@@ -63,14 +71,6 @@ impl Bot {
             calc_time_series: HashMap::new(),
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum CalculationStatus {
-    NotStarted,
-    InProgress,
-    Complete,
-    Error,
 }
 
 /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
