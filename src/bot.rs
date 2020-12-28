@@ -51,13 +51,13 @@ impl Bot {
     fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
         self.calcs.get(name).ok_or("not found")
     }
-    pub fn as_executable(
+    pub fn execute(
         &self,
         asset: Asset,
         timestamp: TimeStamp,
         data_client: Box<dyn DataClient>,
-    ) -> ExecutableBot {
-        ExecutableBot {
+    ) -> GenResult<ExecutableBot> {
+        let mut exe_bot = ExecutableBot {
             asset,
             timestamp,
             execution_order: self.dag.execution_order().clone(),
@@ -69,7 +69,9 @@ impl Bot {
                 .map(|c| (c.clone(), CalculationStatus::NotStarted))
                 .collect(),
             calc_time_series: HashMap::new(),
-        }
+        };
+        exe_bot.execute()?;
+        Ok(exe_bot)
     }
 }
 
@@ -266,8 +268,7 @@ mod tests {
         let asset = Asset::new(String::from("A"));
         let timestamp = TODAY;
         let data_client = MockDataClient::new();
-        let mut executable_bot = bot.as_executable(asset, timestamp, Box::new(data_client));
-        executable_bot.execute().expect("unable to execute");
+        let executable_bot = bot.execute(asset, timestamp, Box::new(data_client))?;
         executable_bot
             .calc_time_series
             .values()

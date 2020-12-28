@@ -32,7 +32,11 @@ mod tests {
         let bot = Bot::new(strategy.clone())?;
         let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         let mut bots: Vec<ExecutableBot> = data_client.assets().values()
-            .map(|a| bot.as_executable(a.clone(), TODAY, Box::new(MockDataClient::new())))
+            .flat_map(|a|
+                bot.execute(a.clone(),
+                            TODAY,
+                            Box::new(MockDataClient::new()))
+            )
             .collect();
         bots.iter_mut().for_each(|b| b.execute().unwrap());
         println!("{:?}", bots);
