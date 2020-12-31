@@ -224,16 +224,27 @@ impl ExecutableBot {
 struct AssetScore {
     asset: Asset,
     timestamp: TimeStamp,
-    status: CalculationStatus,
+    // status: CalculationStatus,
     calc_status: HashMap<TimeSeriesName, CalculationStatus>,
     calc_time_series: HashMap<TimeSeriesName, TimeSeries1D>,
+}
+
+impl AssetScore {
+    fn new(bot: ExecutableBot) -> AssetScore {
+        AssetScore {
+            asset: bot.asset,
+            timestamp: bot.timestamp,
+            calc_status: bot.calc_status,
+            calc_time_series: bot.calc_time_series,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
-    use crate::bot::Bot;
+    use crate::bot::{AssetScore, Bot};
     use crate::data::Asset;
     use crate::errors::GenResult;
     use crate::simulation::{MockDataClient, TODAY};
@@ -269,10 +280,11 @@ mod tests {
         let timestamp = TODAY;
         let data_client = MockDataClient::new();
         let executable_bot = bot.execute(asset, timestamp, Box::new(data_client))?;
-        executable_bot
-            .calc_time_series
-            .values()
-            .for_each(|time_series| assert!(time_series.len() > 0));
+        let asset_score = AssetScore::new(executable_bot);
+        // executable_bot
+        //     .calc_time_series
+        //     .values()
+        //     .for_each(|time_series| assert!(time_series.len() > 0));
         Ok(())
     }
 }
