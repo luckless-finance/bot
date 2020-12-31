@@ -31,23 +31,23 @@ mod tests {
         let strategy = get_strategy();
         let bot = Bot::new(strategy.clone())?;
         let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
-        let mut bots: Vec<ExecutableBot> = data_client.assets().values()
+        let mut bots: Vec<AssetScore> = data_client.assets().values()
             .flat_map(|a|
                 bot.execute(a.clone(),
                             TODAY,
                             Box::new(MockDataClient::new()))
             )
             .collect();
-        bots.iter_mut().for_each(|b| b.execute().unwrap());
+        // bots.iter_mut().for_each(|b| b.execute().unwrap());
         println!("{:?}", bots);
-        let _ts: Vec<&TimeSeries1D> = bots.iter()
-            .map(|b| b.upstream(strategy.score().calc()).unwrap())
-            .collect();
+        // let _ts: Vec<&TimeSeries1D> = bots.iter()
+        //     .map(|b| b.upstream(strategy.score().calc()).unwrap())
+        //     .collect();
         // plot_ts(ts);
-        let scores: Vec<&DataPointValue> = bots.iter()
-            .flat_map(|b| b.score())
-            .collect();
-        println!("{:?}", scores);
+        // let scores: Vec<&DataPointValue> = bots.iter()
+        //     .flat_map(|b| b.score())
+        //     .collect();
+        // println!("{:?}", scores);
         Ok(())
         // let b: &mut yafa::bot::ExecutableBot = bots.get_mut(0).unwrap();
         // b.execute()

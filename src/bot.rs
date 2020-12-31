@@ -15,7 +15,7 @@ use std;
 use std::convert::TryInto;
 use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CalculationStatus {
     NotStarted,
     InProgress,
@@ -51,12 +51,13 @@ impl Bot {
     fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
         self.calcs.get(name).ok_or("not found")
     }
+    // TODO rename to compute_score
     pub fn execute(
         &self,
         asset: Asset,
         timestamp: TimeStamp,
         data_client: Box<dyn DataClient>,
-    ) -> GenResult<ExecutableBot> {
+    ) -> GenResult<AssetScore> {
         let mut exe_bot = ExecutableBot {
             asset,
             timestamp,
@@ -71,7 +72,8 @@ impl Bot {
             calc_time_series: HashMap::new(),
         };
         exe_bot.execute()?;
-        Ok(exe_bot)
+        Ok(AssetScore::new(exe_bot))
+        // Ok(exe_bot)
     }
 }
 
@@ -88,6 +90,37 @@ pub struct ExecutableBot {
 }
 
 impl ExecutableBot {
+    pub(crate) fn overall_status(&self) -> CalculationStatus {
+        // compute group by count using Entry Api
+        let mut count_by_status: HashMap<CalculationStatus, usize> = HashMap::new();
+        for (time_series_name, calc_status) in &self.calc_status {
+            let count = count_by_status.entry(calc_status.clone()).or_insert(1usize);
+            *count += 1;
+        }
+        // declare determining factors of overall status
+        let has_error = match count_by_status.get(&CalculationStatus::Error) {
+            Some(_) => true,
+            None => false,
+        };
+        let all_complete = match count_by_status.get(&CalculationStatus::Complete) {
+            Some(n) => n == &self.calcs.len(),
+            None => false,
+        };
+        let all_not_started = match count_by_status.get(&CalculationStatus::NotStarted) {
+            Some(n) => n == &self.calcs.len(),
+            None => false,
+        };
+        // apply business logic against factors
+        if has_error {
+            CalculationStatus::Error
+        } else if all_complete {
+            CalculationStatus::Complete
+        } else if all_not_started {
+            CalculationStatus::NotStarted
+        } else {
+            CalculationStatus::InProgress
+        }
+    }
     fn status(&mut self, calc_name: &str, new_calc_status: CalculationStatus) {
         if let Some(calc_status) = self.calc_status.get_mut(calc_name) {
             *calc_status = new_calc_status;
@@ -221,22 +254,37 @@ impl ExecutableBot {
     }
 }
 
-struct AssetScore {
+#[derive(Debug)]
+pub struct AssetScore {
     asset: Asset,
     timestamp: TimeStamp,
-    // status: CalculationStatus,
+    status: CalculationStatus,
     calc_status: HashMap<TimeSeriesName, CalculationStatus>,
     calc_time_series: HashMap<TimeSeriesName, TimeSeries1D>,
 }
 
 impl AssetScore {
     fn new(bot: ExecutableBot) -> AssetScore {
+        let overall_status = bot.overall_status();
         AssetScore {
             asset: bot.asset,
             timestamp: bot.timestamp,
+            status: overall_status,
             calc_status: bot.calc_status,
             calc_time_series: bot.calc_time_series,
         }
+    }
+    pub fn asset(&self) -> &Asset {
+        &self.asset
+    }
+    pub fn timestamp(&self) -> usize {
+        self.timestamp
+    }
+    pub fn calc_status(&self) -> &HashMap<TimeSeriesName, CalculationStatus> {
+        &self.calc_status
+    }
+    pub fn calc_time_series(&self) -> &HashMap<TimeSeriesName, TimeSeries1D> {
+        &self.calc_time_series
     }
 }
 
@@ -244,13 +292,14 @@ impl AssetScore {
 mod tests {
     use std::path::Path;
 
-    use crate::bot::{AssetScore, Bot};
+    use crate::bot::{AssetScore, Bot, CalculationStatus};
     use crate::data::Asset;
     use crate::errors::GenResult;
     use crate::simulation::{MockDataClient, TODAY};
     use crate::strategy::{
         from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto, StrategyDto,
     };
+    use std::collections::HashMap;
 
     fn strategy_fixture() -> StrategyDto {
         StrategyDto::new(
@@ -279,12 +328,21 @@ mod tests {
         let asset = Asset::new(String::from("A"));
         let timestamp = TODAY;
         let data_client = MockDataClient::new();
-        let executable_bot = bot.execute(asset, timestamp, Box::new(data_client))?;
-        let asset_score = AssetScore::new(executable_bot);
+        let asset_score: AssetScore = bot.execute(asset, timestamp, Box::new(data_client))?;
+        // let asset_score = AssetScore::new(executable_bot);
         // executable_bot
         //     .calc_time_series
         //     .values()
         //     .for_each(|time_series| assert!(time_series.len() > 0));
         Ok(())
+    }
+
+    #[test]
+    fn group_by_test() {
+        let data: HashMap<usize, i32> = vec![(1usize, -1), (10usize, -10), (100usize, -10)]
+            .into_iter()
+            .collect();
+
+        println!("{:?}", data);
     }
 }
