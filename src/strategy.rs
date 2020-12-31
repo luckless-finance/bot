@@ -5,15 +5,28 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+use crate::errors::{GenError, GenResult};
 use crate::time_series::DataPointValue;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
-// https://doc.rust-lang.org/rust-by-example/error/multiple_error_types/boxing_errors.html
-pub type GenError = Box<dyn std::error::Error>;
-pub type GenResult<T> = std::result::Result<T, GenError>;
 pub type TimeSeriesReference = String;
 pub type TimeSeriesName = String;
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[allow(non_camel_case_types)]
+pub enum Operation {
+    QUERY,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    TS_ADD,
+    TS_SUB,
+    TS_MUL,
+    TS_DIV,
+    SMA,
+}
 
 const DYADIC_TIME_SERIES_OPERATIONS: &[Operation] = &[
     Operation::TS_ADD,
@@ -21,12 +34,21 @@ const DYADIC_TIME_SERIES_OPERATIONS: &[Operation] = &[
     Operation::TS_MUL,
     Operation::TS_DIV,
 ];
+
 const DYADIC_SCALAR_OPERATIONS: &[Operation] = &[
     Operation::ADD,
     Operation::SUB,
     Operation::MUL,
     Operation::DIV,
 ];
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub enum OperandType {
+    Text,
+    Integer,
+    Decimal,
+    Reference,
+}
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct ScoreDto {
@@ -40,14 +62,6 @@ impl ScoreDto {
     pub fn calc(&self) -> &str {
         &self.calc
     }
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub enum OperandType {
-    Text,
-    Integer,
-    Decimal,
-    Reference,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -74,21 +88,6 @@ impl OperandDto {
     pub fn new(name: String, _type: OperandType, value: String) -> Self {
         OperandDto { name, _type, value }
     }
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-#[allow(non_camel_case_types)]
-pub enum Operation {
-    QUERY,
-    ADD,
-    SUB,
-    MUL,
-    DIV,
-    TS_ADD,
-    TS_SUB,
-    TS_MUL,
-    TS_DIV,
-    SMA,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -321,6 +320,10 @@ impl StrategyDto {
 
 impl StrategyDto {
     pub fn new(name: String, score: ScoreDto, calcs: Vec<CalculationDto>) -> Self {
+        &calcs
+            .iter()
+            .find(|c| c.name == score.calc)
+            .expect("Invalid strategy, score calc not found");
         StrategyDto { name, score, calcs }
     }
 }
@@ -339,10 +342,11 @@ mod tests {
     use std::env::current_dir;
     use std::path::Path;
 
+    use crate::errors::GenResult;
     use crate::strategy::*;
     use std::convert::TryInto;
 
-    fn get_strategy() -> StrategyDto {
+    pub fn get_strategy() -> StrategyDto {
         StrategyDto {
             name: String::from("Example Strategy Document"),
             score: ScoreDto {

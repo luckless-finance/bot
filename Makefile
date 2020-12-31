@@ -40,9 +40,15 @@ test:
 	@echo "-------------------"
 	cargo test;
 
+pre-commit:
+	@echo "-------------------"
+	@echo "pre-commit validation: test, format, check"
+	@echo "-------------------"
+	make test && rustfmt src/* --check && make check
+
 watch-test:
 	@echo "-------------------"
-	@echo "start infinite test loop"
+	@echo "run tests whenever files change (see .ignore)"
 	@echo "-------------------"
-	./utils/watch-test.sh;
+	cargo watch -x test
 

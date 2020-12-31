@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-// #![allow(unused)]
 
 use std::collections::HashMap;
 use std::env::current_dir;
@@ -11,39 +10,35 @@ use petgraph::dot::{Config, Dot};
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::Direction;
 
+use crate::errors::{GenError, GenResult, InvalidStrategyError};
 use crate::strategy::{OperandType, StrategyDto};
+use core::fmt;
+use std::convert::{TryFrom, TryInto};
+use std::fmt::Formatter;
 
+/// Directed acyclic graph where vertices/nodes represent calculations and edges represent dependencies.
 #[derive(Debug, Clone)]
 pub struct Dag {
-    dag_dto: DagDto,
+    dag_dto: DiGraph<String, String>,
     node_lkup: HashMap<String, NodeIndex>,
-    execution_order: Vec<String>,
 }
 
 impl Dag {
-    pub fn new(strategy_dto: StrategyDto) -> Self {
-        let dag_dto = to_dag(&strategy_dto).expect("unable to build dag from strategy");
+    pub fn new(strategy_dto: StrategyDto) -> GenResult<Self> {
+        let dag_dto: DiGraph<String, String> = strategy_dto.try_into()?;
         let node_lkup: HashMap<String, NodeIndex<u32>> = dag_dto
             .node_indices()
             .into_iter()
             .map(|idx| (dag_dto.node_weight(idx).expect("impossible").clone(), idx))
             .collect();
-        let execution_order = Dag::compute_execution_order(&dag_dto);
-        Dag {
-            dag_dto,
-            node_lkup,
-            execution_order,
-        }
+        Ok(Dag { dag_dto, node_lkup })
     }
-    fn compute_execution_order(dag_dto: &DagDto) -> Vec<String> {
-        toposort(&dag_dto, None)
+    pub fn execution_order(&self) -> Vec<String> {
+        toposort(&self.dag_dto, None)
             .expect("unable to toposort")
             .iter()
-            .map(|node_idx: &NodeIndex| dag_dto.node_weight(*node_idx).unwrap().clone())
+            .map(|node_idx: &NodeIndex| self.dag_dto.node_weight(*node_idx).unwrap().clone())
             .collect()
-    }
-    pub fn execution_order(&self) -> &Vec<String> {
-        &self.execution_order
     }
     pub fn upstream(&self, node: &String) -> Vec<String> {
         self.dag_dto
@@ -71,35 +66,45 @@ impl Dag {
     }
 }
 
-type DagDto = DiGraph<String, String>;
+impl TryFrom<StrategyDto> for DiGraph<String, String> {
+    type Error = GenError;
+    fn try_from(strategy: StrategyDto) -> GenResult<Self> {
+        let mut dag: DiGraph<String, String> = DiGraph::new();
+        let mut node_lookup = HashMap::new();
 
-pub fn to_dag(strategy: &StrategyDto) -> Result<DagDto, &str> {
-    let mut dag: DagDto = DiGraph::new();
-    let mut node_lookup = HashMap::new();
-
-    // add nodes
-    for calc in strategy.calcs() {
-        // println!("{}", calc.name());
-        let index = dag.add_node(calc.name().to_string());
-        node_lookup.insert(calc.name(), index);
-    }
-    // add edges
-    for calc in strategy.calcs() {
-        for op in calc.operands() {
-            if node_lookup.contains_key(op.value()) && op._type() == &OperandType::Reference {
-                let operand = node_lookup.get(op.value()).expect("operand not found");
-                let calc = node_lookup.get(calc.name()).expect("calc not found");
-                dag.add_edge(*operand, *calc, String::new());
+        // add nodes
+        for calc in strategy.calcs() {
+            // println!("{}", calc.name());
+            let index = dag.add_node(calc.name().to_string());
+            node_lookup.insert(calc.name(), index);
+        }
+        // add edges
+        for calc in strategy.calcs() {
+            for op in calc.operands() {
+                if node_lookup.contains_key(op.value()) && op._type() == &OperandType::Reference {
+                    let operand = node_lookup.get(op.value()).expect("operand not found");
+                    let calc = node_lookup.get(calc.name()).expect("calc not found");
+                    dag.add_edge(*operand, *calc, String::new());
+                }
             }
         }
-    }
-    match is_cyclic_directed(&dag) {
-        true => Err("cyclic"),
-        false => match connected_components(&dag) {
-            0 => Err("zero connected components found"),
-            1 => Ok(dag),
-            _ => Err("more than 1 connected component found"),
-        },
+        match is_cyclic_directed(&dag) {
+            true => Err(InvalidStrategyError::new(
+                strategy.name().to_string(),
+                String::from("cyclic"),
+            )),
+            false => match connected_components(&dag) {
+                0 => Err(InvalidStrategyError::new(
+                    strategy.name().to_string(),
+                    String::from("zero connected components found"),
+                )),
+                1 => Ok(dag),
+                _ => Err(InvalidStrategyError::new(
+                    strategy.name().to_string(),
+                    String::from("more than 1 connected component found"),
+                )),
+            },
+        }
     }
 }
 
@@ -110,20 +115,21 @@ mod tests {
     use std::path::Path;
 
     use crate::dag::Dag;
+    use crate::errors::GenResult;
     use crate::strategy::{from_path, StrategyDto};
 
     fn strategy_fixture() -> StrategyDto {
         from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
     }
 
-    fn dag_fixture() -> Dag {
+    fn dag_fixture() -> GenResult<Dag> {
         Dag::new(strategy_fixture())
     }
 
     #[test]
-    fn strategy_to_dag() {
+    fn strategy_to_dag() -> GenResult<()> {
         let strategy = strategy_fixture();
-        let dag = Dag::new(strategy);
+        let dag = Dag::new(strategy)?;
         dag.save_dot_file();
         let dag_dto = dag.dag_dto;
         assert_eq!(dag_dto.node_count(), 5);
@@ -133,12 +139,13 @@ mod tests {
             .map(|i| dag_dto.node_weight(i).expect("node not found"))
             .find(|d| d.as_str().eq("sma200"))
             .expect("sma200 not found");
-        assert_eq!(nodes, "sma200")
+        assert_eq!(nodes, "sma200");
+        Ok(())
     }
 
     #[test]
-    fn traverse_dag_order() {
-        let dag: Dag = dag_fixture();
+    fn traverse_dag_order() -> GenResult<()> {
+        let dag: Dag = dag_fixture()?;
         let exe_order = dag.execution_order();
 
         let node_execution_order_lkup: HashMap<&String, usize> = (0..exe_order.len())
@@ -161,23 +168,25 @@ mod tests {
                 assert!(a_position < b_position);
             }
         }
+        Ok(())
     }
 
     #[test]
-    fn dag_to_dot_file() {
+    fn dag_to_dot_file() -> GenResult<()> {
         let strategy = strategy_fixture();
-        let dag = Dag::new(strategy);
+        let dag = Dag::new(strategy)?;
         dag.save_dot_file();
         let expected_output =
             read_to_string("expected_output.dot").expect("expected_output.dot not found.");
         let output = read_to_string("output.dot").expect("output.dot not found.");
         assert_eq!(output, expected_output);
+        Ok(())
     }
 
     #[test]
-    fn dag_upstream() {
+    fn dag_upstream() -> GenResult<()> {
         let strategy_dto = strategy_fixture();
-        let dag = Dag::new(strategy_dto);
+        let dag = Dag::new(strategy_dto)?;
         let upstream = dag.upstream(&String::from("sma50"));
         assert_eq!(upstream, vec![String::from("price")]);
 
@@ -186,6 +195,7 @@ mod tests {
         assert!(upstream.contains(&String::from("sma50")));
 
         println!("{:?}", upstream);
+        Ok(())
     }
 }
 
@@ -196,21 +206,23 @@ mod learn_library {
     use petgraph::algo::toposort;
     use petgraph::prelude::*;
 
-    use crate::dag::{to_dag, Dag, DagDto};
+    use crate::dag::{Dag, DiGraph};
+    use crate::errors::GenResult;
     use crate::strategy::{from_path, StrategyDto};
+    use std::convert::TryInto;
 
     fn strategy_fixture() -> StrategyDto {
         from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
     }
 
-    fn dag_fixture() -> Dag {
+    fn dag_fixture() -> GenResult<Dag> {
         Dag::new(strategy_fixture())
     }
 
     #[test]
     fn topo() {
         // dag = C -> B <- A
-        let mut dag: DagDto = DiGraph::new();
+        let mut dag: DiGraph<String, String> = DiGraph::new();
         let b = dag.add_node(String::from("B"));
         let c = dag.add_node(String::from("C"));
         let a = dag.add_node(String::from("A"));
@@ -228,9 +240,9 @@ mod learn_library {
     }
 
     #[test]
-    fn dfs_post_order() {
+    fn dfs_post_order() -> GenResult<()> {
         let strategy = strategy_fixture();
-        let dag: DagDto = to_dag(&strategy).expect("unable to convert to bot");
+        let dag: DiGraph<String, String> = strategy.clone().try_into()?;
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
 
         let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
@@ -244,12 +256,13 @@ mod learn_library {
         let root_node: &String = dag.node_weight(root_node_id).expect("unable to find root");
         // println!("{:?}", root_node);
         assert_eq!(root_node, strategy.score().calc());
+        Ok(())
     }
 
     #[test]
-    fn bfs() {
+    fn bfs() -> GenResult<()> {
         let strategy = strategy_fixture();
-        let dag: DagDto = to_dag(&strategy).expect("unable to convert to bot");
+        let dag: DiGraph<String, String> = strategy.clone().try_into()?;
         let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
 
         let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
@@ -270,5 +283,6 @@ mod learn_library {
             }
         }
         assert_eq!(node, strategy.score().calc());
+        Ok(())
     }
 }
