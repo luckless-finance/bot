@@ -283,7 +283,7 @@ impl AssetScore {
 mod tests {
     use std::path::Path;
 
-    use crate::bot::{AssetScore, Bot, CalculationStatus, AssetScoreStatus};
+    use crate::bot::{AssetScore, AssetScoreStatus, Bot, CalculationStatus};
     use crate::data::Asset;
     use crate::errors::GenResult;
     use crate::simulation::{MockDataClient, TODAY};
@@ -322,14 +322,5 @@ mod tests {
         let asset_score: AssetScore = bot.asset_score(asset, timestamp, Box::new(data_client))?;
         assert_eq!(asset_score.status, AssetScoreStatus::Complete);
         Ok(())
-    }
-
-    #[test]
-    fn group_by_test() {
-        let data: HashMap<usize, i32> = vec![(1usize, -1), (10usize, -10), (100usize, -10)]
-            .into_iter()
-            .collect();
-
-        println!("{:?}", data);
     }
 }
