@@ -145,7 +145,7 @@ impl TryFrom<CalculationDto> for QueryCalculationDto {
                 .operands
                 .iter()
                 .find(|o| o.name == "field")
-                .ok_or("field is required")?
+                .ok_or("Conversion into QueryCalculationDto failed: field is required")?
                 .value
                 .clone();
             Ok(Self { name, field })
@@ -185,14 +185,14 @@ impl TryFrom<CalculationDto> for DyadicTsCalculationDto {
                 .operands
                 .iter()
                 .find(|o| o.name == "left")
-                .ok_or("left is required")?
+                .ok_or("Conversion into DyadicTsCalculationDto failed: left is required")?
                 .value
                 .clone();
             let right: TimeSeriesReference = calculation_dto
                 .operands
                 .iter()
                 .find(|o| o.name == "right")
-                .ok_or("right is required")?
+                .ok_or("Conversion into DyadicTsCalculationDto failed: right is required")?
                 .value
                 .clone();
             Ok(Self { name, left, right })
@@ -232,14 +232,14 @@ impl TryFrom<CalculationDto> for DyadicScalarCalculationDto {
                 .operands
                 .iter()
                 .find(|o| o.name == "time_series")
-                .ok_or("time_series is required")?
+                .ok_or("Conversion into DyadicScalarCalculationDto failed: time_series is required")?
                 .value
                 .clone();
             let scalar: DataPointValue = calculation_dto
                 .operands
                 .iter()
                 .find(|o| o.name == "scalar")
-                .ok_or("scalar is required")?
+                .ok_or("Conversion into DyadicScalarCalculationDto failed: scalar is required")?
                 .value
                 .parse()?;
             Ok(Self {
@@ -280,14 +280,14 @@ impl TryFrom<CalculationDto> for SmaCalculationDto {
                 .operands
                 .iter()
                 .find(|o| o.name == "window_size")
-                .ok_or("window_size is required")?
+                .ok_or("Conversion into SmaCalculationDto failed: window_size is required")?
                 .value
                 .parse()?;
             let time_series: String = calculation_dto
                 .operands
                 .iter()
                 .find(|o| o.name == "time_series")
-                .ok_or("time_series is required")?
+                .ok_or("Conversion into SmaCalculationDto failed: time_series is required")?
                 .value
                 .clone();
             Ok(Self {

@@ -271,7 +271,7 @@ impl AssetScore {
     fn timestamp(&self) -> usize {
         self.timestamp
     }
-    fn score(&self) -> &TimeSeries1D {
+    pub fn score(&self) -> &TimeSeries1D {
         &self.score
     }
     fn status(&self) -> &AssetScoreStatus {

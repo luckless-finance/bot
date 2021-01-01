@@ -24,33 +24,39 @@ mod tests {
     use yafa::bot::*;
     use yafa::time_series::{DataPointValue, TimeSeries1D};
     use yafa::errors::GenResult;
+    use yafa::strategy::{CalculationDto, Operation, QueryCalculationDto};
+    use std::convert::TryInto;
 
 
     #[test]
     fn back_test() -> GenResult<()> {
         let strategy = get_strategy();
-        let bot = Bot::new(strategy.clone())?;
+        let bot = Bot::new(strategy)?;
         let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
-        let asset_scores: Vec<AssetScore> = data_client.assets().values()
-            .flat_map(|a|
-                bot.asset_score(a.clone(),
-                                TODAY,
-                                Box::new(MockDataClient::new()))
-            )
-            .collect();
-        println!("{:?}", asset_scores);
-
-        // let _ts: Vec<&TimeSeries1D> = bots.iter()
-        //     .map(|b| b.upstream(strategy.score().calc()).unwrap())
+        let query: Option<QueryCalculationDto> = Some(CalculationDto::new(
+            "price".to_string(),
+            Operation::QUERY,
+            vec![]).try_into()?);
+        // let asset_time_series: Vec<&TimeSeries1D> = data_client.assets().values()
+        //     .flat_map(|a| data_client.query(
+        //         a,
+        //         &TODAY,
+        //         None,
+        //     ))
         //     .collect();
-        // plot_ts(ts);
-        // let scores: Vec<&DataPointValue> = bots.iter()
-        //     .flat_map(|b| b.score())
+        // let asset_scores: Vec<AssetScore> = data_client.assets().values()
+        //     .flat_map(|a|
+        //         bot.asset_score(a.clone(),
+        //                         TODAY,
+        //                         Box::new(MockDataClient::new()))
+        //     )
         //     .collect();
-        // println!("{:?}", scores);
+        // // println!("{:?}", asset_scores);
+        // let ts: Vec<&TimeSeries1D> = asset_scores.iter()
+        //     .map(|asset_score| asset_score.score())
+        //     .collect();
+        // // plot_ts(ts);
         Ok(())
-        // let b: &mut yafa::bot::ExecutableBot = bots.get_mut(0).unwrap();
-        // b.execute()
     }
 }
 
