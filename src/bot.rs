@@ -86,7 +86,7 @@ impl ExecutableBot {
     pub(crate) fn overall_status(&self) -> CalculationStatus {
         // compute group by count using Entry Api
         let mut count_by_status: HashMap<CalculationStatus, usize> = HashMap::new();
-        for (time_series_name, calc_status) in &self.calc_status {
+        for calc_status in self.calc_status.values().into_iter() {
             let count = count_by_status.entry(calc_status.clone()).or_insert(0usize);
             *count += 1;
         }
