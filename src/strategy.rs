@@ -232,7 +232,9 @@ impl TryFrom<CalculationDto> for DyadicScalarCalculationDto {
                 .operands
                 .iter()
                 .find(|o| o.name == "time_series")
-                .ok_or("Conversion into DyadicScalarCalculationDto failed: time_series is required")?
+                .ok_or(
+                    "Conversion into DyadicScalarCalculationDto failed: time_series is required",
+                )?
                 .value
                 .clone();
             let scalar: DataPointValue = calculation_dto

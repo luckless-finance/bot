@@ -24,7 +24,7 @@ mod tests {
     use yafa::bot::*;
     use yafa::time_series::{DataPointValue, TimeSeries1D};
     use yafa::errors::GenResult;
-    use yafa::strategy::{CalculationDto, Operation, QueryCalculationDto};
+    use yafa::strategy::{CalculationDto, Operation, QueryCalculationDto, OperandDto, OperandType};
     use std::convert::TryInto;
 
 
@@ -36,26 +36,30 @@ mod tests {
         let query: Option<QueryCalculationDto> = Some(CalculationDto::new(
             "price".to_string(),
             Operation::QUERY,
-            vec![]).try_into()?);
-        // let asset_time_series: Vec<&TimeSeries1D> = data_client.assets().values()
-        //     .flat_map(|a| data_client.query(
-        //         a,
-        //         &TODAY,
-        //         None,
-        //     ))
-        //     .collect();
-        // let asset_scores: Vec<AssetScore> = data_client.assets().values()
-        //     .flat_map(|a|
-        //         bot.asset_score(a.clone(),
-        //                         TODAY,
-        //                         Box::new(MockDataClient::new()))
-        //     )
-        //     .collect();
-        // // println!("{:?}", asset_scores);
-        // let ts: Vec<&TimeSeries1D> = asset_scores.iter()
-        //     .map(|asset_score| asset_score.score())
-        //     .collect();
-        // // plot_ts(ts);
+            vec![
+                OperandDto::new("field".to_string(), OperandType::Text, "close".to_string())
+            ]).try_into()?);
+        let asset_price_time_series: Vec<&TimeSeries1D> = data_client.assets().values()
+            .flat_map(|a| data_client.query(
+                a,
+                &TODAY,
+                None,
+            ))
+            .collect();
+        plot_ts(asset_price_time_series);
+
+        let asset_scores: Vec<AssetScore> = data_client.assets().values()
+            .flat_map(|a|
+                bot.asset_score(a.clone(),
+                                TODAY,
+                                Box::new(MockDataClient::new()))
+            )
+            .collect();
+        // println!("{:?}", asset_scores);
+        let asset_score_time_series: Vec<&TimeSeries1D> = asset_scores.iter()
+            .map(|asset_score| asset_score.score())
+            .collect();
+        plot_ts(asset_score_time_series);
         Ok(())
     }
 }
