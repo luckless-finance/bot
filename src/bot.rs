@@ -314,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    fn execute() -> GenResult<()> {
+    fn asset_score() -> GenResult<()> {
         let bot = bot_fixture()?;
         let asset = Asset::new(String::from("A"));
         let timestamp = TODAY;
