@@ -45,12 +45,7 @@ impl Bot {
             calcs,
         })
     }
-    fn strategy(&self) -> &StrategyDto {
-        &self.strategy
-    }
-    fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
-        self.calcs.get(name).ok_or("not found")
-    }
+    /// Computes the score of the given `Asset` at the given `TimeStamp`
     pub fn asset_score(
         &self,
         asset: Asset,
@@ -72,7 +67,6 @@ impl Bot {
         };
         exe_bot.execute()?;
         Ok(AssetScore::new(exe_bot))
-        // Ok(exe_bot)
     }
 }
 
@@ -93,7 +87,7 @@ impl ExecutableBot {
         // compute group by count using Entry Api
         let mut count_by_status: HashMap<CalculationStatus, usize> = HashMap::new();
         for (time_series_name, calc_status) in &self.calc_status {
-            let count = count_by_status.entry(calc_status.clone()).or_insert(1usize);
+            let count = count_by_status.entry(calc_status.clone()).or_insert(0usize);
             *count += 1;
         }
         // declare determining factors of overall status
@@ -328,11 +322,7 @@ mod tests {
         let timestamp = TODAY;
         let data_client = MockDataClient::new();
         let asset_score: AssetScore = bot.asset_score(asset, timestamp, Box::new(data_client))?;
-        // let asset_score = AssetScore::new(executable_bot);
-        // executable_bot
-        //     .calc_time_series
-        //     .values()
-        //     .for_each(|time_series| assert!(time_series.len() > 0));
+        assert_eq!(asset_score.status, CalculationStatus::Complete);
         Ok(())
     }
 
