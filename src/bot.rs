@@ -23,6 +23,14 @@ pub enum CalculationStatus {
     Error,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AssetScoreStatus {
+    NotStarted,
+    InProgress,
+    Complete,
+    Error,
+}
+
 /// Wraps several Dtos required traverse and consume a strategy
 #[derive(Debug, Clone)]
 pub struct Bot {
@@ -66,7 +74,7 @@ impl Bot {
             calc_time_series: HashMap::new(),
         };
         exe_bot.execute()?;
-        Ok(AssetScore::new(exe_bot))
+        Ok(AssetScore::new(exe_bot)?)
     }
 }
 
@@ -83,7 +91,7 @@ pub struct ExecutableBot {
 }
 
 impl ExecutableBot {
-    pub(crate) fn overall_status(&self) -> CalculationStatus {
+    pub(crate) fn overall_status(&self) -> AssetScoreStatus {
         // compute group by count using Entry Api
         let mut count_by_status: HashMap<CalculationStatus, usize> = HashMap::new();
         for calc_status in self.calc_status.values().into_iter() {
@@ -105,13 +113,13 @@ impl ExecutableBot {
         };
         // apply business logic against factors
         if has_error {
-            CalculationStatus::Error
+            AssetScoreStatus::Error
         } else if all_complete {
-            CalculationStatus::Complete
+            AssetScoreStatus::Complete
         } else if all_not_started {
-            CalculationStatus::NotStarted
+            AssetScoreStatus::NotStarted
         } else {
-            CalculationStatus::InProgress
+            AssetScoreStatus::InProgress
         }
     }
     fn status(&mut self, calc_name: &str, new_calc_status: CalculationStatus) {
@@ -127,18 +135,8 @@ impl ExecutableBot {
         }
     }
 
-    pub fn score(&self) -> GenResult<&DataPointValue> {
-        match self
-            .upstream(self.execution_order.last().expect("impossible"))?
-            .values()
-            .last()
-        {
-            Some(score) => Ok(score),
-            None => Err(UpstreamNotFoundError::new(format!(
-                "score calc: {}",
-                self.execution_order.last().expect("impossible")
-            ))),
-        }
+    pub(crate) fn score(&self) -> GenResult<&TimeSeries1D> {
+        Ok(self.upstream(self.execution_order.last().expect("impossible"))?)
     }
 
     /// Traverse `Dag` executing each node for given `Asset` as of `Timestamp`
@@ -251,33 +249,33 @@ impl ExecutableBot {
 pub struct AssetScore {
     asset: Asset,
     timestamp: TimeStamp,
-    status: CalculationStatus,
-    calc_status: HashMap<TimeSeriesName, CalculationStatus>,
-    calc_time_series: HashMap<TimeSeriesName, TimeSeries1D>,
+    score: TimeSeries1D,
+    status: AssetScoreStatus,
 }
 
 impl AssetScore {
-    fn new(bot: ExecutableBot) -> AssetScore {
-        let overall_status = bot.overall_status();
-        AssetScore {
+    fn new(bot: ExecutableBot) -> GenResult<AssetScore> {
+        // TODO warn when overall_status is not Complete
+        let status = bot.overall_status();
+        let score = bot.score()?.clone();
+        Ok(AssetScore {
             asset: bot.asset,
             timestamp: bot.timestamp,
-            status: overall_status,
-            calc_status: bot.calc_status,
-            calc_time_series: bot.calc_time_series,
-        }
+            score,
+            status,
+        })
     }
-    pub fn asset(&self) -> &Asset {
+    fn asset(&self) -> &Asset {
         &self.asset
     }
-    pub fn timestamp(&self) -> usize {
+    fn timestamp(&self) -> usize {
         self.timestamp
     }
-    pub fn calc_status(&self) -> &HashMap<TimeSeriesName, CalculationStatus> {
-        &self.calc_status
+    fn score(&self) -> &TimeSeries1D {
+        &self.score
     }
-    pub fn calc_time_series(&self) -> &HashMap<TimeSeriesName, TimeSeries1D> {
-        &self.calc_time_series
+    fn status(&self) -> &AssetScoreStatus {
+        &self.status
     }
 }
 
@@ -285,7 +283,7 @@ impl AssetScore {
 mod tests {
     use std::path::Path;
 
-    use crate::bot::{AssetScore, Bot, CalculationStatus};
+    use crate::bot::{AssetScore, Bot, CalculationStatus, AssetScoreStatus};
     use crate::data::Asset;
     use crate::errors::GenResult;
     use crate::simulation::{MockDataClient, TODAY};
@@ -322,7 +320,7 @@ mod tests {
         let timestamp = TODAY;
         let data_client = MockDataClient::new();
         let asset_score: AssetScore = bot.asset_score(asset, timestamp, Box::new(data_client))?;
-        assert_eq!(asset_score.status, CalculationStatus::Complete);
+        assert_eq!(asset_score.status, AssetScoreStatus::Complete);
         Ok(())
     }
 
