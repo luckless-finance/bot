@@ -24,33 +24,43 @@ mod tests {
     use yafa::bot::*;
     use yafa::time_series::{DataPointValue, TimeSeries1D};
     use yafa::errors::GenResult;
+    use yafa::strategy::{CalculationDto, Operation, QueryCalculationDto, OperandDto, OperandType};
+    use std::convert::TryInto;
 
 
     #[test]
     fn back_test() -> GenResult<()> {
         let strategy = get_strategy();
-        let bot = Bot::new(strategy.clone())?;
+        let bot = Bot::new(strategy)?;
         let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
-        let mut bots: Vec<AssetScore> = data_client.assets().values()
+        let query: Option<QueryCalculationDto> = Some(CalculationDto::new(
+            "price".to_string(),
+            Operation::QUERY,
+            vec![
+                OperandDto::new("field".to_string(), OperandType::Text, "close".to_string())
+            ]).try_into()?);
+        let asset_price_time_series: Vec<&TimeSeries1D> = data_client.assets().values()
+            .flat_map(|a| data_client.query(
+                a,
+                &TODAY,
+                None,
+            ))
+            .collect();
+        plot_ts(asset_price_time_series);
+
+        let asset_scores: Vec<AssetScore> = data_client.assets().values()
             .flat_map(|a|
-                bot.execute(a.clone(),
-                            TODAY,
-                            Box::new(MockDataClient::new()))
+                bot.asset_score(a.clone(),
+                                TODAY,
+                                Box::new(MockDataClient::new()))
             )
             .collect();
-        // bots.iter_mut().for_each(|b| b.execute().unwrap());
-        println!("{:?}", bots);
-        // let _ts: Vec<&TimeSeries1D> = bots.iter()
-        //     .map(|b| b.upstream(strategy.score().calc()).unwrap())
-        //     .collect();
-        // plot_ts(ts);
-        // let scores: Vec<&DataPointValue> = bots.iter()
-        //     .flat_map(|b| b.score())
-        //     .collect();
-        // println!("{:?}", scores);
+        // println!("{:?}", asset_scores);
+        let asset_score_time_series: Vec<&TimeSeries1D> = asset_scores.iter()
+            .map(|asset_score| asset_score.score())
+            .collect();
+        plot_ts(asset_score_time_series);
         Ok(())
-        // let b: &mut yafa::bot::ExecutableBot = bots.get_mut(0).unwrap();
-        // b.execute()
     }
 }
 
