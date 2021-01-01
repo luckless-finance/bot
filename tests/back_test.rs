@@ -33,9 +33,9 @@ mod tests {
         let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         let mut bots: Vec<AssetScore> = data_client.assets().values()
             .flat_map(|a|
-                bot.execute(a.clone(),
-                            TODAY,
-                            Box::new(MockDataClient::new()))
+                bot.asset_score(a.clone(),
+                                TODAY,
+                                Box::new(MockDataClient::new()))
             )
             .collect();
         // bots.iter_mut().for_each(|b| b.execute().unwrap());

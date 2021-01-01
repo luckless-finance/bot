@@ -51,8 +51,7 @@ impl Bot {
     fn calc(&self, name: &str) -> Result<&CalculationDto, &str> {
         self.calcs.get(name).ok_or("not found")
     }
-    // TODO rename to compute_score
-    pub fn execute(
+    pub fn asset_score(
         &self,
         asset: Asset,
         timestamp: TimeStamp,
@@ -328,7 +327,7 @@ mod tests {
         let asset = Asset::new(String::from("A"));
         let timestamp = TODAY;
         let data_client = MockDataClient::new();
-        let asset_score: AssetScore = bot.execute(asset, timestamp, Box::new(data_client))?;
+        let asset_score: AssetScore = bot.asset_score(asset, timestamp, Box::new(data_client))?;
         // let asset_score = AssetScore::new(executable_bot);
         // executable_bot
         //     .calc_time_series
