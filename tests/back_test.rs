@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+#![allow(unused_variables)]
 extern crate yafa;
 
 use yafa::bot::asset_score::*;
