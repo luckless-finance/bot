@@ -2,13 +2,14 @@
 #![allow(unused_variables)]
 extern crate yafa;
 
-use yafa::bot::asset_score::*;
-use yafa::time_series;
-use yafa::dto::strategy::*;
-use yafa::data;
-use yafa::simulation::MockDataClient;
 use std::env::current_dir;
 use std::path::Path;
+
+use yafa::bot::asset_score::*;
+use yafa::data;
+use yafa::dto::strategy::*;
+use yafa::simulation::MockDataClient;
+use yafa::time_series;
 
 pub fn get_strategy() -> StrategyDto {
     let strategy_path = current_dir()
@@ -19,15 +20,16 @@ pub fn get_strategy() -> StrategyDto {
 
 #[cfg(test)]
 mod tests {
-    use crate::get_strategy;
-    use yafa::simulation::{MockDataClient};
-    use yafa::data::{DataClient, plot_ts};
-    use yafa::bot::asset_score::*;
-    use yafa::time_series::{DataPointValue, TimeSeries1D};
-    use yafa::errors::GenResult;
-    use yafa::dto::strategy::{CalculationDto, Operation, QueryCalculationDto, OperandDto, OperandType};
     use std::convert::TryInto;
 
+    use yafa::bot::asset_score::*;
+    use yafa::data::{DataClient, plot_ts};
+    use yafa::dto::strategy::{CalculationDto, OperandDto, OperandType, Operation, QueryCalculationDto};
+    use yafa::errors::GenResult;
+    use yafa::simulation::MockDataClient;
+    use yafa::time_series::{DataPointValue, TimeSeries1D};
+
+    use crate::get_strategy;
 
     #[test]
     fn back_test() -> GenResult<()> {

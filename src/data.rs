@@ -6,10 +6,11 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::Index;
 
+use chrono::{DateTime, Utc};
+use gnuplot::{AxesCommon, Figure};
 use gnuplot::AutoOption::Fix;
 use gnuplot::Coordinate::Graph;
 use gnuplot::PlotOption::Caption;
-use gnuplot::{AxesCommon, Figure};
 
 use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::GenResult;
@@ -69,17 +70,29 @@ pub fn plot_ts(ts_vec: Vec<&TimeSeries1D>) {
         .iter()
         .flat_map(|x| x.iter())
         .fold(f64::NAN, |a, b| f64::min(a, *b).clone());
+    // handle negative y-values
     y_min = f64::min(y_min - y_min.abs() * 0.1, 0f64);
+    let xs: Vec<&Vec<DateTime<Utc>>> = ts_vec.iter().map(|ts| ts.index()).collect();
+    let x_max: DateTime<Utc> = xs
+        .iter()
+        .flat_map(|x| x.iter())
+        .fold(chrono::MIN_DATETIME, |a, b| DateTime::max(a, *b).clone());
+    let x_min: DateTime<Utc> = xs
+        .iter()
+        .flat_map(|x| x.iter())
+        .fold(chrono::MAX_DATETIME, |a, b| DateTime::min(a, *b).clone());
+    let x_label = format!("{:?} - {:?}", x_min, x_max);
     let axis = fg
         .axes2d()
         .set_title("Time Series Plot", &[])
         .set_legend(Graph(0.5), Graph(0.9), &[], &[])
-        .set_x_label("timestamp", &[])
+        .set_x_label("index", &[])
+        .set_x2_label(x_label.as_str(), &[])
         .set_y_label("values", &[])
         .set_y_range(Fix::<f64>(y_min), Fix::<f64>(y_max));
     for i in 0..ys.len() {
         axis.lines(
-            ts_vec[i].index().iter().map(|ts| ts.timestamp()).clone(),
+            0..ts_vec[i].len(),
             ts_vec[i].values().clone(),
             &[Caption(&format!("{}", i))],
         );
