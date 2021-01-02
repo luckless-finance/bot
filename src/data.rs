@@ -11,8 +11,8 @@ use gnuplot::Coordinate::Graph;
 use gnuplot::PlotOption::Caption;
 use gnuplot::{AxesCommon, Figure};
 
+use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::GenResult;
-use crate::strategy::QueryCalculationDto;
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
 pub type Symbol = String;
