@@ -7,10 +7,10 @@ use std::fmt::{Display, Formatter};
 use std::ops::Index;
 
 use chrono::{DateTime, Utc};
-use gnuplot::{AxesCommon, Figure};
 use gnuplot::AutoOption::Fix;
 use gnuplot::Coordinate::Graph;
 use gnuplot::PlotOption::Caption;
+use gnuplot::{AxesCommon, Figure};
 
 use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::GenResult;

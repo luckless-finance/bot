@@ -4,8 +4,8 @@ use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::ops::{Add, Div, Neg};
 
-use chrono::{Duration, TimeZone};
 use chrono::prelude::*;
+use chrono::{Duration, TimeZone};
 
 use crate::errors::{GenError, GenResult};
 
@@ -161,8 +161,8 @@ impl TimeSeries1D {
 
 #[cfg(test)]
 mod tests {
-    use chrono::Duration;
     use chrono::prelude::*;
+    use chrono::Duration;
 
     use crate::time_series::TimeSeries1D;
 
