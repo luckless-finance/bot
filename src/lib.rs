@@ -286,8 +286,8 @@ pub mod bot {
             fn asset(&self) -> &Asset {
                 &self.asset
             }
-            fn timestamp(&self) -> usize {
-                self.timestamp
+            fn timestamp(&self) -> &TimeStamp {
+                &self.timestamp
             }
             pub fn score(&self) -> &TimeSeries1D {
                 &self.score
@@ -311,7 +311,7 @@ pub mod bot {
                 StrategyDto,
             };
             use crate::errors::GenResult;
-            use crate::simulation::{MockDataClient, TODAY};
+            use crate::simulation::MockDataClient;
 
             fn strategy_fixture() -> StrategyDto {
                 StrategyDto::new(
@@ -339,7 +339,7 @@ pub mod bot {
             fn asset_score() -> GenResult<()> {
                 let bot = compiled_strategy_fixture()?;
                 let asset = Asset::new(String::from("A"));
-                let timestamp = TODAY;
+                let timestamp = MockDataClient::today();
                 let data_client = MockDataClient::new();
                 let asset_score: AssetScore =
                     bot.asset_score(asset, timestamp, Box::new(data_client))?;
