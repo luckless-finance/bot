@@ -3,7 +3,7 @@ extern crate yafa;
 
 use yafa::bot::*;
 use yafa::time_series;
-use yafa::strategy::*;
+use yafa::dto::strategy::*;
 use yafa::data;
 use yafa::simulation::MockDataClient;
 use std::env::current_dir;
@@ -24,7 +24,7 @@ mod tests {
     use yafa::bot::*;
     use yafa::time_series::{DataPointValue, TimeSeries1D};
     use yafa::errors::GenResult;
-    use yafa::strategy::{CalculationDto, Operation, QueryCalculationDto, OperandDto, OperandType};
+    use yafa::dto::strategy::{CalculationDto, Operation, QueryCalculationDto, OperandDto, OperandType};
     use std::convert::TryInto;
 
 

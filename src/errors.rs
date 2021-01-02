@@ -1,5 +1,5 @@
 use crate::data::Symbol;
-use crate::strategy::TimeSeriesName;
+use crate::dto::strategy::TimeSeriesName;
 use core::fmt;
 use std::fmt::Formatter;
 

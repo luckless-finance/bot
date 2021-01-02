@@ -1,6 +1,6 @@
 use crate::data::{Asset, DataClient, Symbol};
+use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::{AssetNotFoundError, GenResult};
-use crate::strategy::QueryCalculationDto;
 use crate::time_series::TimeSeries1D;
 use std::collections::HashMap;
 use std::f64::consts::PI;
