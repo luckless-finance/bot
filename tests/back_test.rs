@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 extern crate yafa;
 
-use yafa::bot::*;
+use yafa::bot::asset_score::*;
 use yafa::time_series;
 use yafa::dto::strategy::*;
 use yafa::data;
@@ -21,7 +21,7 @@ mod tests {
     use crate::get_strategy;
     use yafa::simulation::{MockDataClient, TODAY};
     use yafa::data::{DataClient, plot_ts};
-    use yafa::bot::*;
+    use yafa::bot::asset_score::*;
     use yafa::time_series::{DataPointValue, TimeSeries1D};
     use yafa::errors::GenResult;
     use yafa::dto::strategy::{CalculationDto, Operation, QueryCalculationDto, OperandDto, OperandType};

@@ -8,9 +8,631 @@ pub mod data;
 pub mod errors;
 pub mod simulation;
 pub mod time_series;
+
+pub mod bot {
+    pub mod asset_score {
+        #![allow(dead_code)]
+
+        use std;
+        use std::collections::HashMap;
+        use std::convert::TryInto;
+        use std::fmt;
+
+        use serde::export::Formatter;
+
+        use crate::bot::dag::Dag;
+        use crate::data::{Asset, DataClient};
+        use crate::dto::strategy::{
+            CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, Operation,
+            QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
+        };
+        use crate::errors::{GenResult, UpstreamNotFoundError};
+        use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
+
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        pub enum CalculationStatus {
+            NotStarted,
+            InProgress,
+            Complete,
+            Error,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        pub enum AssetScoreStatus {
+            NotStarted,
+            InProgress,
+            Complete,
+            Error,
+        }
+
+        /// Wraps several Dtos required traverse and consume a strategy
+        #[derive(Debug, Clone)]
+        pub struct CompiledStrategy {
+            strategy: StrategyDto,
+            dag: Dag,
+            calcs: HashMap<TimeSeriesName, CalculationDto>,
+        }
+
+        impl CompiledStrategy {
+            pub fn new(strategy: StrategyDto) -> GenResult<Self> {
+                let dag = Dag::new(strategy.clone())?;
+                let calcs: HashMap<String, CalculationDto> = strategy
+                    .calcs()
+                    .iter()
+                    .map(|calc| (calc.name().to_string(), calc.clone()))
+                    .collect();
+                Ok(CompiledStrategy {
+                    strategy,
+                    dag,
+                    calcs,
+                })
+            }
+            /// Computes the score of the given `Asset` at the given `TimeStamp`
+            pub fn asset_score(
+                &self,
+                asset: Asset,
+                timestamp: TimeStamp,
+                data_client: Box<dyn DataClient>,
+            ) -> GenResult<AssetScore> {
+                let mut scorable_asset = ScorableAsset {
+                    asset,
+                    timestamp,
+                    execution_order: self.dag.execution_order().clone(),
+                    calcs: self.calcs.clone(),
+                    data_client,
+                    calc_status: self
+                        .calcs
+                        .keys()
+                        .map(|c| (c.clone(), CalculationStatus::NotStarted))
+                        .collect(),
+                    calc_time_series: HashMap::new(),
+                };
+                scorable_asset.execute()?;
+                Ok(AssetScore::new(scorable_asset)?)
+            }
+        }
+
+        /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
+        #[derive(Debug)]
+        pub struct ScorableAsset {
+            asset: Asset,
+            timestamp: TimeStamp,
+            execution_order: Vec<TimeSeriesName>,
+            calcs: HashMap<TimeSeriesName, CalculationDto>,
+            data_client: Box<dyn DataClient>,
+            calc_status: HashMap<TimeSeriesName, CalculationStatus>,
+            calc_time_series: HashMap<TimeSeriesName, TimeSeries1D>,
+        }
+
+        impl ScorableAsset {
+            pub(crate) fn overall_status(&self) -> AssetScoreStatus {
+                // compute group by count using Entry Api
+                let mut count_by_status: HashMap<CalculationStatus, usize> = HashMap::new();
+                for calc_status in self.calc_status.values().into_iter() {
+                    let count = count_by_status.entry(calc_status.clone()).or_insert(0usize);
+                    *count += 1;
+                }
+                // declare determining factors of overall status
+                let has_error = match count_by_status.get(&CalculationStatus::Error) {
+                    Some(_) => true,
+                    None => false,
+                };
+                let all_complete = match count_by_status.get(&CalculationStatus::Complete) {
+                    Some(n) => n == &self.calcs.len(),
+                    None => false,
+                };
+                let all_not_started = match count_by_status.get(&CalculationStatus::NotStarted) {
+                    Some(n) => n == &self.calcs.len(),
+                    None => false,
+                };
+                // apply business logic against factors
+                if has_error {
+                    AssetScoreStatus::Error
+                } else if all_complete {
+                    AssetScoreStatus::Complete
+                } else if all_not_started {
+                    AssetScoreStatus::NotStarted
+                } else {
+                    AssetScoreStatus::InProgress
+                }
+            }
+            fn status(&mut self, calc_name: &str, new_calc_status: CalculationStatus) {
+                if let Some(calc_status) = self.calc_status.get_mut(calc_name) {
+                    *calc_status = new_calc_status;
+                }
+            }
+
+            pub fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
+                match self.calc_time_series.get(calc_name) {
+                    Some(time_series_) => Ok(time_series_),
+                    None => Err(UpstreamNotFoundError::new(calc_name.to_string())),
+                }
+            }
+
+            pub(crate) fn score(&self) -> GenResult<&TimeSeries1D> {
+                Ok(self.upstream(self.execution_order.last().expect("impossible"))?)
+            }
+
+            /// Traverse `Dag` executing each node for given `Asset` as of `Timestamp`
+            fn execute(&mut self) -> GenResult<()> {
+                let calc_order = self.execution_order.clone();
+                for calc_name in calc_order {
+                    println!("\nexecuting {}", calc_name);
+                    self.status(&calc_name, CalculationStatus::InProgress);
+                    let calc = self.calcs.get(&calc_name).ok_or("calc not found")?;
+
+                    let calc_time_series = match calc.operation() {
+                        Operation::QUERY => self.handle_query(calc),
+                        Operation::ADD => self.handle_add(calc),
+                        Operation::SUB => self.handle_sub(calc),
+                        Operation::MUL => self.handle_mul(calc),
+                        Operation::DIV => self.handle_div(calc),
+                        Operation::TS_ADD => self.handle_ts_add(calc),
+                        Operation::TS_SUB => self.handle_ts_sub(calc),
+                        Operation::TS_MUL => self.handle_ts_mul(calc),
+                        Operation::TS_DIV => self.handle_ts_div(calc),
+                        Operation::SMA => self.handle_sma(calc),
+                    };
+                    self.status(
+                        &calc_name,
+                        match calc_time_series.is_ok() {
+                            true => CalculationStatus::Complete,
+                            false => CalculationStatus::Error,
+                        },
+                    );
+
+                    self.calc_time_series
+                        .insert(calc_name.clone(), calc_time_series?);
+                }
+                Ok(())
+            }
+            // TODO parameterized query: generalize market data retrieval
+            fn handle_query(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+                assert_eq!(*calculation_dto.operation(), Operation::QUERY);
+                let query_dto: QueryCalculationDto = calculation_dto.clone().try_into()?;
+                Ok(self
+                    .data_client
+                    .query(&self.asset, &self.timestamp, Some(query_dto))?
+                    .clone())
+            }
+            fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+                assert_eq!(*calculation_dto.operation(), Operation::ADD);
+                let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+                    calculation_dto.clone().try_into()?;
+                let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
+                Ok(time_series.add(dyadic_scalar_calc_dto.scalar()))
+            }
+            fn handle_sub(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+                assert_eq!(*calculation_dto.operation(), Operation::SUB);
+                let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+                    calculation_dto.clone().try_into()?;
+                let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
+                Ok(time_series.sub(dyadic_scalar_calc_dto.scalar()))
+            }
+            fn handle_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+                assert_eq!(*calculation_dto.operation(), Operation::MUL);
+                let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+                    calculation_dto.clone().try_into()?;
+                let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
+                Ok(time_series.mul(dyadic_scalar_calc_dto.scalar()))
+            }
+            fn handle_div(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+                assert_eq!(*calculation_dto.operation(), Operation::DIV);
+                let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
+                    calculation_dto.clone().try_into()?;
+                let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
+                Ok(time_series.div(dyadic_scalar_calc_dto.scalar()))
+            }
+            fn handle_ts_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+                assert_eq!(*calculation_dto.operation(), Operation::TS_ADD);
+                let dyadic_ts_calc_dto: DyadicTsCalculationDto =
+                    calculation_dto.clone().try_into()?;
+                let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
+                let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
+                Ok(left_value.ts_add(right_value))
+            }
+            fn handle_ts_sub(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+                assert_eq!(*calculation_dto.operation(), Operation::TS_SUB);
+                let dyadic_ts_calc_dto: DyadicTsCalculationDto =
+                    calculation_dto.clone().try_into()?;
+                let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
+                let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
+                Ok(left_value.ts_sub(right_value))
+            }
+            fn handle_ts_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+                assert_eq!(*calculation_dto.operation(), Operation::TS_MUL);
+                let dyadic_ts_calc_dto: DyadicTsCalculationDto =
+                    calculation_dto.clone().try_into()?;
+                let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
+                let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
+                Ok(left_value.ts_mul(right_value))
+            }
+            fn handle_ts_div(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+                assert_eq!(*calculation_dto.operation(), Operation::TS_DIV);
+                let dyadic_ts_calc_dto: DyadicTsCalculationDto =
+                    calculation_dto.clone().try_into()?;
+                let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
+                let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
+                Ok(left_value.ts_div(right_value))
+            }
+            fn handle_sma(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
+                assert_eq!(*calculation_dto.operation(), Operation::SMA);
+                let sma_dto: SmaCalculationDto = calculation_dto.clone().try_into()?;
+                let time_series = self.upstream(sma_dto.time_series())?;
+                Ok(time_series.sma(sma_dto.window_size()))
+            }
+        }
+
+        #[derive(Debug)]
+        pub struct AssetScore {
+            asset: Asset,
+            timestamp: TimeStamp,
+            score: TimeSeries1D,
+            status: AssetScoreStatus,
+        }
+
+        impl AssetScore {
+            fn new(scorable_asset: ScorableAsset) -> GenResult<AssetScore> {
+                // TODO warn when overall_status is not Complete
+                let status = scorable_asset.overall_status();
+                let score = scorable_asset.score()?.clone();
+                Ok(AssetScore {
+                    asset: scorable_asset.asset,
+                    timestamp: scorable_asset.timestamp,
+                    score,
+                    status,
+                })
+            }
+            fn asset(&self) -> &Asset {
+                &self.asset
+            }
+            fn timestamp(&self) -> usize {
+                self.timestamp
+            }
+            pub fn score(&self) -> &TimeSeries1D {
+                &self.score
+            }
+            fn status(&self) -> &AssetScoreStatus {
+                &self.status
+            }
+        }
+
+        #[cfg(test)]
+        mod tests {
+            use std::collections::HashMap;
+            use std::path::Path;
+
+            use crate::bot::asset_score::{
+                AssetScore, AssetScoreStatus, CalculationStatus, CompiledStrategy,
+            };
+            use crate::data::Asset;
+            use crate::dto::strategy::{
+                from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto,
+                StrategyDto,
+            };
+            use crate::errors::GenResult;
+            use crate::simulation::{MockDataClient, TODAY};
+
+            fn strategy_fixture() -> StrategyDto {
+                StrategyDto::new(
+                    String::from("Small Strategy Document"),
+                    ScoreDto::new(String::from("price")),
+                    vec![CalculationDto::new(
+                        String::from("price"),
+                        Operation::QUERY,
+                        vec![OperandDto::new(
+                            String::from("field"),
+                            OperandType::Text,
+                            String::from("close"),
+                        )],
+                    )],
+                )
+            }
+
+            fn compiled_strategy_fixture() -> GenResult<CompiledStrategy> {
+                let strategy =
+                    from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
+                CompiledStrategy::new(strategy)
+            }
+
+            #[test]
+            fn asset_score() -> GenResult<()> {
+                let bot = compiled_strategy_fixture()?;
+                let asset = Asset::new(String::from("A"));
+                let timestamp = TODAY;
+                let data_client = MockDataClient::new();
+                let asset_score: AssetScore =
+                    bot.asset_score(asset, timestamp, Box::new(data_client))?;
+                assert_eq!(asset_score.status, AssetScoreStatus::Complete);
+                Ok(())
+            }
+        }
+    }
+
+    pub mod dag {
+        #![allow(dead_code)]
+
+        use core::fmt;
+        use std::collections::HashMap;
+        use std::convert::{TryFrom, TryInto};
+        use std::env::current_dir;
+        use std::fmt::Formatter;
+        use std::fs::File;
+        use std::io::Write;
+
+        use petgraph::algo::{connected_components, is_cyclic_directed, toposort};
+        use petgraph::dot::{Config, Dot};
+        use petgraph::graph::{DiGraph, NodeIndex};
+        use petgraph::Direction;
+
+        use crate::dto::strategy::{OperandType, StrategyDto};
+        use crate::errors::{GenError, GenResult, InvalidStrategyError};
+
+        /// Directed acyclic graph where vertices/nodes represent calculations and edges represent dependencies.
+        #[derive(Debug, Clone)]
+        pub struct Dag {
+            dag_dto: DiGraph<String, String>,
+            node_lkup: HashMap<String, NodeIndex>,
+        }
+
+        impl Dag {
+            pub fn new(strategy_dto: StrategyDto) -> GenResult<Self> {
+                let dag_dto: DiGraph<String, String> = strategy_dto.try_into()?;
+                let node_lkup: HashMap<String, NodeIndex<u32>> = dag_dto
+                    .node_indices()
+                    .into_iter()
+                    .map(|idx| (dag_dto.node_weight(idx).expect("impossible").clone(), idx))
+                    .collect();
+                Ok(Dag { dag_dto, node_lkup })
+            }
+            pub fn execution_order(&self) -> Vec<String> {
+                toposort(&self.dag_dto, None)
+                    .expect("unable to toposort")
+                    .iter()
+                    .map(|node_idx: &NodeIndex| {
+                        self.dag_dto.node_weight(*node_idx).unwrap().clone()
+                    })
+                    .collect()
+            }
+            pub fn upstream(&self, node: &String) -> Vec<String> {
+                self.dag_dto
+                    .neighbors_directed(
+                        self.node_lkup.get(node).expect("node not found").clone(),
+                        Direction::Incoming,
+                    )
+                    .map(|x| self.dag_dto.node_weight(x).expect("node not found").clone())
+                    .collect()
+            }
+            fn save_dot_file(&self) {
+                let mut output_file = File::create(
+                    current_dir()
+                        .expect("unable to find current_dir")
+                        .join("output.dot"),
+                )
+                .expect("unable to open output file");
+                let dot_text = format!(
+                    "{:?}",
+                    Dot::with_config(&self.dag_dto, &[Config::EdgeNoLabel])
+                );
+                output_file
+                    .write_all(dot_text.as_bytes())
+                    .expect("unable to write file");
+            }
+        }
+
+        impl TryFrom<StrategyDto> for DiGraph<String, String> {
+            type Error = GenError;
+            fn try_from(strategy: StrategyDto) -> GenResult<Self> {
+                let mut dag: DiGraph<String, String> = DiGraph::new();
+                let mut node_lookup = HashMap::new();
+
+                // add nodes
+                for calc in strategy.calcs() {
+                    // println!("{}", calc.name());
+                    let index = dag.add_node(calc.name().to_string());
+                    node_lookup.insert(calc.name(), index);
+                }
+                // add edges
+                for calc in strategy.calcs() {
+                    for op in calc.operands() {
+                        if node_lookup.contains_key(op.value())
+                            && op._type() == &OperandType::Reference
+                        {
+                            let operand = node_lookup.get(op.value()).expect("operand not found");
+                            let calc = node_lookup.get(calc.name()).expect("calc not found");
+                            dag.add_edge(*operand, *calc, String::new());
+                        }
+                    }
+                }
+                match is_cyclic_directed(&dag) {
+                    true => Err(InvalidStrategyError::new(
+                        strategy.name().to_string(),
+                        String::from("cyclic"),
+                    )),
+                    false => match connected_components(&dag) {
+                        0 => Err(InvalidStrategyError::new(
+                            strategy.name().to_string(),
+                            String::from("zero connected components found"),
+                        )),
+                        1 => Ok(dag),
+                        _ => Err(InvalidStrategyError::new(
+                            strategy.name().to_string(),
+                            String::from("more than 1 connected component found"),
+                        )),
+                    },
+                }
+            }
+        }
+
+        #[cfg(test)]
+        mod tests {
+            use std::collections::HashMap;
+            use std::convert::TryInto;
+            use std::fs::read_to_string;
+            use std::path::Path;
+
+            use petgraph::algo::toposort;
+            use petgraph::prelude::*;
+
+            use crate::bot::dag::{Dag, DiGraph};
+            use crate::dto::strategy::{from_path, StrategyDto};
+            use crate::errors::GenResult;
+
+            fn strategy_fixture() -> StrategyDto {
+                from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
+            }
+
+            fn dag_fixture() -> GenResult<Dag> {
+                Dag::new(strategy_fixture())
+            }
+
+            #[test]
+            fn strategy_to_dag() -> GenResult<()> {
+                let strategy = strategy_fixture();
+                let dag = Dag::new(strategy)?;
+                dag.save_dot_file();
+                let dag_dto = dag.dag_dto;
+                assert_eq!(dag_dto.node_count(), 5);
+                assert_eq!(dag_dto.edge_count(), 6);
+                let nodes = dag_dto
+                    .node_indices()
+                    .map(|i| dag_dto.node_weight(i).expect("node not found"))
+                    .find(|d| d.as_str().eq("sma200"))
+                    .expect("sma200 not found");
+                assert_eq!(nodes, "sma200");
+                Ok(())
+            }
+
+            #[test]
+            fn traverse_dag_order() -> GenResult<()> {
+                let dag: Dag = dag_fixture()?;
+                let exe_order = dag.execution_order();
+
+                let node_execution_order_lkup: HashMap<&String, usize> = (0..exe_order.len())
+                    .into_iter()
+                    .map(|position| (exe_order.get(position).unwrap(), position))
+                    .collect();
+                let order_constraints = &[
+                    &["price", "sma50", "sma_diff", "sma_gap"],
+                    &["price", "sma200", "sma_diff", "sma_gap"],
+                ];
+                for outer_idx in 0..order_constraints.len() {
+                    let expected_order = order_constraints[outer_idx];
+                    for inner_idx in 0..(expected_order.len() - 1) {
+                        let a = expected_order[inner_idx];
+                        let a_position = node_execution_order_lkup.get(&a.to_string()).unwrap();
+                        let b = expected_order[inner_idx + 1];
+                        let b_position = node_execution_order_lkup.get(&b.to_string()).unwrap();
+                        // println!("{:?}", (a, b));
+                        // println!("{:?}", (a_position, b_position));
+                        assert!(a_position < b_position);
+                    }
+                }
+                Ok(())
+            }
+
+            #[test]
+            fn dag_to_dot_file() -> GenResult<()> {
+                let strategy = strategy_fixture();
+                let dag = Dag::new(strategy)?;
+                dag.save_dot_file();
+                let expected_output =
+                    read_to_string("expected_output.dot").expect("expected_output.dot not found.");
+                let output = read_to_string("output.dot").expect("output.dot not found.");
+                assert_eq!(output, expected_output);
+                Ok(())
+            }
+
+            #[test]
+            fn dag_upstream() -> GenResult<()> {
+                let strategy_dto = strategy_fixture();
+                let dag = Dag::new(strategy_dto)?;
+                let upstream = dag.upstream(&String::from("sma50"));
+                assert_eq!(upstream, vec![String::from("price")]);
+
+                let upstream = dag.upstream(&String::from("sma_gap"));
+                assert!(upstream.contains(&String::from("sma_diff")));
+                assert!(upstream.contains(&String::from("sma50")));
+
+                println!("{:?}", upstream);
+                Ok(())
+            }
+
+            #[test]
+            fn topo() {
+                // dag = C -> B <- A
+                let mut dag: DiGraph<String, String> = DiGraph::new();
+                let b = dag.add_node(String::from("B"));
+                let c = dag.add_node(String::from("C"));
+                let a = dag.add_node(String::from("A"));
+                dag.add_edge(a, b, String::new());
+                dag.add_edge(c, b, String::new());
+                let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
+
+                let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
+                let node = dag.node_weight(*leaf_node_idx).unwrap();
+                assert_eq!(node, "A");
+
+                let leaf_node_idx = sorted_node_ids.get(1).expect("unable to get leaf");
+                let node = dag.node_weight(*leaf_node_idx).unwrap();
+                assert_eq!(node, "C");
+            }
+
+            #[test]
+            fn dfs_post_order() -> GenResult<()> {
+                let strategy = strategy_fixture();
+                let dag: DiGraph<String, String> = strategy.clone().try_into()?;
+                let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
+
+                let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
+                let leaf_node = dag
+                    .node_weight(*leaf_node_idx)
+                    .expect("unable to find node");
+                assert_eq!(leaf_node, "price");
+
+                let mut dfs_post_order = DfsPostOrder::new(&dag, *leaf_node_idx);
+                let root_node_id = dfs_post_order.next(&dag).unwrap();
+                let root_node: &String =
+                    dag.node_weight(root_node_id).expect("unable to find root");
+                // println!("{:?}", root_node);
+                assert_eq!(root_node, strategy.score().calc());
+                Ok(())
+            }
+
+            #[test]
+            fn bfs() -> GenResult<()> {
+                let strategy = strategy_fixture();
+                let dag: DiGraph<String, String> = strategy.clone().try_into()?;
+                let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
+
+                let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
+                let leaf_node = dag
+                    .node_weight(*leaf_node_idx)
+                    .expect("unable to find node");
+                assert_eq!(leaf_node, "price");
+
+                let mut bfs = Bfs::new(&dag, *leaf_node_idx);
+
+                let mut node: &String;
+                loop {
+                    let node_id = bfs.next(&dag).unwrap();
+                    node = dag.node_weight(node_id).expect("unable to find root");
+                    // println!("{:?}", node);
+                    if node == strategy.score().calc() {
+                        break;
+                    }
+                }
+                assert_eq!(node, strategy.score().calc());
+                Ok(())
+            }
+        }
+    }
+}
+
 pub mod dto {
     // TODO trade DTOs for messages to external broker service
     pub mod trade {}
+
     pub mod strategy {
         use std::borrow::BorrowMut;
         use std::convert::TryFrom;
@@ -577,629 +1199,6 @@ operands:
                 assert_eq!(sma.right, "bar");
                 Ok(())
             }
-        }
-    }
-}
-
-pub mod bot {
-    #![allow(dead_code)]
-
-    use std;
-    use std::collections::HashMap;
-    use std::convert::TryInto;
-    use std::fmt;
-
-    use serde::export::Formatter;
-
-    use crate::dag::Dag;
-    use crate::data::{Asset, DataClient};
-    use crate::dto::strategy::{
-        CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, Operation,
-        QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
-    };
-    use crate::errors::{GenResult, UpstreamNotFoundError};
-    use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
-
-    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-    pub enum CalculationStatus {
-        NotStarted,
-        InProgress,
-        Complete,
-        Error,
-    }
-
-    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-    pub enum AssetScoreStatus {
-        NotStarted,
-        InProgress,
-        Complete,
-        Error,
-    }
-
-    /// Wraps several Dtos required traverse and consume a strategy
-    #[derive(Debug, Clone)]
-    pub struct CompiledStrategy {
-        strategy: StrategyDto,
-        dag: Dag,
-        calcs: HashMap<TimeSeriesName, CalculationDto>,
-    }
-
-    impl CompiledStrategy {
-        pub fn new(strategy: StrategyDto) -> GenResult<Self> {
-            let dag = Dag::new(strategy.clone())?;
-            let calcs: HashMap<String, CalculationDto> = strategy
-                .calcs()
-                .iter()
-                .map(|calc| (calc.name().to_string(), calc.clone()))
-                .collect();
-            Ok(CompiledStrategy {
-                strategy,
-                dag,
-                calcs,
-            })
-        }
-        /// Computes the score of the given `Asset` at the given `TimeStamp`
-        pub fn asset_score(
-            &self,
-            asset: Asset,
-            timestamp: TimeStamp,
-            data_client: Box<dyn DataClient>,
-        ) -> GenResult<AssetScore> {
-            let mut scorable_asset = ScorableAsset {
-                asset,
-                timestamp,
-                execution_order: self.dag.execution_order().clone(),
-                calcs: self.calcs.clone(),
-                data_client,
-                calc_status: self
-                    .calcs
-                    .keys()
-                    .map(|c| (c.clone(), CalculationStatus::NotStarted))
-                    .collect(),
-                calc_time_series: HashMap::new(),
-            };
-            scorable_asset.execute()?;
-            Ok(AssetScore::new(scorable_asset)?)
-        }
-    }
-
-    /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
-    #[derive(Debug)]
-    pub struct ScorableAsset {
-        asset: Asset,
-        timestamp: TimeStamp,
-        execution_order: Vec<TimeSeriesName>,
-        calcs: HashMap<TimeSeriesName, CalculationDto>,
-        data_client: Box<dyn DataClient>,
-        calc_status: HashMap<TimeSeriesName, CalculationStatus>,
-        calc_time_series: HashMap<TimeSeriesName, TimeSeries1D>,
-    }
-
-    impl ScorableAsset {
-        pub(crate) fn overall_status(&self) -> AssetScoreStatus {
-            // compute group by count using Entry Api
-            let mut count_by_status: HashMap<CalculationStatus, usize> = HashMap::new();
-            for calc_status in self.calc_status.values().into_iter() {
-                let count = count_by_status.entry(calc_status.clone()).or_insert(0usize);
-                *count += 1;
-            }
-            // declare determining factors of overall status
-            let has_error = match count_by_status.get(&CalculationStatus::Error) {
-                Some(_) => true,
-                None => false,
-            };
-            let all_complete = match count_by_status.get(&CalculationStatus::Complete) {
-                Some(n) => n == &self.calcs.len(),
-                None => false,
-            };
-            let all_not_started = match count_by_status.get(&CalculationStatus::NotStarted) {
-                Some(n) => n == &self.calcs.len(),
-                None => false,
-            };
-            // apply business logic against factors
-            if has_error {
-                AssetScoreStatus::Error
-            } else if all_complete {
-                AssetScoreStatus::Complete
-            } else if all_not_started {
-                AssetScoreStatus::NotStarted
-            } else {
-                AssetScoreStatus::InProgress
-            }
-        }
-        fn status(&mut self, calc_name: &str, new_calc_status: CalculationStatus) {
-            if let Some(calc_status) = self.calc_status.get_mut(calc_name) {
-                *calc_status = new_calc_status;
-            }
-        }
-
-        pub fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
-            match self.calc_time_series.get(calc_name) {
-                Some(time_series_) => Ok(time_series_),
-                None => Err(UpstreamNotFoundError::new(calc_name.to_string())),
-            }
-        }
-
-        pub(crate) fn score(&self) -> GenResult<&TimeSeries1D> {
-            Ok(self.upstream(self.execution_order.last().expect("impossible"))?)
-        }
-
-        /// Traverse `Dag` executing each node for given `Asset` as of `Timestamp`
-        fn execute(&mut self) -> GenResult<()> {
-            let calc_order = self.execution_order.clone();
-            for calc_name in calc_order {
-                println!("\nexecuting {}", calc_name);
-                self.status(&calc_name, CalculationStatus::InProgress);
-                let calc = self.calcs.get(&calc_name).ok_or("calc not found")?;
-
-                let calc_time_series = match calc.operation() {
-                    Operation::QUERY => self.handle_query(calc),
-                    Operation::ADD => self.handle_add(calc),
-                    Operation::SUB => self.handle_sub(calc),
-                    Operation::MUL => self.handle_mul(calc),
-                    Operation::DIV => self.handle_div(calc),
-                    Operation::TS_ADD => self.handle_ts_add(calc),
-                    Operation::TS_SUB => self.handle_ts_sub(calc),
-                    Operation::TS_MUL => self.handle_ts_mul(calc),
-                    Operation::TS_DIV => self.handle_ts_div(calc),
-                    Operation::SMA => self.handle_sma(calc),
-                };
-                self.status(
-                    &calc_name,
-                    match calc_time_series.is_ok() {
-                        true => CalculationStatus::Complete,
-                        false => CalculationStatus::Error,
-                    },
-                );
-
-                self.calc_time_series
-                    .insert(calc_name.clone(), calc_time_series?);
-            }
-            Ok(())
-        }
-        // TODO parameterized query: generalize market data retrieval
-        fn handle_query(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-            assert_eq!(*calculation_dto.operation(), Operation::QUERY);
-            let query_dto: QueryCalculationDto = calculation_dto.clone().try_into()?;
-            Ok(self
-                .data_client
-                .query(&self.asset, &self.timestamp, Some(query_dto))?
-                .clone())
-        }
-        fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-            assert_eq!(*calculation_dto.operation(), Operation::ADD);
-            let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
-                calculation_dto.clone().try_into()?;
-            let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
-            Ok(time_series.add(dyadic_scalar_calc_dto.scalar()))
-        }
-        fn handle_sub(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-            assert_eq!(*calculation_dto.operation(), Operation::SUB);
-            let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
-                calculation_dto.clone().try_into()?;
-            let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
-            Ok(time_series.sub(dyadic_scalar_calc_dto.scalar()))
-        }
-        fn handle_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-            assert_eq!(*calculation_dto.operation(), Operation::MUL);
-            let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
-                calculation_dto.clone().try_into()?;
-            let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
-            Ok(time_series.mul(dyadic_scalar_calc_dto.scalar()))
-        }
-        fn handle_div(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-            assert_eq!(*calculation_dto.operation(), Operation::DIV);
-            let dyadic_scalar_calc_dto: DyadicScalarCalculationDto =
-                calculation_dto.clone().try_into()?;
-            let time_series = self.upstream(dyadic_scalar_calc_dto.time_series())?;
-            Ok(time_series.div(dyadic_scalar_calc_dto.scalar()))
-        }
-        fn handle_ts_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-            assert_eq!(*calculation_dto.operation(), Operation::TS_ADD);
-            let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
-            let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
-            let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
-            Ok(left_value.ts_add(right_value))
-        }
-        fn handle_ts_sub(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-            assert_eq!(*calculation_dto.operation(), Operation::TS_SUB);
-            let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
-            let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
-            let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
-            Ok(left_value.ts_sub(right_value))
-        }
-        fn handle_ts_mul(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-            assert_eq!(*calculation_dto.operation(), Operation::TS_MUL);
-            let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
-            let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
-            let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
-            Ok(left_value.ts_mul(right_value))
-        }
-        fn handle_ts_div(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-            assert_eq!(*calculation_dto.operation(), Operation::TS_DIV);
-            let dyadic_ts_calc_dto: DyadicTsCalculationDto = calculation_dto.clone().try_into()?;
-            let left_value = self.upstream(dyadic_ts_calc_dto.left())?;
-            let right_value = self.upstream(dyadic_ts_calc_dto.right())?;
-            Ok(left_value.ts_div(right_value))
-        }
-        fn handle_sma(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
-            assert_eq!(*calculation_dto.operation(), Operation::SMA);
-            let sma_dto: SmaCalculationDto = calculation_dto.clone().try_into()?;
-            let time_series = self.upstream(sma_dto.time_series())?;
-            Ok(time_series.sma(sma_dto.window_size()))
-        }
-    }
-
-    #[derive(Debug)]
-    pub struct AssetScore {
-        asset: Asset,
-        timestamp: TimeStamp,
-        score: TimeSeries1D,
-        status: AssetScoreStatus,
-    }
-
-    impl AssetScore {
-        fn new(scorable_asset: ScorableAsset) -> GenResult<AssetScore> {
-            // TODO warn when overall_status is not Complete
-            let status = scorable_asset.overall_status();
-            let score = scorable_asset.score()?.clone();
-            Ok(AssetScore {
-                asset: scorable_asset.asset,
-                timestamp: scorable_asset.timestamp,
-                score,
-                status,
-            })
-        }
-        fn asset(&self) -> &Asset {
-            &self.asset
-        }
-        fn timestamp(&self) -> usize {
-            self.timestamp
-        }
-        pub fn score(&self) -> &TimeSeries1D {
-            &self.score
-        }
-        fn status(&self) -> &AssetScoreStatus {
-            &self.status
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use std::collections::HashMap;
-        use std::path::Path;
-
-        use crate::bot::{AssetScore, AssetScoreStatus, CalculationStatus, CompiledStrategy};
-        use crate::data::Asset;
-        use crate::dto::strategy::{
-            from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto, StrategyDto,
-        };
-        use crate::errors::GenResult;
-        use crate::simulation::{MockDataClient, TODAY};
-
-        fn strategy_fixture() -> StrategyDto {
-            StrategyDto::new(
-                String::from("Small Strategy Document"),
-                ScoreDto::new(String::from("price")),
-                vec![CalculationDto::new(
-                    String::from("price"),
-                    Operation::QUERY,
-                    vec![OperandDto::new(
-                        String::from("field"),
-                        OperandType::Text,
-                        String::from("close"),
-                    )],
-                )],
-            )
-        }
-
-        fn compiled_strategy_fixture() -> GenResult<CompiledStrategy> {
-            let strategy = from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
-            CompiledStrategy::new(strategy)
-        }
-
-        #[test]
-        fn asset_score() -> GenResult<()> {
-            let bot = compiled_strategy_fixture()?;
-            let asset = Asset::new(String::from("A"));
-            let timestamp = TODAY;
-            let data_client = MockDataClient::new();
-            let asset_score: AssetScore =
-                bot.asset_score(asset, timestamp, Box::new(data_client))?;
-            assert_eq!(asset_score.status, AssetScoreStatus::Complete);
-            Ok(())
-        }
-    }
-}
-
-pub mod dag {
-    #![allow(dead_code)]
-
-    use core::fmt;
-    use std::collections::HashMap;
-    use std::convert::{TryFrom, TryInto};
-    use std::env::current_dir;
-    use std::fmt::Formatter;
-    use std::fs::File;
-    use std::io::Write;
-
-    use petgraph::algo::{connected_components, is_cyclic_directed, toposort};
-    use petgraph::dot::{Config, Dot};
-    use petgraph::graph::{DiGraph, NodeIndex};
-    use petgraph::Direction;
-
-    use crate::dto::strategy::{OperandType, StrategyDto};
-    use crate::errors::{GenError, GenResult, InvalidStrategyError};
-
-    /// Directed acyclic graph where vertices/nodes represent calculations and edges represent dependencies.
-    #[derive(Debug, Clone)]
-    pub struct Dag {
-        dag_dto: DiGraph<String, String>,
-        node_lkup: HashMap<String, NodeIndex>,
-    }
-
-    impl Dag {
-        pub fn new(strategy_dto: StrategyDto) -> GenResult<Self> {
-            let dag_dto: DiGraph<String, String> = strategy_dto.try_into()?;
-            let node_lkup: HashMap<String, NodeIndex<u32>> = dag_dto
-                .node_indices()
-                .into_iter()
-                .map(|idx| (dag_dto.node_weight(idx).expect("impossible").clone(), idx))
-                .collect();
-            Ok(Dag { dag_dto, node_lkup })
-        }
-        pub fn execution_order(&self) -> Vec<String> {
-            toposort(&self.dag_dto, None)
-                .expect("unable to toposort")
-                .iter()
-                .map(|node_idx: &NodeIndex| self.dag_dto.node_weight(*node_idx).unwrap().clone())
-                .collect()
-        }
-        pub fn upstream(&self, node: &String) -> Vec<String> {
-            self.dag_dto
-                .neighbors_directed(
-                    self.node_lkup.get(node).expect("node not found").clone(),
-                    Direction::Incoming,
-                )
-                .map(|x| self.dag_dto.node_weight(x).expect("node not found").clone())
-                .collect()
-        }
-        fn save_dot_file(&self) {
-            let mut output_file = File::create(
-                current_dir()
-                    .expect("unable to find current_dir")
-                    .join("output.dot"),
-            )
-            .expect("unable to open output file");
-            let dot_text = format!(
-                "{:?}",
-                Dot::with_config(&self.dag_dto, &[Config::EdgeNoLabel])
-            );
-            output_file
-                .write_all(dot_text.as_bytes())
-                .expect("unable to write file");
-        }
-    }
-
-    impl TryFrom<StrategyDto> for DiGraph<String, String> {
-        type Error = GenError;
-        fn try_from(strategy: StrategyDto) -> GenResult<Self> {
-            let mut dag: DiGraph<String, String> = DiGraph::new();
-            let mut node_lookup = HashMap::new();
-
-            // add nodes
-            for calc in strategy.calcs() {
-                // println!("{}", calc.name());
-                let index = dag.add_node(calc.name().to_string());
-                node_lookup.insert(calc.name(), index);
-            }
-            // add edges
-            for calc in strategy.calcs() {
-                for op in calc.operands() {
-                    if node_lookup.contains_key(op.value()) && op._type() == &OperandType::Reference
-                    {
-                        let operand = node_lookup.get(op.value()).expect("operand not found");
-                        let calc = node_lookup.get(calc.name()).expect("calc not found");
-                        dag.add_edge(*operand, *calc, String::new());
-                    }
-                }
-            }
-            match is_cyclic_directed(&dag) {
-                true => Err(InvalidStrategyError::new(
-                    strategy.name().to_string(),
-                    String::from("cyclic"),
-                )),
-                false => match connected_components(&dag) {
-                    0 => Err(InvalidStrategyError::new(
-                        strategy.name().to_string(),
-                        String::from("zero connected components found"),
-                    )),
-                    1 => Ok(dag),
-                    _ => Err(InvalidStrategyError::new(
-                        strategy.name().to_string(),
-                        String::from("more than 1 connected component found"),
-                    )),
-                },
-            }
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use std::collections::HashMap;
-        use std::fs::read_to_string;
-        use std::path::Path;
-
-        use crate::dag::Dag;
-        use crate::dto::strategy::{from_path, StrategyDto};
-        use crate::errors::GenResult;
-
-        fn strategy_fixture() -> StrategyDto {
-            from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
-        }
-
-        fn dag_fixture() -> GenResult<Dag> {
-            Dag::new(strategy_fixture())
-        }
-
-        #[test]
-        fn strategy_to_dag() -> GenResult<()> {
-            let strategy = strategy_fixture();
-            let dag = Dag::new(strategy)?;
-            dag.save_dot_file();
-            let dag_dto = dag.dag_dto;
-            assert_eq!(dag_dto.node_count(), 5);
-            assert_eq!(dag_dto.edge_count(), 6);
-            let nodes = dag_dto
-                .node_indices()
-                .map(|i| dag_dto.node_weight(i).expect("node not found"))
-                .find(|d| d.as_str().eq("sma200"))
-                .expect("sma200 not found");
-            assert_eq!(nodes, "sma200");
-            Ok(())
-        }
-
-        #[test]
-        fn traverse_dag_order() -> GenResult<()> {
-            let dag: Dag = dag_fixture()?;
-            let exe_order = dag.execution_order();
-
-            let node_execution_order_lkup: HashMap<&String, usize> = (0..exe_order.len())
-                .into_iter()
-                .map(|position| (exe_order.get(position).unwrap(), position))
-                .collect();
-            let order_constraints = &[
-                &["price", "sma50", "sma_diff", "sma_gap"],
-                &["price", "sma200", "sma_diff", "sma_gap"],
-            ];
-            for outer_idx in 0..order_constraints.len() {
-                let expected_order = order_constraints[outer_idx];
-                for inner_idx in 0..(expected_order.len() - 1) {
-                    let a = expected_order[inner_idx];
-                    let a_position = node_execution_order_lkup.get(&a.to_string()).unwrap();
-                    let b = expected_order[inner_idx + 1];
-                    let b_position = node_execution_order_lkup.get(&b.to_string()).unwrap();
-                    // println!("{:?}", (a, b));
-                    // println!("{:?}", (a_position, b_position));
-                    assert!(a_position < b_position);
-                }
-            }
-            Ok(())
-        }
-
-        #[test]
-        fn dag_to_dot_file() -> GenResult<()> {
-            let strategy = strategy_fixture();
-            let dag = Dag::new(strategy)?;
-            dag.save_dot_file();
-            let expected_output =
-                read_to_string("expected_output.dot").expect("expected_output.dot not found.");
-            let output = read_to_string("output.dot").expect("output.dot not found.");
-            assert_eq!(output, expected_output);
-            Ok(())
-        }
-
-        #[test]
-        fn dag_upstream() -> GenResult<()> {
-            let strategy_dto = strategy_fixture();
-            let dag = Dag::new(strategy_dto)?;
-            let upstream = dag.upstream(&String::from("sma50"));
-            assert_eq!(upstream, vec![String::from("price")]);
-
-            let upstream = dag.upstream(&String::from("sma_gap"));
-            assert!(upstream.contains(&String::from("sma_diff")));
-            assert!(upstream.contains(&String::from("sma50")));
-
-            println!("{:?}", upstream);
-            Ok(())
-        }
-    }
-
-    #[cfg(test)]
-    mod learn_library {
-        use std::convert::TryInto;
-        use std::path::Path;
-
-        use petgraph::algo::toposort;
-        use petgraph::prelude::*;
-
-        use crate::dag::{Dag, DiGraph};
-        use crate::dto::strategy::{from_path, StrategyDto};
-        use crate::errors::GenResult;
-
-        fn strategy_fixture() -> StrategyDto {
-            from_path(Path::new("strategy.yaml")).expect("unable to load strategy")
-        }
-
-        fn dag_fixture() -> GenResult<Dag> {
-            Dag::new(strategy_fixture())
-        }
-
-        #[test]
-        fn topo() {
-            // dag = C -> B <- A
-            let mut dag: DiGraph<String, String> = DiGraph::new();
-            let b = dag.add_node(String::from("B"));
-            let c = dag.add_node(String::from("C"));
-            let a = dag.add_node(String::from("A"));
-            dag.add_edge(a, b, String::new());
-            dag.add_edge(c, b, String::new());
-            let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
-
-            let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
-            let node = dag.node_weight(*leaf_node_idx).unwrap();
-            assert_eq!(node, "A");
-
-            let leaf_node_idx = sorted_node_ids.get(1).expect("unable to get leaf");
-            let node = dag.node_weight(*leaf_node_idx).unwrap();
-            assert_eq!(node, "C");
-        }
-
-        #[test]
-        fn dfs_post_order() -> GenResult<()> {
-            let strategy = strategy_fixture();
-            let dag: DiGraph<String, String> = strategy.clone().try_into()?;
-            let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
-
-            let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
-            let leaf_node = dag
-                .node_weight(*leaf_node_idx)
-                .expect("unable to find node");
-            assert_eq!(leaf_node, "price");
-
-            let mut dfs_post_order = DfsPostOrder::new(&dag, *leaf_node_idx);
-            let root_node_id = dfs_post_order.next(&dag).unwrap();
-            let root_node: &String = dag.node_weight(root_node_id).expect("unable to find root");
-            // println!("{:?}", root_node);
-            assert_eq!(root_node, strategy.score().calc());
-            Ok(())
-        }
-
-        #[test]
-        fn bfs() -> GenResult<()> {
-            let strategy = strategy_fixture();
-            let dag: DiGraph<String, String> = strategy.clone().try_into()?;
-            let sorted_node_ids = toposort(&dag, None).expect("unable to toposort");
-
-            let leaf_node_idx = sorted_node_ids.get(0).expect("unable to get leaf");
-            let leaf_node = dag
-                .node_weight(*leaf_node_idx)
-                .expect("unable to find node");
-            assert_eq!(leaf_node, "price");
-
-            let mut bfs = Bfs::new(&dag, *leaf_node_idx);
-
-            let mut node: &String;
-            loop {
-                let node_id = bfs.next(&dag).unwrap();
-                node = dag.node_weight(node_id).expect("unable to find root");
-                // println!("{:?}", node);
-                if node == strategy.score().calc() {
-                    break;
-                }
-            }
-            assert_eq!(node, strategy.score().calc());
-            Ok(())
         }
     }
 }
