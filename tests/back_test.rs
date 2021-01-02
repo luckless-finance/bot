@@ -19,7 +19,7 @@ pub fn get_strategy() -> StrategyDto {
 #[cfg(test)]
 mod tests {
     use crate::get_strategy;
-    use yafa::simulation::{MockDataClient, TODAY};
+    use yafa::simulation::{MockDataClient};
     use yafa::data::{DataClient, plot_ts};
     use yafa::bot::asset_score::*;
     use yafa::time_series::{DataPointValue, TimeSeries1D};
@@ -42,7 +42,7 @@ mod tests {
         let asset_price_time_series: Vec<&TimeSeries1D> = data_client.assets().values()
             .flat_map(|a| data_client.query(
                 a,
-                &TODAY,
+                &MockDataClient::today(),
                 None,
             ))
             .collect();
@@ -51,7 +51,7 @@ mod tests {
         let asset_scores: Vec<AssetScore> = data_client.assets().values()
             .flat_map(|a|
                 bot.asset_score(a.clone(),
-                                TODAY,
+                                MockDataClient::today(),
                                 Box::new(MockDataClient::new()))
             )
             .collect();

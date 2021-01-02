@@ -1,18 +1,24 @@
 use crate::data::{Asset, DataClient, Symbol};
 use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::{AssetNotFoundError, GenResult};
-use crate::time_series::TimeSeries1D;
+use crate::time_series::{TimeSeries1D, TimeStamp};
+use chrono::prelude::*;
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::io::{Error, ErrorKind};
 
 pub static DATA_SIZE: usize = 900;
-pub static TODAY: usize = DATA_SIZE;
 
 #[derive(Debug)]
 pub struct MockDataClient {
     assets: HashMap<Symbol, Asset>,
     data: HashMap<Symbol, TimeSeries1D>,
+}
+
+impl MockDataClient {
+    pub fn today() -> DateTime<Utc> {
+        TimeSeries1D::epoch() + TimeSeries1D::index_unit() * DATA_SIZE as i32
+    }
 }
 
 fn simulate_time_series(n: usize) -> TimeSeries1D {
@@ -39,7 +45,7 @@ impl DataClient for MockDataClient {
     fn query(
         &self,
         asset: &Asset,
-        timestamp: &usize,
+        timestamp: &TimeStamp,
         query_dto: Option<QueryCalculationDto>,
     ) -> GenResult<&TimeSeries1D> {
         match self.data.get(&asset.symbol().to_string()) {
@@ -163,7 +169,6 @@ mod tests {
     use crate::data::{plot_ts, plots};
     use crate::simulation::*;
     use crate::time_series::TimeSeries1D;
-    use rand_distr::num_traits::{AsPrimitive, Pow};
     use std::collections::HashSet;
     use std::f64::consts::PI;
 
@@ -171,7 +176,7 @@ mod tests {
 
     #[test]
     fn linspace_0_10() -> GenResult<()> {
-        let ten = linspace(10, 0.as_(), 10.as_());
+        let ten = linspace(10, 0., 10.);
         assert_eq!(ten.len(), 10);
         assert_eq!(ten[0], 0f64);
         assert_eq!(ten[9], 10f64);
@@ -180,7 +185,7 @@ mod tests {
 
     #[test]
     fn linspace_0_2pi() -> GenResult<()> {
-        let x = linspace(100, 0.as_(), PI * 2f64);
+        let x = linspace(100, 0., PI * 2f64);
         assert_eq!(x.len(), 100);
         assert_eq!(x[0], 0f64);
         assert_eq!(x[99], PI * 2f64);
@@ -245,7 +250,7 @@ mod tests {
         let x = linspace(n, x0, xf);
         let y0 = 10f64;
         let coeffs = vec![y0, 0f64, 1f64];
-        let yf = y0 + xf.pow(2);
+        let yf = y0 + xf.powf(2.);
         let ts = TimeSeries1D::polynomial(&x, coeffs);
         assert!(ts.values().iter().all(|yi| yi >= &y0));
         assert_eq!(ts.values().last(), Some(&yf));
@@ -298,7 +303,9 @@ mod tests {
         let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         // println!("{:?}", client);
         let asset = Asset::new(Symbol::from("A"));
-        let ts = client.query(&asset, &TODAY, None).unwrap();
+        let ts = client
+            .query(&asset, &MockDataClient::today(), None)
+            .unwrap();
         // println!("{:?}", ts);
         assert_eq!(ts.len(), DATA_SIZE);
     }

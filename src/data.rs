@@ -79,7 +79,7 @@ pub fn plot_ts(ts_vec: Vec<&TimeSeries1D>) {
         .set_y_range(Fix::<f64>(y_min), Fix::<f64>(y_max));
     for i in 0..ys.len() {
         axis.lines(
-            ts_vec[i].index().clone(),
+            ts_vec[i].index().iter().map(|ts| ts.timestamp()).clone(),
             ts_vec[i].values().clone(),
             &[Caption(&format!("{}", i))],
         );
