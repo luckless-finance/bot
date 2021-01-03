@@ -221,19 +221,35 @@ mod tests {
             ],
             values: vec![1., 2., 3., 4., 8.],
         };
-        let (l_out, r_out) = l_in.intersect(&r_in);
-
-        assert_eq!(
-            r_out.index,
-            vec![
+        let expected_l_out = TimeSeries1D {
+            index: vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
-            ]
+            ],
+            values: vec![1., 2., 4.],
+        };
+        let expected_r_out = TimeSeries1D {
+            index: vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+            ],
+            values: vec![2., 3., 8.],
+        };
+        let (l_out, r_out) = l_in.intersect(&r_in);
+        assert_eq!(
+            l_out.index, r_out.index,
+            "both TimeSeries should have same indices"
         );
-        assert_eq!(r_out.index, l_out.index);
-        assert_eq!(l_out.values, &[1., 2., 4.]);
-        assert_eq!(r_out.values, &[2., 3., 8.]);
+        assert_eq!(l_out.index, expected_l_out.index);
+        assert_eq!(r_out.index, expected_r_out.index);
+        // only keep values with intersecting indices
+        assert_eq!(l_out.values, expected_l_out.values);
+        assert_eq!(r_out.values, expected_r_out.values);
+        // high level sanity check
+        assert_eq!(l_out, expected_l_out);
+        assert_eq!(r_out, expected_r_out);
     }
 
     #[test]
