@@ -337,12 +337,12 @@ pub mod bot {
 
             #[test]
             fn asset_score() -> GenResult<()> {
-                let bot = compiled_strategy_fixture()?;
+                let compiled_strategy = compiled_strategy_fixture()?;
                 let asset = Asset::new(String::from("A"));
                 let timestamp = MockDataClient::today();
                 let data_client = MockDataClient::new();
                 let asset_score: AssetScore =
-                    bot.asset_score(asset, timestamp, Box::new(data_client))?;
+                    compiled_strategy.asset_score(asset, timestamp, Box::new(data_client))?;
                 assert_eq!(asset_score.status, AssetScoreStatus::Complete);
                 Ok(())
             }
