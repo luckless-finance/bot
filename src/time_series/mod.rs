@@ -2,7 +2,7 @@
 
 use std::cmp::Ordering;
 use std::convert::TryFrom;
-use std::ops::{Add, Div, Neg};
+use std::ops::{Add, Div, Neg, Mul};
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
@@ -102,6 +102,7 @@ impl TimeSeries1D {
     }
     pub fn mul(&self, rhs: DataPointValue) -> Self {
         let product_idx: Index = self.index.clone();
+        let x = 5;
         let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
         TimeSeries1D::new(product_idx, product_values)
     }
