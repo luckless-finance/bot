@@ -157,7 +157,7 @@ pub mod bot {
             fn execute(&mut self) -> GenResult<()> {
                 let calc_order = self.execution_order.clone();
                 for calc_name in calc_order {
-                    println!("\nexecuting {}", calc_name);
+                    // println!("\nexecuting {}", calc_name);
                     self.status(&calc_name, CalculationStatus::InProgress);
                     let calc = self.calcs.get(&calc_name).ok_or("calc not found")?;
 
@@ -554,7 +554,7 @@ pub mod bot {
                 assert!(upstream.contains(&String::from("sma_diff")));
                 assert!(upstream.contains(&String::from("sma50")));
 
-                println!("{:?}", upstream);
+                // println!("{:?}", upstream);
                 Ok(())
             }
 
