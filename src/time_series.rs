@@ -56,9 +56,9 @@ impl TimeSeries1D {
     pub fn len(&self) -> usize {
         self.index.len()
     }
-    /// Align the indices of 2 `TimeSeries`.
+    /// Align the indices of 2 `TimeSeries`, only values with indices in both `TimeSeries` are included.
     /// Creates 2 new `TimeSeries` instances.
-    pub fn align(&self, rhs: &TimeSeries1D) -> (Self, Self) {
+    pub fn intersect(&self, rhs: &TimeSeries1D) -> (Self, Self) {
         let mut l_i = 0;
         let lhs_i = &self.index;
         let lhs_v = &self.values;
@@ -111,7 +111,7 @@ impl TimeSeries1D {
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     pub fn ts_add(&self, rhs: &TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.align(&rhs);
+        let (mut lhs, rhs) = self.intersect(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l += *r;
         }
@@ -120,7 +120,7 @@ impl TimeSeries1D {
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     pub fn ts_sub(&self, rhs: &TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.align(&rhs);
+        let (mut lhs, rhs) = self.intersect(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l -= *r;
         }
@@ -129,7 +129,7 @@ impl TimeSeries1D {
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     pub fn ts_mul(&self, rhs: &TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.align(&rhs);
+        let (mut lhs, rhs) = self.intersect(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l *= *r;
         }
@@ -138,7 +138,7 @@ impl TimeSeries1D {
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     pub fn ts_div(&self, rhs: &TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.align(&rhs);
+        let (mut lhs, rhs) = self.intersect(&rhs);
         for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
             *l /= *r;
         }
@@ -199,7 +199,7 @@ mod tests {
     }
 
     #[test]
-    fn align() {
+    fn intersect() {
         let l_in = TimeSeries1D {
             index: vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
@@ -221,7 +221,7 @@ mod tests {
             ],
             values: vec![1., 2., 3., 4., 8.],
         };
-        let (l_out, r_out) = l_in.align(&r_in);
+        let (l_out, r_out) = l_in.intersect(&r_in);
 
         assert_eq!(
             r_out.index,

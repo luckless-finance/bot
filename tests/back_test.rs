@@ -29,7 +29,7 @@ mod tests {
     use yafa::simulation::MockDataClient;
     use yafa::time_series::{DataPointValue, TimeSeries1D};
 
-    use crate::get_strategy;
+    use crate::{get_strategy};
 
     #[test]
     fn back_test() -> GenResult<()> {
