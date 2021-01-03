@@ -2,7 +2,7 @@
 
 use std::cmp::Ordering;
 use std::convert::TryFrom;
-use std::ops::{Add, Div, Neg, Mul};
+use std::ops::{Add, Div, Mul, Neg};
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
