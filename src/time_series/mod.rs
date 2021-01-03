@@ -9,6 +9,8 @@ use chrono::{Duration, TimeZone};
 
 use crate::errors::{GenError, GenResult};
 
+mod core;
+
 pub type DataPointValue = f64;
 pub type TimeStamp = DateTime<Utc>;
 pub type Index = Vec<TimeStamp>;
@@ -200,8 +202,8 @@ mod tests {
 
     #[test]
     fn intersect() {
-        let l_in = TimeSeries1D {
-            index: vec![
+        let l_in = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 6,
@@ -209,34 +211,34 @@ mod tests {
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 8,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1., 2., 3., 4., 5., 8.],
-        };
-        let r_in = TimeSeries1D {
-            index: vec![
+            vec![1., 2., 3., 4., 5., 8.],
+        );
+        let r_in = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            values: vec![1., 2., 3., 4., 8.],
-        };
-        let expected_l_out = TimeSeries1D {
-            index: vec![
+            vec![1., 2., 3., 4., 8.],
+        );
+        let expected_l_out = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            values: vec![1., 2., 4.],
-        };
-        let expected_r_out = TimeSeries1D {
-            index: vec![
+            vec![1., 2., 4.],
+        );
+        let expected_r_out = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            values: vec![2., 3., 8.],
-        };
+            vec![2., 3., 8.],
+        );
         let (l_out, r_out) = l_in.intersect(&r_in);
         assert_eq!(
             l_out.index, r_out.index,
@@ -254,16 +256,16 @@ mod tests {
 
     #[test]
     fn len() {
-        let ts = TimeSeries1D {
-            index: vec![
+        let ts = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1., 2., 3., 4., 5.],
-        };
+            vec![1., 2., 3., 4., 5.],
+        );
         assert_eq!(ts.len(), ts.index().len());
         assert_eq!(ts.len(), ts.values().len());
         assert_eq!(ts.len(), 5);
@@ -271,26 +273,26 @@ mod tests {
 
     #[test]
     fn add() {
-        let ts = TimeSeries1D {
-            index: vec![
+        let ts = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1., 2., 3., 4., 5.],
-        };
-        let expected = TimeSeries1D {
-            index: vec![
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1. + 2., 2. + 2., 3. + 2., 4. + 2., 5. + 2.],
-        };
+            vec![1. + 2., 2. + 2., 3. + 2., 4. + 2., 5. + 2.],
+        );
         let actual = ts.add(2.);
         assert_eq!(actual, expected);
         assert_eq!(actual.sub(2.), ts);
@@ -298,26 +300,26 @@ mod tests {
 
     #[test]
     fn sub() {
-        let ts = TimeSeries1D {
-            index: vec![
+        let ts = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1., 2., 3., 4., 5.],
-        };
-        let expected = TimeSeries1D {
-            index: vec![
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1. - 2., 2. - 2., 3. - 2., 4. - 2., 5. - 2.],
-        };
+            vec![1. - 2., 2. - 2., 3. - 2., 4. - 2., 5. - 2.],
+        );
         let actual = ts.sub(2.);
         assert_eq!(actual, expected);
         assert_eq!(actual.add(2.), ts);
@@ -325,26 +327,26 @@ mod tests {
 
     #[test]
     fn mul() {
-        let ts = TimeSeries1D {
-            index: vec![
+        let ts = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1., 2., 3., 4., 5.],
-        };
-        let expected = TimeSeries1D {
-            index: vec![
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1. * 2., 2. * 2., 3. * 2., 4. * 2., 5. * 2.],
-        };
+            vec![1. * 2., 2. * 2., 3. * 2., 4. * 2., 5. * 2.],
+        );
         let actual = ts.mul(2.);
         assert_eq!(actual, expected);
         assert_eq!(actual.div(2.), ts);
@@ -352,26 +354,26 @@ mod tests {
 
     #[test]
     fn div() {
-        let ts = TimeSeries1D {
-            index: vec![
+        let ts = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1., 2., 3., 4., 5.],
-        };
-        let expected = TimeSeries1D {
-            index: vec![
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1. / 2., 2. / 2., 3. / 2., 4. / 2., 5. / 2.],
-        };
+            vec![1. / 2., 2. / 2., 3. / 2., 4. / 2., 5. / 2.],
+        );
         let actual = ts.div(2.);
         assert_eq!(actual, expected);
         assert_eq!(actual.mul(2.), ts);
@@ -379,148 +381,148 @@ mod tests {
 
     #[test]
     fn ts_add() {
-        let lhs = TimeSeries1D {
-            index: vec![
+        let lhs = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1., 2., 3., 4., 5.],
-        };
-        let rhs = TimeSeries1D {
-            index: vec![
+            vec![1., 2., 3., 4., 5.],
+        );
+        let rhs = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 6,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            values: vec![-5., 4., 3., 2.],
-        };
-        let expected = TimeSeries1D {
-            index: vec![
+            vec![-5., 4., 3., 2.],
+        );
+        let expected = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            values: vec![-3., 7., 6.],
-        };
+            vec![-3., 7., 6.],
+        );
         let actual = lhs.ts_add(&rhs);
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn ts_sub() {
-        let lhs = TimeSeries1D {
-            index: vec![
+        let lhs = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1., 2., 3., 4., 5.],
-        };
-        let rhs = TimeSeries1D {
-            index: vec![
+            vec![1., 2., 3., 4., 5.],
+        );
+        let rhs = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 6,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            values: vec![-5., 4., 3., 2.],
-        };
-        let expected = TimeSeries1D {
-            index: vec![
+            vec![-5., 4., 3., 2.],
+        );
+        let expected = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            values: vec![7., -1., 2.],
-        };
+            vec![7., -1., 2.],
+        );
         let actual = lhs.ts_sub(&rhs);
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn ts_mul() {
-        let lhs = TimeSeries1D {
-            index: vec![
+        let lhs = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1., 2., 3., 4., 5.],
-        };
-        let rhs = TimeSeries1D {
-            index: vec![
+            vec![1., 2., 3., 4., 5.],
+        );
+        let rhs = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 6,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            values: vec![-5., 4., 3., 2.],
-        };
-        let expected = TimeSeries1D {
-            index: vec![
+            vec![-5., 4., 3., 2.],
+        );
+        let expected = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            values: vec![-10., 12., 8.],
-        };
+            vec![-10., 12., 8.],
+        );
         let actual = lhs.ts_mul(&rhs);
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn ts_div() {
-        let lhs = TimeSeries1D {
-            index: vec![
+        let lhs = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1., 2., 3., 4., 5.],
-        };
-        let rhs = TimeSeries1D {
-            index: vec![
+            vec![1., 2., 3., 4., 5.],
+        );
+        let rhs = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 6,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            values: vec![-5., 4., 3., 2.],
-        };
-        let expected = TimeSeries1D {
-            index: vec![
+            vec![-5., 4., 3., 2.],
+        );
+        let expected = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            values: vec![-0.4, 0.75, 2.],
-        };
+            vec![-0.4, 0.75, 2.],
+        );
         let actual = lhs.ts_div(&rhs);
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn sma() {
-        let ts = TimeSeries1D {
-            index: vec![
+        let ts = TimeSeries1D::new(
+            vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ],
-            values: vec![1., 2., 3., 4., 5.],
-        };
+            vec![1., 2., 3., 4., 5.],
+        );
         let sma = ts.sma(2);
 
         assert_eq!(sma.len(), 4);
