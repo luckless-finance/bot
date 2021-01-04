@@ -102,7 +102,6 @@ impl TimeSeries1D {
     }
     pub fn mul(&self, rhs: DataPointValue) -> Self {
         let product_idx: Index = self.index.clone();
-        let x = 5;
         let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
         TimeSeries1D::new(product_idx, product_values)
     }
