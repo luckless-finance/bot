@@ -9,7 +9,7 @@ use chrono::{Duration, TimeZone};
 
 use crate::errors::{GenError, GenResult};
 
-mod core;
+mod generic_time_series;
 
 pub type DataPointValue = f64;
 pub type TimeStamp = DateTime<Utc>;

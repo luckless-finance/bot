@@ -12,46 +12,64 @@ type TimeSeries1D = TimeSeries<DateTime<Utc>, f64>;
 
 #[derive(Debug, Clone, PartialEq)]
 struct TimeSeries<K, V>
-    where
-        K: Ord + Sized + Debug + Clone + PartialEq,
-        V: Sized + Debug + Clone + PartialEq + Add<Output=V>
+where
+    K: Ord + Sized + Debug + Clone + PartialEq,
+    V: Sized + Debug + Clone + PartialEq,
 {
     data: BTreeMap<K, V>,
 }
 
 impl<K, V> TimeSeries<K, V>
-    where
-        K: Ord + Sized + Debug + Clone + PartialEq,
-        V: Sized + Debug + Clone + PartialEq + Add<Output=V>
+where
+    K: Ord + Sized + Debug + Clone + PartialEq,
+    V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
 {
     pub fn new() -> TimeSeries<K, V> {
         TimeSeries {
             data: BTreeMap::new(),
         }
     }
-}
 
-// https://doc.rust-lang.org/std/ops/trait.Add.html
-impl<K, V> Add for TimeSeries<K, V>
-    where
-        K: Ord + Sized + Debug + Clone + PartialEq,
-        V: Sized + Debug + Clone + PartialEq + Add<Output=V>
-{
-    type Output = Self;
-    fn add(self, rhs: Self) -> Self::Output {
-        // self.data.keys()
-        // self.data.append()
-        // let left_index = self.data.first_key_value()?.0;
-        // let right_index = rhs.data.first_key_value()?.0;
-        // let i = match left_index.cmp(&right_index) {
-        //     Ordering::Equal => left_index,
-        //     _ => left_index
-        // };
-        Self::new()
+    pub fn align(&self) -> TimeSeries<K, V> {
+        TimeSeries::new()
     }
 }
 
+// https://doc.rust-lang.org/std/ops/trait.Add.html
+// impl<K, V> Add for TimeSeries<K, V>
+//     where
+//         K: Ord + Sized + Debug + Clone + PartialEq,
+//         V: Sized + Debug + Clone + PartialEq + Add<Output=V>
+// {
+//     type Output = Self;
+//     fn add(self, rhs: Self) -> Self::Output {
+//         // self.data.keys()
+//         // self.data.append()
+//         // let left_index = self.data.first_key_value()?.0;
+//         // let right_index = rhs.data.first_key_value()?.0;
+//         // let i = match left_index.cmp(&right_index) {
+//         //     Ordering::Equal => left_index,
+//         //     _ => left_index
+//         // };
+//         Self::new();
+//         Self {
+//             data: self.data
+//         }
+//     }
+// }
+
 impl<K> TimeSeries<K, f64> where K: Ord + Sized + Debug + Clone + PartialEq {}
+
+impl<K> Add for TimeSeries<K, f64>
+where
+    K: Ord + Sized + Debug + Clone + PartialEq,
+{
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self { data: rhs.data }
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -61,7 +79,7 @@ mod test {
 
     use chrono::prelude::*;
 
-    use crate::time_series::core::*;
+    use crate::time_series::generic_time_series::*;
 
     #[test]
     fn test_1d() {

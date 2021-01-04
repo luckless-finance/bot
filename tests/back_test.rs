@@ -58,6 +58,7 @@ mod tests {
                                               Box::new(MockDataClient::new()))
             )
             .collect();
+
         let asset_score_time_series: Vec<&TimeSeries1D> = asset_scores.iter()
             .map(|asset_score| asset_score.score())
             .collect();
