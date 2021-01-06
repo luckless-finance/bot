@@ -44,7 +44,7 @@ pre-commit:
 	@echo "-------------------"
 	@echo "pre-commit validation: test, format, check"
 	@echo "-------------------"
-	make test && rustfmt src/**/* --check && make check
+	cargo test --quiet && rustfmt src/**/* --check && make check
 
 watch-test:
 	@echo "-------------------"
