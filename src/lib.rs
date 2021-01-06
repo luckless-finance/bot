@@ -284,7 +284,7 @@ pub mod bot {
                     status,
                 })
             }
-            fn asset(&self) -> &Asset {
+            pub fn asset(&self) -> &Asset {
                 &self.asset
             }
             fn timestamp(&self) -> &TimeStamp {

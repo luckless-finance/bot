@@ -20,16 +20,19 @@ pub fn get_strategy() -> StrategyDto {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::convert::TryInto;
 
+    use chrono::{DateTime, Utc};
+
     use yafa::bot::asset_score::*;
-    use yafa::data::{DataClient, plot_ts};
+    use yafa::data::{Asset, DataClient, plot_ts};
     use yafa::dto::strategy::{CalculationDto, OperandDto, OperandType, Operation, QueryCalculationDto};
     use yafa::errors::GenResult;
     use yafa::simulation::MockDataClient;
     use yafa::time_series::{DataPointValue, TimeSeries1D};
 
-    use crate::{get_strategy};
+    use crate::get_strategy;
 
     #[test]
     fn back_test() -> GenResult<()> {
@@ -59,9 +62,11 @@ mod tests {
             )
             .collect();
 
-        let asset_score_time_series: Vec<&TimeSeries1D> = asset_scores.iter()
-            .map(|asset_score| asset_score.score())
+        let asset_score_time_series: HashMap<&Asset, &TimeSeries1D> = asset_scores.iter()
+            .map(|asset_score| (asset_score.asset(), asset_score.score()))
             .collect();
+        let foo: Vec<(DateTime<Utc>, HashMap<&Asset, &DataPointValue>)> = Vec::new();
+
         // plot_ts(asset_score_time_series);
         Ok(())
     }
