@@ -155,26 +155,25 @@ mod test {
         Ok(())
     }
 
-    //
-    // #[test]
-    // fn btreemap_join_eq_start() -> GenResult<()> {
-    //     let mut lhs = BTreeMap::new();
-    //     lhs.insert(1, 0);
-    //     lhs.insert(3, 1);
-    //     lhs.insert(10, 3);
-    //     lhs.insert(11, 4);
-    //     let mut rhs = BTreeMap::new();
-    //     rhs.insert(1, 0);
-    //     rhs.insert(3, 1);
-    //     rhs.insert(4, 2);
-    //     rhs.insert(10, 3);
-    //     rhs.insert(13, 4);
-    //     let mut out = BTreeMap::new();
-    //     out.insert(3, 2);
-    //     out.insert(10, 6);
-    //     // BTreeMap sorts its keys
-    //     out.insert(1, 0);
-    //     assert_eq!(out, join(lhs, rhs, V::merge));
-    //     Ok(())
-    // }
+    #[test]
+    fn btreemap_join_eq_start() -> GenResult<()> {
+        let mut lhs = BTreeMap::new();
+        lhs.insert(1.try_into()?, 0);
+        lhs.insert(3.try_into()?, 1);
+        lhs.insert(10.try_into()?, 3);
+        lhs.insert(11.try_into()?, 4);
+        let mut rhs = BTreeMap::new();
+        rhs.insert(1.try_into()?, 0);
+        rhs.insert(3.try_into()?, 1);
+        rhs.insert(4.try_into()?, 2);
+        rhs.insert(10.try_into()?, 3);
+        rhs.insert(13.try_into()?, 4);
+        let mut out = BTreeMap::new();
+        out.insert(3.try_into()?, 2);
+        out.insert(10.try_into()?, 6);
+        // BTreeMap sorts its keys
+        out.insert(1.try_into()?, 0);
+        assert_eq!(out, join(lhs, rhs, V::merge));
+        Ok(())
+    }
 }
