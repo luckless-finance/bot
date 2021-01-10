@@ -1,7 +1,4 @@
 #![allow(unstable_features)]
-// #![allow(unused_variables)]
-// #![allow(unused_must_use)]
-// #![allow(unused_mut)]
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -66,9 +63,9 @@ where
     pub fn new(name: String, time_series: BTreeMap<T, BTreeMap<K, V>>) -> GenTimeSeries<T, K, V> {
         GenTimeSeries { name, time_series }
     }
-    pub fn with_name(self, name: String) -> GenTimeSeries<T, K, V> {
+    pub fn with_name(self, name: &str) -> GenTimeSeries<T, K, V> {
         GenTimeSeries {
-            name,
+            name: name.to_string(),
             time_series: self.time_series,
         }
     }
@@ -133,13 +130,13 @@ where
             }
         }
         Self {
-            name: format!("join({}, {})", self.name, other.name),
+            name: format!("join({},{})", self.name, other.name),
             time_series: out,
         }
     }
 }
 
-impl<T, K, V> Eq for GenTimeSeries<T, K, V>
+impl<T, K, V: 'static> Eq for GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord,
     K: Sized + Debug + Clone + Eq + Ord,
@@ -147,19 +144,17 @@ where
 {
 }
 
-impl<T, K, V> PartialEq for GenTimeSeries<T, K, V>
+impl<T, K, V: 'static> PartialEq for GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord,
     K: Sized + Debug + Clone + Eq + Ord,
     V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
 {
-    // FIXME only checks keys
-    fn eq(&self, _other: &Self) -> bool {
-        self.time_series.keys().eq(_other.time_series.keys())
+    fn eq(&self, other: &Self) -> bool {
+        self.name.eq(&other.name) && self.time_series.eq(&other.time_series)
     }
-    // FIXME only checks keys
-    fn ne(&self, _other: &Self) -> bool {
-        self.time_series.keys().ne(_other.time_series.keys())
+    fn ne(&self, other: &Self) -> bool {
+        self.name.eq(&other.name) && self.time_series.eq(&other.time_series)
     }
 }
 
@@ -189,20 +184,33 @@ where
 {
     type Output = GenResult<Self>;
 
-    fn add(self, rhs: Self) -> Self::Output {
-        // FIXME validate time axis of self and rhs align
-        match self.time_series.keys().eq(rhs.time_series.keys()) {
+    fn add(self, other: Self) -> Self::Output {
+        match self.time_series.keys().eq(other.time_series.keys()) {
             false => Err(TimeSeriesError::new(format!(
                 "Error: unable to add: {} + {}; inconsistent time indices",
-                self.name, rhs.name
+                self.name, other.name
             ))),
             true => {
-                // self.time_series.iter().zip(rhs.time_series.iter())
-                //     .map(|(l,r)|l.1.iter().zip())
+                // zip on time
+                let time_series = self
+                    .time_series
+                    .iter()
+                    .zip(other.time_series.iter())
+                    .map(|((t, lhs), (_, rhs))| {
+                        (t.clone(), {
+                            // TODO add informative message
+                            assert!(lhs.keys().eq(rhs.keys()));
+                            // zip on keys
+                            lhs.iter()
+                                .zip(rhs.iter())
+                                .map(|((k, a), (_, b))| (k.clone(), a.clone() + b.clone()))
+                                .collect()
+                        })
+                    })
+                    .collect();
                 Ok(Self {
-                    name: format!("add({},{})", self.name, rhs.name),
-                    // TODO implement add
-                    time_series: rhs.time_series,
+                    name: format!("add({},{})", self.name, other.name),
+                    time_series,
                 })
             }
         }
@@ -213,19 +221,6 @@ type TimeType = DateTime<Utc>;
 type KeyType = String;
 type ValueType = f64;
 type TimeSeries = GenTimeSeries<TimeType, KeyType, ValueType>;
-//
-// impl Add for GenTimeSeries<TimeType, KeyType, ValueType> {
-//     type Output = Self;
-//
-//     fn add(self, rhs: Self) -> Self::Output {
-//         // FIXME validate time axis of self and rhs align
-//         Self {
-//             name: format!("add({},{})", self.name, rhs.name),
-//             // TODO implement add
-//             time_series: rhs.time_series,
-//         }
-//     }
-// }
 
 #[cfg(test)]
 mod test {
@@ -252,6 +247,7 @@ mod test {
 
     #[test]
     fn join() {
+        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
         let lhs: GenTimeSeries<i32, &str, f64> = vec![
             (2, vec![(DEFAULT_KEY, 12.3)]),
             (3, vec![(DEFAULT_KEY, 12.3)]),
@@ -277,11 +273,12 @@ mod test {
         ]
         .into_iter()
         .collect();
-        assert_eq!(out, lhs.join(rhs));
+        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
     }
 
     #[test]
     fn btreemap_join_eq_start() -> GenResult<()> {
+        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
         let lhs: GenTimeSeries<i32, &str, f64> = vec![
             (1, vec![(DEFAULT_KEY, 12.3)]),
             (3, vec![(DEFAULT_KEY, 12.3)]),
@@ -307,7 +304,38 @@ mod test {
         ]
         .into_iter()
         .collect();
-        assert_eq!(out, lhs.join(rhs));
+        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+        Ok(())
+    }
+
+    #[test]
+    fn add() -> GenResult<()> {
+        let name = format!("add({},{})", DEFAULT_KEY, DEFAULT_KEY);
+        let lhs: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(DEFAULT_KEY, 12.3)]),
+            (3, vec![(DEFAULT_KEY, 12.3)]),
+            (10, vec![(DEFAULT_KEY, 12.3)]),
+            (11, vec![(DEFAULT_KEY, 12.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let rhs: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(DEFAULT_KEY, 12.3)]),
+            (3, vec![(DEFAULT_KEY, 12.3)]),
+            (10, vec![(DEFAULT_KEY, 12.3)]),
+            (11, vec![(DEFAULT_KEY, 12.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let out: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(DEFAULT_KEY, 24.6)]),
+            (3, vec![(DEFAULT_KEY, 24.6)]),
+            (10, vec![(DEFAULT_KEY, 24.6)]),
+            (11, vec![(DEFAULT_KEY, 24.6)]),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(out.with_name(&name), lhs.add(rhs)?);
         Ok(())
     }
 
