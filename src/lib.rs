@@ -3,6 +3,7 @@
 #![feature(map_first_last)]
 #![feature(array_zip)]
 #![feature(iter_advance_by)]
+#![feature(core_panic)]
 #[cfg(test)]
 #[macro_use]
 extern crate approx;
