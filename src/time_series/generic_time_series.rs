@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::iter::{FromIterator, FusedIterator};
-use std::ops::{Add, Range};
+use std::ops::{Add, Div, Mul, Range, Sub};
 
 use crate::errors::{GenError, GenResult, TimeSeriesError};
 use chrono::{Date, DateTime, Utc, MAX_DATETIME, MIN_DATETIME};
@@ -16,15 +16,34 @@ use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::hash::Hash;
 
-const DEFAULT_KEY: &str = "DEFAULT";
+/// Default for `K` in `GenTimeSeries<T, K, V>`
+pub const DEFAULT_KEY: &str = "DEFAULT";
+/// Default for `name` field in `GenTimeSeries`
 const DEFAULT_TIME_SERIES_NAME: &str = "DEFAULT";
 
+/// Generic n-dimensional time series data structure.
+/// Model for a "subject" (eg a stock) that contains:
+/// - multiple variables (eg. closing price, PE ratio)
+///
+/// name: (eg "MSFT")
+/// T: time (eg Utc::now())
+/// K: variable (eg "close")
+/// V: value (eg 23.31)
+///
+/// GenTimeSeries is dense: for any t1, t2 in T; K1 == K2.
 #[derive(Debug, Clone)]
 struct GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord,
     K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
+    V: Sized
+        + Debug
+        + Clone
+        + PartialEq
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Div<Output = V>,
 {
     name: String,
     time_series: BTreeMap<T, BTreeMap<K, V>>,
@@ -42,7 +61,14 @@ trait Merge {
 impl<K, V> Merge for BTreeMap<K, V>
 where
     K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
+    V: Sized
+        + Debug
+        + Clone
+        + PartialEq
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Div<Output = V>,
 {
     fn merge(lhs: &Self, rhs: &Self) -> Self {
         let mut out: Self = BTreeMap::from(lhs.clone());
@@ -58,7 +84,14 @@ impl<T, K, V> GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord + Limits,
     K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
+    V: Sized
+        + Debug
+        + Clone
+        + PartialEq
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Div<Output = V>,
 {
     pub fn new(name: String, time_series: BTreeMap<T, BTreeMap<K, V>>) -> GenTimeSeries<T, K, V> {
         GenTimeSeries { name, time_series }
@@ -70,7 +103,7 @@ where
         }
     }
 
-    /// Performs inner join with another instance and returns new joined instance
+    /// Performs inner join with another instance and returns new (dense) joined instance
     /// Returned instance only contains `T` keys that are present in both `self` and `other`.
     /// Runtime: O(min(n,m)) where n,m are the lens of the TimeSeries instances
     pub fn join(self, other: Self) -> Self {
@@ -134,57 +167,8 @@ where
             time_series: out,
         }
     }
-}
 
-impl<T, K, V: 'static> Eq for GenTimeSeries<T, K, V>
-where
-    T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
-{
-}
-
-impl<T, K, V: 'static> PartialEq for GenTimeSeries<T, K, V>
-where
-    T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.name.eq(&other.name) && self.time_series.eq(&other.time_series)
-    }
-    fn ne(&self, other: &Self) -> bool {
-        self.name.eq(&other.name) && self.time_series.eq(&other.time_series)
-    }
-}
-
-impl<T, K, V> FromIterator<(T, Vec<(K, V)>)> for GenTimeSeries<T, K, V>
-where
-    T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
-{
-    fn from_iter<I: IntoIterator<Item = (T, Vec<(K, V)>)>>(iter: I) -> Self {
-        let mut time_series = BTreeMap::new();
-        for tuple in iter {
-            time_series.insert(tuple.0, tuple.1.into_iter().collect());
-        }
-        Self {
-            name: DEFAULT_TIME_SERIES_NAME.to_string(),
-            time_series,
-        }
-    }
-}
-
-impl<T, K, V> Add for GenTimeSeries<T, K, V>
-where
-    T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
-{
-    type Output = GenResult<Self>;
-
-    fn add(self, other: Self) -> Self::Output {
+    pub fn apply(self, other: Self, fun: fn(V, V) -> GenResult<V>) -> GenResult<Self> {
         match self.time_series.keys().eq(other.time_series.keys()) {
             false => Err(TimeSeriesError::new(format!(
                 "Error: unable to add: {} + {}; inconsistent time indices",
@@ -203,7 +187,9 @@ where
                             // zip on keys
                             lhs.iter()
                                 .zip(rhs.iter())
-                                .map(|((k, a), (_, b))| (k.clone(), a.clone() + b.clone()))
+                                .map(|((k, a), (_, b))| {
+                                    (k.clone(), fun(a.clone(), b.clone()).expect("FIX ME"))
+                                })
                                 .collect()
                         })
                     })
@@ -214,6 +200,183 @@ where
                 })
             }
         }
+    }
+}
+
+impl<T, K, V: 'static> Eq for GenTimeSeries<T, K, V>
+where
+    T: Sized + Debug + Clone + PartialEq + Ord,
+    K: Sized + Debug + Clone + Eq + Ord,
+    V: Sized
+        + Debug
+        + Clone
+        + PartialEq
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Div<Output = V>,
+{
+}
+
+impl<T, K, V: 'static> PartialEq for GenTimeSeries<T, K, V>
+where
+    T: Sized + Debug + Clone + PartialEq + Ord,
+    K: Sized + Debug + Clone + Eq + Ord,
+    V: Sized
+        + Debug
+        + Clone
+        + PartialEq
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Div<Output = V>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.name.eq(&other.name) && self.time_series.eq(&other.time_series)
+    }
+    fn ne(&self, other: &Self) -> bool {
+        self.name.eq(&other.name) && self.time_series.eq(&other.time_series)
+    }
+}
+
+impl<T, K, V> FromIterator<(T, Vec<(K, V)>)> for GenTimeSeries<T, K, V>
+where
+    T: Sized + Debug + Clone + PartialEq + Ord,
+    K: Sized + Debug + Clone + Eq + Ord,
+    V: Sized
+        + Debug
+        + Clone
+        + PartialEq
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Div<Output = V>,
+{
+    fn from_iter<I: IntoIterator<Item = (T, Vec<(K, V)>)>>(iter: I) -> Self {
+        let mut time_series = BTreeMap::new();
+        for tuple in iter {
+            time_series.insert(tuple.0, tuple.1.into_iter().collect());
+        }
+        Self {
+            name: DEFAULT_TIME_SERIES_NAME.to_string(),
+            time_series,
+        }
+    }
+}
+
+impl<T, K, V> Add for GenTimeSeries<T, K, V>
+where
+    T: Sized + Debug + Clone + PartialEq + Ord + Limits,
+    K: Sized + Debug + Clone + Eq + Ord,
+    V: Sized
+        + Debug
+        + Clone
+        + PartialEq
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Div<Output = V>,
+{
+    type Output = GenResult<Self>;
+
+    fn add(self, other: Self) -> Self::Output
+    where
+        V: Add<Output = V>,
+    {
+        fn fun<Z>(lhs: Z, rhs: Z) -> GenResult<Z>
+        where
+            Z: Add<Output = Z>,
+        {
+            Ok(lhs.add(rhs))
+        }
+        self.apply(other, fun)
+    }
+}
+
+impl<T, K, V> Sub for GenTimeSeries<T, K, V>
+where
+    T: Sized + Debug + Clone + PartialEq + Ord + Limits,
+    K: Sized + Debug + Clone + Eq + Ord,
+    V: Sized
+        + Debug
+        + Clone
+        + PartialEq
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Div<Output = V>,
+{
+    type Output = GenResult<Self>;
+
+    fn sub(self, other: Self) -> Self::Output
+    where
+        V: Sub<Output = V>,
+    {
+        fn fun<Z>(lhs: Z, rhs: Z) -> GenResult<Z>
+        where
+            Z: Sub<Output = Z>,
+        {
+            Ok(lhs.sub(rhs))
+        }
+        self.apply(other, fun)
+    }
+}
+
+impl<T, K, V> Mul for GenTimeSeries<T, K, V>
+where
+    T: Sized + Debug + Clone + PartialEq + Ord + Limits,
+    K: Sized + Debug + Clone + Eq + Ord,
+    V: Sized
+        + Debug
+        + Clone
+        + PartialEq
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Div<Output = V>,
+{
+    type Output = GenResult<Self>;
+
+    fn mul(self, other: Self) -> Self::Output
+    where
+        V: Mul<Output = V>,
+    {
+        fn fun<Z>(lhs: Z, rhs: Z) -> GenResult<Z>
+        where
+            Z: Mul<Output = Z>,
+        {
+            Ok(lhs.mul(rhs))
+        }
+        self.apply(other, fun)
+    }
+}
+
+impl<T, K, V> Div for GenTimeSeries<T, K, V>
+where
+    T: Sized + Debug + Clone + PartialEq + Ord + Limits,
+    K: Sized + Debug + Clone + Eq + Ord,
+    V: Sized
+        + Debug
+        + Clone
+        + PartialEq
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Div<Output = V>,
+{
+    type Output = GenResult<Self>;
+
+    fn div(self, other: Self) -> Self::Output
+    where
+        V: Div<Output = V>,
+    {
+        fn fun<Z>(lhs: Z, rhs: Z) -> GenResult<Z>
+        where
+            Z: Div<Output = Z>,
+        {
+            Ok(lhs.div(rhs))
+        }
+        self.apply(other, fun)
     }
 }
 
@@ -309,13 +472,13 @@ mod test {
     }
 
     #[test]
-    fn add() -> GenResult<()> {
+    fn add_sub_mul_div() -> GenResult<()> {
         let name = format!("add({},{})", DEFAULT_KEY, DEFAULT_KEY);
         let lhs: GenTimeSeries<i32, &str, f64> = vec![
             (1, vec![(DEFAULT_KEY, 12.3)]),
             (3, vec![(DEFAULT_KEY, 12.3)]),
             (10, vec![(DEFAULT_KEY, 12.3)]),
-            (11, vec![(DEFAULT_KEY, 12.3)]),
+            (11, vec![(DEFAULT_KEY, 12.2)]),
         ]
         .into_iter()
         .collect();
@@ -323,7 +486,7 @@ mod test {
             (1, vec![(DEFAULT_KEY, 12.3)]),
             (3, vec![(DEFAULT_KEY, 12.3)]),
             (10, vec![(DEFAULT_KEY, 12.3)]),
-            (11, vec![(DEFAULT_KEY, 12.3)]),
+            (11, vec![(DEFAULT_KEY, 12.4)]),
         ]
         .into_iter()
         .collect();
@@ -335,7 +498,21 @@ mod test {
         ]
         .into_iter()
         .collect();
-        assert_eq!(out.with_name(&name), lhs.add(rhs)?);
+        assert_eq!(out.clone().with_name(&name), lhs.clone().add(rhs.clone())?);
+        assert_eq!(
+            lhs.clone().with_name(&name),
+            lhs.clone()
+                .add(lhs.clone())?
+                .sub(lhs.clone())?
+                .with_name(&name)
+        );
+        assert_eq!(
+            lhs.clone().with_name(&name),
+            lhs.clone()
+                .mul(lhs.clone())?
+                .div(lhs.clone())?
+                .with_name(&name)
+        );
         Ok(())
     }
 
