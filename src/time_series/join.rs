@@ -21,7 +21,7 @@ use std::hash::Hash;
 const DEFAULT_KEY: &str = "DEFAULT";
 const DEFAULT_TIME_SERIES_NAME: &str = "DEFAULT";
 
-trait Limits {
+pub trait Limits {
     fn min_value() -> Self;
     fn max_value() -> Self;
 }
@@ -73,17 +73,16 @@ impl Merge for HashMap<String, f64> {
     }
 }
 
-// type T = i32;
-type T = Time;
-type K = String;
-type V = f64;
-type M = HashMap<K, V>;
-
-pub fn join(
+pub fn join<T, K, V>(
     lhs: BTreeMap<T, HashMap<K, V>>,
     rhs: BTreeMap<T, HashMap<K, V>>,
     merge: fn(&HashMap<K, V>, &HashMap<K, V>) -> HashMap<K, V>,
-) -> BTreeMap<T, HashMap<K, V>> {
+) -> BTreeMap<T, HashMap<K, V>>
+where
+    T: Ord + Debug + Limits + Clone,
+    K: Debug,
+    V: Debug,
+{
     let mut lhs_t = lhs.first_key_value().unwrap().0;
     let lhs_tn = lhs.last_key_value().unwrap().0;
     let mut rhs_t = rhs.first_key_value().unwrap().0;
@@ -151,7 +150,7 @@ mod test {
 
     #[test]
     fn btreemap_join_eq_end() -> GenResult<()> {
-        let mut lhs: BTreeMap<T, HashMap<K, V>> = BTreeMap::new();
+        let mut lhs: BTreeMap<Time, HashMap<String, f64>> = BTreeMap::new();
         lhs.insert(2.try_into()?, HashMap::new());
         lhs.insert(3.try_into()?, HashMap::new());
         lhs.insert(10.try_into()?, HashMap::new());
@@ -167,13 +166,13 @@ mod test {
         out.insert(3.try_into()?, HashMap::new());
         out.insert(10.try_into()?, HashMap::new());
         out.insert(13.try_into()?, HashMap::new());
-        assert_eq!(out, join(lhs, rhs, M::combine));
+        assert_eq!(out, join(lhs, rhs, HashMap::combine));
         Ok(())
     }
 
     #[test]
     fn btreemap_join_eq_start() -> GenResult<()> {
-        let mut lhs = BTreeMap::new();
+        let mut lhs: BTreeMap<Time, HashMap<String, f64>> = BTreeMap::new();
         lhs.insert(1.try_into()?, HashMap::new());
         lhs.insert(3.try_into()?, HashMap::new());
         lhs.insert(10.try_into()?, HashMap::new());
@@ -189,7 +188,7 @@ mod test {
         out.insert(10.try_into()?, HashMap::new());
         // out of order inserts OK, BTreeMap sorts its keys
         out.insert(1.try_into()?, HashMap::new());
-        assert_eq!(out, join(lhs, rhs, M::combine));
+        assert_eq!(out, join(lhs, rhs, HashMap::combine));
         Ok(())
     }
 }
