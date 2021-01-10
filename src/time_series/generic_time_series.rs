@@ -70,11 +70,17 @@ where
         + Mul<Output = V>
         + Div<Output = V>,
 {
+    // TODO return GenResult, Err if keys are not disjoint
     fn merge(lhs: &Self, rhs: &Self) -> Self {
-        let mut out: Self = BTreeMap::from(lhs.clone());
-        rhs.iter().for_each(|(a, b)| {
-            out.insert(a.clone(), b.clone());
-            ()
+        // println!("merging lhs={:?} with rhs={:?}", lhs, rhs);
+        // TODO init out with longer of lhs and rhs
+        //  insert shorter of lhs and rhs with loop
+        let mut out: Self = BTreeMap::new();
+        lhs.iter().for_each(|(k, v)| {
+            out.insert(k.clone(), v.clone());
+        });
+        rhs.iter().for_each(|(k, v)| {
+            out.insert(k.clone(), v.clone());
         });
         out
     }
@@ -109,16 +115,27 @@ where
     pub fn join(self, other: Self) -> Self {
         let lhs = self.time_series;
         let rhs = other.time_series;
-
-        let mut lhs_t = lhs.first_key_value().unwrap().0;
-        let lhs_tn = lhs.last_key_value().unwrap().0;
-        let mut rhs_t = rhs.first_key_value().unwrap().0;
-        let rhs_tn = rhs.last_key_value().unwrap().0;
+        let min_value = T::min_value();
+        let max_value = T::max_value();
+        let mut lhs_t = match lhs.first_key_value() {
+            Some((k, _)) => k,
+            None => &max_value,
+        };
+        let lhs_tn = match lhs.last_key_value() {
+            Some((k, _)) => k,
+            None => &min_value,
+        };
+        let mut rhs_t = match rhs.first_key_value() {
+            Some((k, _)) => k,
+            None => &max_value,
+        };
+        let rhs_tn = match rhs.last_key_value() {
+            Some((k, _)) => k,
+            None => &min_value,
+        };
 
         // println!("lhs = {:?}\nlhs_t={:?} lhs_tn={:?}", lhs, lhs_t, lhs_tn);
         // println!("rhs = {:?}\nrhs_t={:?} rhs_tn={:?}", rhs, rhs_t, rhs_tn);
-
-        let max_value = T::max_value();
 
         let mut i = 0;
         let mut out: BTreeMap<T, BTreeMap<K, V>> = BTreeMap::new();
@@ -133,7 +150,7 @@ where
                 Ordering::Equal => {
                     // println!("\nlhs = rhs , {:?} = {:?}", lhs_t, rhs_t);
                     // let x = lhs[&lhs_t].borrow();
-                    out.insert(lhs_t.clone(), BTreeMap::merge(&rhs[&lhs_t], &rhs[&lhs_t]));
+                    out.insert(lhs_t.clone(), BTreeMap::merge(&rhs[&lhs_t], &lhs[&lhs_t]));
                     // println!("out = {:?}", out);
 
                     let mut lhs_iter = lhs.range(lhs_t..);
@@ -409,30 +426,142 @@ mod test {
     }
 
     #[test]
-    fn join() {
-        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
-        let lhs: GenTimeSeries<i32, &str, f64> = vec![
-            (2, vec![(DEFAULT_KEY, 12.3)]),
+    fn from_iter() {
+        let x = vec![
+            (1, vec![(DEFAULT_KEY, 12.3)]),
             (3, vec![(DEFAULT_KEY, 12.3)]),
-            (10, vec![(DEFAULT_KEY, 12.3)]),
-            (11, vec![(DEFAULT_KEY, 12.3)]),
-            (13, vec![(DEFAULT_KEY, 12.3)]),
+        ];
+        let ts: GenTimeSeries<i32, &str, f64> = x.into_iter().collect();
+        assert_eq!(ts.time_series[&1].get(DEFAULT_KEY).unwrap(), &12.3);
+        assert_eq!(ts.time_series[&3].get(DEFAULT_KEY).unwrap(), &12.3);
+    }
+
+    #[test]
+    fn join_eq_end() {
+        let lhs_name = "LHS";
+        let lhs: GenTimeSeries<i32, &str, f64> = vec![
+            (2, vec![(lhs_name, 10.3)]),
+            (3, vec![(lhs_name, 10.3)]),
+            (10, vec![(lhs_name, 10.3)]),
+            (11, vec![(lhs_name, 10.3)]),
+            (13, vec![(lhs_name, 10.3)]),
         ]
         .into_iter()
         .collect();
+        let rhs_name = "RHS";
         let rhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(DEFAULT_KEY, 12.3)]),
-            (3, vec![(DEFAULT_KEY, 12.3)]),
-            (4, vec![(DEFAULT_KEY, 12.3)]),
-            (10, vec![(DEFAULT_KEY, 12.3)]),
-            (13, vec![(DEFAULT_KEY, 12.3)]),
+            (1, vec![(rhs_name, 5.3)]),
+            (3, vec![(rhs_name, 5.3)]),
+            (4, vec![(rhs_name, 5.3)]),
+            (10, vec![(rhs_name, 5.3)]),
+            (13, vec![(rhs_name, 5.3)]),
         ]
         .into_iter()
         .collect();
         let out: GenTimeSeries<i32, &str, f64> = vec![
-            (3, vec![(DEFAULT_KEY, 12.3)]),
-            (10, vec![(DEFAULT_KEY, 12.3)]),
-            (13, vec![(DEFAULT_KEY, 12.3)]),
+            (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            (13, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+    }
+
+    #[test]
+    fn join_eq_start() {
+        let lhs_name = "LHS";
+        let lhs: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(lhs_name, 10.3)]),
+            (3, vec![(lhs_name, 10.3)]),
+            (10, vec![(lhs_name, 10.3)]),
+            (11, vec![(lhs_name, 10.3)]),
+            (12, vec![(lhs_name, 10.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let rhs_name = "RHS";
+        let rhs: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(rhs_name, 5.3)]),
+            (3, vec![(rhs_name, 5.3)]),
+            (4, vec![(rhs_name, 5.3)]),
+            (10, vec![(rhs_name, 5.3)]),
+            (13, vec![(rhs_name, 5.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let out: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+    }
+
+    #[test]
+    fn join_eq_ends() {
+        let lhs_name = "LHS";
+        let lhs: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(lhs_name, 10.3)]),
+            (3, vec![(lhs_name, 10.3)]),
+            (10, vec![(lhs_name, 10.3)]),
+            (11, vec![(lhs_name, 10.3)]),
+            (13, vec![(lhs_name, 10.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let rhs_name = "RHS";
+        let rhs: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(rhs_name, 5.3)]),
+            (3, vec![(rhs_name, 5.3)]),
+            (4, vec![(rhs_name, 5.3)]),
+            (10, vec![(rhs_name, 5.3)]),
+            (13, vec![(rhs_name, 5.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let out: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            (13, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+    }
+
+    #[test]
+    fn join_ne_ends() {
+        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+        let lhs_name = "LHS";
+        let lhs: GenTimeSeries<i32, &str, f64> = vec![
+            (0, vec![(lhs_name, 10.3)]),
+            (3, vec![(lhs_name, 10.3)]),
+            (10, vec![(lhs_name, 10.3)]),
+            (11, vec![(lhs_name, 10.3)]),
+            (12, vec![(lhs_name, 10.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let rhs_name = "RHS";
+        let rhs: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(rhs_name, 5.3)]),
+            (3, vec![(rhs_name, 5.3)]),
+            (4, vec![(rhs_name, 5.3)]),
+            (10, vec![(rhs_name, 5.3)]),
+            (13, vec![(rhs_name, 5.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let out: GenTimeSeries<i32, &str, f64> = vec![
+            (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
         ]
         .into_iter()
         .collect();
@@ -440,35 +569,39 @@ mod test {
     }
 
     #[test]
-    fn btreemap_join_eq_start() -> GenResult<()> {
+    fn join_empty_lhs() {
         let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+        let lhs_name = "LHS";
         let lhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(DEFAULT_KEY, 12.3)]),
-            (3, vec![(DEFAULT_KEY, 12.3)]),
-            (10, vec![(DEFAULT_KEY, 12.3)]),
-            (11, vec![(DEFAULT_KEY, 12.3)]),
+            (0, vec![(lhs_name, 10.3)]),
+            (3, vec![(lhs_name, 10.3)]),
+            (10, vec![(lhs_name, 10.3)]),
+            (11, vec![(lhs_name, 10.3)]),
+            (12, vec![(lhs_name, 10.3)]),
         ]
         .into_iter()
         .collect();
-        let rhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(DEFAULT_KEY, 12.3)]),
-            (3, vec![(DEFAULT_KEY, 12.3)]),
-            (4, vec![(DEFAULT_KEY, 12.3)]),
-            (10, vec![(DEFAULT_KEY, 12.3)]),
-            (13, vec![(DEFAULT_KEY, 12.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let out: GenTimeSeries<i32, &str, f64> = vec![
-            (3, vec![(DEFAULT_KEY, 12.3)]),
-            (10, vec![(DEFAULT_KEY, 12.3)]),
-            // out of order inserts OK, BTreeMap sorts its keys
-            (1, vec![(DEFAULT_KEY, 12.3)]),
-        ]
-        .into_iter()
-        .collect();
+        let rhs: GenTimeSeries<i32, &str, f64> = vec![].into_iter().collect();
+        let out: GenTimeSeries<i32, &str, f64> = vec![].into_iter().collect();
         assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
-        Ok(())
+    }
+
+    #[test]
+    fn join_empty_rhs() {
+        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+        let lhs: GenTimeSeries<i32, &str, f64> = vec![].into_iter().collect();
+        let rhs_name = "RHS";
+        let rhs: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(rhs_name, 5.3)]),
+            (3, vec![(rhs_name, 5.3)]),
+            (4, vec![(rhs_name, 5.3)]),
+            (10, vec![(rhs_name, 5.3)]),
+            (13, vec![(rhs_name, 5.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let out: GenTimeSeries<i32, &str, f64> = vec![].into_iter().collect();
+        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
     }
 
     #[test]
@@ -514,17 +647,6 @@ mod test {
                 .with_name(&name)
         );
         Ok(())
-    }
-
-    #[test]
-    fn from_iter() {
-        let x = vec![
-            (1, vec![(DEFAULT_KEY, 12.3)]),
-            (3, vec![(DEFAULT_KEY, 12.3)]),
-        ];
-        let ts: GenTimeSeries<i32, &str, f64> = x.into_iter().collect();
-        assert_eq!(ts.time_series[&1].get(DEFAULT_KEY).unwrap(), &12.3);
-        assert_eq!(ts.time_series[&3].get(DEFAULT_KEY).unwrap(), &12.3);
     }
 
     #[test]
