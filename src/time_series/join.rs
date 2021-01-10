@@ -13,6 +13,7 @@ use crate::errors::{GenError, GenResult};
 use chrono::{Date, DateTime, Utc, MAX_DATETIME, MIN_DATETIME};
 use itertools::traits::HomogeneousTuple;
 use itertools::Itertools;
+use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::convert::TryInto;
 use std::hash::Hash;
@@ -26,7 +27,7 @@ trait Limits {
 }
 
 trait Merge {
-    fn merge(lhs: Self, rhs: Self) -> Self;
+    fn merge(lhs: &Self, rhs: &Self) -> Self;
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -58,17 +59,25 @@ impl Limits for Time {
     }
 }
 
-impl Merge for V {
-    fn merge(lhs: Self, rhs: Self) -> Self {
+impl Merge for i32 {
+    fn merge(lhs: &Self, rhs: &Self) -> Self {
         lhs + rhs
+    }
+}
+
+impl Merge for HashMap<String, f64> {
+    fn merge(lhs: &Self, rhs: &Self) -> Self {
+        let mut out = lhs.clone();
+        out.extend(rhs.clone());
+        out
     }
 }
 
 // type T = i32;
 type T = Time;
-type V = i32;
+type V = HashMap<String, f64>;
 
-pub fn join(lhs: BTreeMap<T, V>, rhs: BTreeMap<T, V>, merge: fn(V, V) -> V) -> BTreeMap<T, V> {
+pub fn join(lhs: BTreeMap<T, V>, rhs: BTreeMap<T, V>, merge: fn(&V, &V) -> V) -> BTreeMap<T, V> {
     let mut lhs_t = lhs.first_key_value().unwrap().0;
     let lhs_tn = lhs.last_key_value().unwrap().0;
     let mut rhs_t = rhs.first_key_value().unwrap().0;
@@ -91,7 +100,8 @@ pub fn join(lhs: BTreeMap<T, V>, rhs: BTreeMap<T, V>, merge: fn(V, V) -> V) -> B
             }
             Ordering::Equal => {
                 println!("\nlhs = rhs , {:?} = {:?}", lhs_t, rhs_t);
-                out.insert(lhs_t.clone(), merge(lhs[&lhs_t], rhs[&lhs_t]));
+                // let x = lhs[&lhs_t].borrow();
+                out.insert(lhs_t.clone(), merge(&rhs[&lhs_t], &rhs[&lhs_t]));
                 println!("out = {:?}", out);
 
                 let mut lhs_iter = lhs.range(lhs_t..);
@@ -135,22 +145,22 @@ mod test {
 
     #[test]
     fn btreemap_join_eq_end() -> GenResult<()> {
-        let mut lhs = BTreeMap::new();
-        lhs.insert(2.try_into()?, 0);
-        lhs.insert(3.try_into()?, 1);
-        lhs.insert(10.try_into()?, 3);
-        lhs.insert(11.try_into()?, 4);
-        lhs.insert(13.try_into()?, 4);
+        let mut lhs: BTreeMap<T, V> = BTreeMap::new();
+        lhs.insert(2.try_into()?, HashMap::new());
+        lhs.insert(3.try_into()?, HashMap::new());
+        lhs.insert(10.try_into()?, HashMap::new());
+        lhs.insert(11.try_into()?, HashMap::new());
+        lhs.insert(13.try_into()?, HashMap::new());
         let mut rhs = BTreeMap::new();
-        rhs.insert(1.try_into()?, 0);
-        rhs.insert(3.try_into()?, 1);
-        rhs.insert(4.try_into()?, 2);
-        rhs.insert(10.try_into()?, 3);
-        rhs.insert(13.try_into()?, 4);
+        rhs.insert(1.try_into()?, HashMap::new());
+        rhs.insert(3.try_into()?, HashMap::new());
+        rhs.insert(4.try_into()?, HashMap::new());
+        rhs.insert(10.try_into()?, HashMap::new());
+        rhs.insert(13.try_into()?, HashMap::new());
         let mut out = BTreeMap::new();
-        out.insert(3.try_into()?, 2);
-        out.insert(10.try_into()?, 6);
-        out.insert(13.try_into()?, 8);
+        out.insert(3.try_into()?, HashMap::new());
+        out.insert(10.try_into()?, HashMap::new());
+        out.insert(13.try_into()?, HashMap::new());
         assert_eq!(out, join(lhs, rhs, V::merge));
         Ok(())
     }
@@ -158,21 +168,21 @@ mod test {
     #[test]
     fn btreemap_join_eq_start() -> GenResult<()> {
         let mut lhs = BTreeMap::new();
-        lhs.insert(1.try_into()?, 0);
-        lhs.insert(3.try_into()?, 1);
-        lhs.insert(10.try_into()?, 3);
-        lhs.insert(11.try_into()?, 4);
+        lhs.insert(1.try_into()?, HashMap::new());
+        lhs.insert(3.try_into()?, HashMap::new());
+        lhs.insert(10.try_into()?, HashMap::new());
+        lhs.insert(11.try_into()?, HashMap::new());
         let mut rhs = BTreeMap::new();
-        rhs.insert(1.try_into()?, 0);
-        rhs.insert(3.try_into()?, 1);
-        rhs.insert(4.try_into()?, 2);
-        rhs.insert(10.try_into()?, 3);
-        rhs.insert(13.try_into()?, 4);
+        rhs.insert(1.try_into()?, HashMap::new());
+        rhs.insert(3.try_into()?, HashMap::new());
+        rhs.insert(4.try_into()?, HashMap::new());
+        rhs.insert(10.try_into()?, HashMap::new());
+        rhs.insert(13.try_into()?, HashMap::new());
         let mut out = BTreeMap::new();
-        out.insert(3.try_into()?, 2);
-        out.insert(10.try_into()?, 6);
+        out.insert(3.try_into()?, HashMap::new());
+        out.insert(10.try_into()?, HashMap::new());
         // BTreeMap sorts its keys
-        out.insert(1.try_into()?, 0);
+        out.insert(1.try_into()?, HashMap::new());
         assert_eq!(out, join(lhs, rhs, V::merge));
         Ok(())
     }
