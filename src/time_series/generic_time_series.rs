@@ -4,7 +4,7 @@
 // #![allow(unused_mut)]
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::iter::{FromIterator, FusedIterator};
 use std::ops::{Add, Range};
@@ -15,6 +15,7 @@ use core::panicking::panic;
 use itertools::traits::HomogeneousTuple;
 use itertools::{zip, Itertools};
 use petgraph::visit::Time;
+use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::hash::Hash;
 
@@ -25,11 +26,11 @@ const DEFAULT_TIME_SERIES_NAME: &str = "DEFAULT";
 struct GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Hash,
+    K: Sized + Debug + Clone + Eq + Ord,
     V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
 {
     name: String,
-    time_series: BTreeMap<T, HashMap<K, V>>,
+    time_series: BTreeMap<T, BTreeMap<K, V>>,
 }
 
 pub trait Limits {
@@ -41,15 +42,17 @@ trait Merge {
     fn merge(lhs: &Self, rhs: &Self) -> Self;
 }
 
-impl<K, V> Merge for HashMap<K, V>
+impl<K, V> Merge for BTreeMap<K, V>
 where
-    K: Sized + Debug + Clone + Eq + Hash,
+    K: Sized + Debug + Clone + Eq + Ord,
     V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
 {
     fn merge(lhs: &Self, rhs: &Self) -> Self {
-        let mut out = HashMap::new();
-        out.extend(lhs.clone());
-        out.extend(rhs.clone());
+        let mut out: Self = BTreeMap::from(lhs.clone());
+        rhs.iter().for_each(|(a, b)| {
+            out.insert(a.clone(), b.clone());
+            ()
+        });
         out
     }
 }
@@ -57,10 +60,10 @@ where
 impl<T, K, V> GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord + Limits,
-    K: Sized + Debug + Clone + Eq + Hash,
+    K: Sized + Debug + Clone + Eq + Ord,
     V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
 {
-    pub fn new(name: String, time_series: BTreeMap<T, HashMap<K, V>>) -> GenTimeSeries<T, K, V> {
+    pub fn new(name: String, time_series: BTreeMap<T, BTreeMap<K, V>>) -> GenTimeSeries<T, K, V> {
         GenTimeSeries { name, time_series }
     }
     pub fn with_name(self, name: String) -> GenTimeSeries<T, K, V> {
@@ -88,7 +91,7 @@ where
         let max_value = T::max_value();
 
         let mut i = 0;
-        let mut out: BTreeMap<T, HashMap<K, V>> = BTreeMap::new();
+        let mut out: BTreeMap<T, BTreeMap<K, V>> = BTreeMap::new();
         while lhs_t <= lhs_tn && rhs_t <= rhs_tn {
             match lhs_t.cmp(rhs_t) {
                 Ordering::Less => {
@@ -100,7 +103,7 @@ where
                 Ordering::Equal => {
                     // println!("\nlhs = rhs , {:?} = {:?}", lhs_t, rhs_t);
                     // let x = lhs[&lhs_t].borrow();
-                    out.insert(lhs_t.clone(), HashMap::merge(&rhs[&lhs_t], &rhs[&lhs_t]));
+                    out.insert(lhs_t.clone(), BTreeMap::merge(&rhs[&lhs_t], &rhs[&lhs_t]));
                     // println!("out = {:?}", out);
 
                     let mut lhs_iter = lhs.range(lhs_t..);
@@ -139,7 +142,7 @@ where
 impl<T, K, V> Eq for GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Hash,
+    K: Sized + Debug + Clone + Eq + Ord,
     V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
 {
 }
@@ -147,7 +150,7 @@ where
 impl<T, K, V> PartialEq for GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Hash,
+    K: Sized + Debug + Clone + Eq + Ord,
     V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
 {
     // FIXME only checks keys
@@ -163,7 +166,7 @@ where
 impl<T, K, V> FromIterator<(T, Vec<(K, V)>)> for GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Hash,
+    K: Sized + Debug + Clone + Eq + Ord,
     V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
 {
     fn from_iter<I: IntoIterator<Item = (T, Vec<(K, V)>)>>(iter: I) -> Self {
@@ -181,7 +184,7 @@ where
 impl<T, K, V> Add for GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Hash,
+    K: Sized + Debug + Clone + Eq + Ord,
     V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
 {
     type Output = GenResult<Self>;
@@ -226,7 +229,7 @@ type TimeSeries = GenTimeSeries<TimeType, KeyType, ValueType>;
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
     use std::error::Error;
     use std::ops::Add;
 
