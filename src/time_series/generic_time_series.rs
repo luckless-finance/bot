@@ -12,7 +12,7 @@ use std::ops::{Add, Range};
 use crate::errors::{GenError, GenResult};
 use chrono::{Date, DateTime, Utc, MAX_DATETIME, MIN_DATETIME};
 use itertools::traits::HomogeneousTuple;
-use itertools::Itertools;
+use itertools::{zip, Itertools};
 use petgraph::visit::Time;
 use std::collections::hash_map::RandomState;
 use std::hash::Hash;
@@ -52,6 +52,7 @@ where
     }
 }
 
+// TODO implement checks for element equivalence
 impl<T, K, V> PartialEq for GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord,
@@ -59,11 +60,11 @@ where
     V: Sized + Debug + Clone + PartialEq + Add<Output = V>,
 {
     fn eq(&self, _other: &Self) -> bool {
-        unimplemented!()
+        self.time_series.keys().eq(_other.time_series.keys())
     }
 
     fn ne(&self, _other: &Self) -> bool {
-        unimplemented!()
+        self.time_series.keys().ne(_other.time_series.keys())
     }
 }
 
@@ -115,6 +116,69 @@ mod test {
 
     use crate::time_series::generic_time_series::*;
     use std::borrow::Borrow;
+
+    #[test]
+    fn join() {
+        let lhs: GenTimeSeries<i32, String, f64> = vec![
+            (2, vec![("close".to_string(), 12.3)]),
+            (3, vec![("close".to_string(), 12.3)]),
+            (10, vec![("close".to_string(), 12.3)]),
+            (11, vec![("close".to_string(), 12.3)]),
+            (13, vec![("close".to_string(), 12.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let rhs: GenTimeSeries<i32, String, f64> = vec![
+            (1, vec![("close".to_string(), 12.3)]),
+            (3, vec![("close".to_string(), 12.3)]),
+            (4, vec![("close".to_string(), 12.3)]),
+            (10, vec![("close".to_string(), 12.3)]),
+            (13, vec![("close".to_string(), 12.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let out: GenTimeSeries<i32, String, f64> = vec![
+            (3, vec![("close".to_string(), 12.3)]),
+            (10, vec![("close".to_string(), 12.3)]),
+            (13, vec![("close".to_string(), 12.3)]),
+        ]
+        .into_iter()
+        .collect();
+        // FIXME replace lhs.clone() with out
+        assert_eq!(lhs.clone(), lhs.join(rhs));
+    }
+
+    #[test]
+    fn btreemap_join_eq_start() -> GenResult<()> {
+        let lhs: GenTimeSeries<i32, String, f64> = vec![
+            (1, vec![("close".to_string(), 12.3)]),
+            (3, vec![("close".to_string(), 12.3)]),
+            (10, vec![("close".to_string(), 12.3)]),
+            (11, vec![("close".to_string(), 12.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let rhs: GenTimeSeries<i32, String, f64> = vec![
+            (1, vec![("close".to_string(), 12.3)]),
+            (3, vec![("close".to_string(), 12.3)]),
+            (4, vec![("close".to_string(), 12.3)]),
+            (10, vec![("close".to_string(), 12.3)]),
+            (13, vec![("close".to_string(), 12.3)]),
+        ]
+        .into_iter()
+        .collect();
+        let out: GenTimeSeries<i32, String, f64> = vec![
+            (3, vec![("close".to_string(), 12.3)]),
+            (10, vec![("close".to_string(), 12.3)]),
+            // out of order inserts OK, BTreeMap sorts its keys
+            (1, vec![("close".to_string(), 12.3)]),
+        ]
+        .into_iter()
+        .collect();
+        // FIXME replace lhs.clone() with out
+        assert_eq!(lhs.clone(), lhs.join(rhs));
+        Ok(())
+    }
 
     #[test]
     fn from_iter() {
