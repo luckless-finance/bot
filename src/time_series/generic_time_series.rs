@@ -18,7 +18,7 @@ use std::collections::hash_map::RandomState;
 use std::hash::Hash;
 
 /// Default for `K` in `GenTimeSeries<T, K, V>`
-const DEFAULT_KEY: &str = "DEFAULT";
+const DEFAULT_INNER_KEY: &str = "DEFAULT";
 /// Default for `name` field in `GenTimeSeries`
 const DEFAULT_TIME_SERIES_NAME: &str = "DEFAULT";
 
@@ -515,17 +515,17 @@ mod test {
     #[test]
     fn from_iter() {
         let x = vec![
-            (1, vec![(DEFAULT_KEY, 12.3)]),
-            (3, vec![(DEFAULT_KEY, 12.3)]),
+            (1, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (3, vec![(DEFAULT_INNER_KEY, 12.3)]),
         ];
         let ts: GenTimeSeries<i32, &str, f64> = x.into_iter().collect();
-        assert_eq!(ts.time_series[&1].get(DEFAULT_KEY).unwrap(), &12.3);
-        assert_eq!(ts.time_series[&3].get(DEFAULT_KEY).unwrap(), &12.3);
+        assert_eq!(ts.time_series[&1].get(DEFAULT_INNER_KEY).unwrap(), &12.3);
+        assert_eq!(ts.time_series[&3].get(DEFAULT_INNER_KEY).unwrap(), &12.3);
     }
 
     mod join {
         use crate::errors::GenResult;
-        use crate::time_series::generic_time_series::{GenTimeSeries, DEFAULT_KEY};
+        use crate::time_series::generic_time_series::{GenTimeSeries, DEFAULT_INNER_KEY};
 
         #[test]
         fn join_eq_end() -> GenResult<()> {
@@ -556,7 +556,7 @@ mod test {
             ]
             .into_iter()
             .collect();
-            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            let name = format!("join({},{})", DEFAULT_INNER_KEY, DEFAULT_INNER_KEY);
             assert_eq!(out.with_name(name.as_str()), lhs.join(rhs)?);
             Ok(())
         }
@@ -590,7 +590,7 @@ mod test {
             ]
             .into_iter()
             .collect();
-            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            let name = format!("join({},{})", DEFAULT_INNER_KEY, DEFAULT_INNER_KEY);
             assert_eq!(out.with_name(name.as_str()), lhs.join(rhs)?);
             Ok(())
         }
@@ -625,14 +625,14 @@ mod test {
             ]
             .into_iter()
             .collect();
-            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            let name = format!("join({},{})", DEFAULT_INNER_KEY, DEFAULT_INNER_KEY);
             assert_eq!(out.with_name(name.as_str()), lhs.join(rhs)?);
             Ok(())
         }
 
         #[test]
         fn join_ne_ends() -> GenResult<()> {
-            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            let name = format!("join({},{})", DEFAULT_INNER_KEY, DEFAULT_INNER_KEY);
             let lhs_name = "LHS";
             let lhs: GenTimeSeries<i32, &str, f64> = vec![
                 (0, vec![(lhs_name, 10.3)]),
@@ -665,7 +665,7 @@ mod test {
 
         #[test]
         fn join_empty_lhs() -> GenResult<()> {
-            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            let name = format!("join({},{})", DEFAULT_INNER_KEY, DEFAULT_INNER_KEY);
             let lhs_name = "LHS";
             let lhs: GenTimeSeries<i32, &str, f64> = vec![
                 (0, vec![(lhs_name, 10.3)]),
@@ -684,7 +684,7 @@ mod test {
 
         #[test]
         fn join_empty_rhs() -> GenResult<()> {
-            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            let name = format!("join({},{})", DEFAULT_INNER_KEY, DEFAULT_INNER_KEY);
             let lhs: GenTimeSeries<i32, &str, f64> = GenTimeSeries::empty();
             let rhs_name = "RHS";
             let rhs: GenTimeSeries<i32, &str, f64> = vec![
@@ -726,28 +726,28 @@ mod test {
 
     #[test]
     fn add_sub_mul_div() -> GenResult<()> {
-        let name = format!("add({},{})", DEFAULT_KEY, DEFAULT_KEY);
+        let name = format!("add({},{})", DEFAULT_INNER_KEY, DEFAULT_INNER_KEY);
         let lhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(DEFAULT_KEY, 12.3)]),
-            (3, vec![(DEFAULT_KEY, 12.3)]),
-            (10, vec![(DEFAULT_KEY, 12.3)]),
-            (11, vec![(DEFAULT_KEY, 12.2)]),
+            (1, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (3, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (10, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (11, vec![(DEFAULT_INNER_KEY, 12.2)]),
         ]
         .into_iter()
         .collect();
         let rhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(DEFAULT_KEY, 12.3)]),
-            (3, vec![(DEFAULT_KEY, 12.3)]),
-            (10, vec![(DEFAULT_KEY, 12.3)]),
-            (11, vec![(DEFAULT_KEY, 12.4)]),
+            (1, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (3, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (10, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (11, vec![(DEFAULT_INNER_KEY, 12.4)]),
         ]
         .into_iter()
         .collect();
         let out: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(DEFAULT_KEY, 24.6)]),
-            (3, vec![(DEFAULT_KEY, 24.6)]),
-            (10, vec![(DEFAULT_KEY, 24.6)]),
-            (11, vec![(DEFAULT_KEY, 24.6)]),
+            (1, vec![(DEFAULT_INNER_KEY, 24.6)]),
+            (3, vec![(DEFAULT_INNER_KEY, 24.6)]),
+            (10, vec![(DEFAULT_INNER_KEY, 24.6)]),
+            (11, vec![(DEFAULT_INNER_KEY, 24.6)]),
         ]
         .into_iter()
         .collect();
