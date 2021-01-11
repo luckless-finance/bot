@@ -77,7 +77,7 @@ where
     time_series: BTreeMap<T, BTreeMap<K, V>>,
 }
 
-/// Specify `min_value` and `max_value` for `T`; used in [`join`](struct.GenTimeSeries.html#method.joinGenTimeSeries.html#method.join)
+/// Specify `min_value` and `max_value` for `T`; used in [`join`](struct.GenTimeSeries.html#method.join)
 pub trait Limits {
     /// minimum value allowed for this type
     fn min_value() -> Self;
