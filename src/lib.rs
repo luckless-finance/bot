@@ -4,6 +4,7 @@
 #![feature(array_zip)]
 #![feature(iter_advance_by)]
 #![feature(core_panic)]
+#![feature(array_value_iter)]
 #[cfg(test)]
 #[macro_use]
 extern crate approx;

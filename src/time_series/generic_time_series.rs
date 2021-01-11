@@ -12,27 +12,51 @@ use core::panicking::panic;
 use itertools::traits::HomogeneousTuple;
 use itertools::{zip, Itertools};
 use petgraph::visit::Time;
+use std::array::IntoIter;
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::hash::Hash;
 
 /// Default for `K` in `GenTimeSeries<T, K, V>`
-pub const DEFAULT_KEY: &str = "DEFAULT";
+const DEFAULT_KEY: &str = "DEFAULT";
 /// Default for `name` field in `GenTimeSeries`
 const DEFAULT_TIME_SERIES_NAME: &str = "DEFAULT";
 
-/// Generic n-dimensional time series data structure.
-/// Model for a "subject" (eg a stock) that contains:
-/// - multiple variables (eg. closing price, PE ratio)
+/// n-dimensional time series structured as nested `BTreeMap`:
+/// - outer index is time `T` (eg "2021-01-10")
+/// - inner index is key `K` (eg "close")
+/// - inner value `V` (eg 23.04)
+/// For example, price data of a single stock could be structured as
+/// ```json
+/// {
+///     "2021-01-10": {"close": 3, "high": 4, "low": 1, "open": 2},
+///     "2021-01-11": {"close": 4, "high": 5, "low": 2, "open": 3},
+///     "2021-01-12": {"close": 5, "high": 6, "low": 3, "open": 4}
+/// }
+/// ```
+/// TimeSeries are used by `Bot` to cache intermediate calculations for a single stock.  `strategy.yaml` could result
+/// ```json
+/// {
+///     "2021-01-10": {"close": 3, "sma50": 4, "sma200": 1, "sma_diff": 2, "score": 2},
+///     "2021-01-11": {"close": 4, "sma50": 5, "sma200": 2, "sma_diff": 3, "score": 3},
+///     "2021-01-12": {"close": 5, "sma50": 6, "sma200": 3, "sma_diff": 4, "score": 4},
+///     ...
+/// }
+/// ```
+/// # TimeSeries are Dense
 ///
-/// name: (eg "MSFT")
-/// T: time (eg Utc::now())
-/// K: variable (eg "close")
-/// V: value (eg 23.31)
-///
-/// GenTimeSeries is dense: for any t1, t2 in T; K1 == K2.
+/// Note that GenTimeSeries is dense: every `t` in `T` has the same set of keys `K`
+/// so this would be an error
+/// ```json
+/// {
+///     "2021-01-10": {"close": 3, "high": 4, "low": 1, "open": 2},
+///     "2021-01-11": {"close": 4, "high": 5, "low": 2},
+///     "2021-01-12": {"close": 5, "high": 6, "low": 3, "open": 4}
+/// }
+/// ```
+/// because "open" is missing for "2021-01-11".
 #[derive(Debug, Clone)]
-struct GenTimeSeries<T, K, V>
+pub struct GenTimeSeries<T, K, V>
 where
     T: Sized + Debug + Clone + PartialEq + Ord,
     K: Sized + Debug + Clone + Eq + Ord,
@@ -49,8 +73,12 @@ where
     time_series: BTreeMap<T, BTreeMap<K, V>>,
 }
 
+/// Specify `min_value` and `max_value` for `T`
+/// Used in [`join`](struct.GenTimeSeries.html#method.join)
 pub trait Limits {
+    /// minimum value allowed for this type
     fn min_value() -> Self;
+    /// maximum value allowed for this type
     fn max_value() -> Self;
 }
 
@@ -99,14 +127,28 @@ where
         + Mul<Output = V>
         + Div<Output = V>,
 {
+    /// Create new instance from given time series data.
     pub fn new(name: String, time_series: BTreeMap<T, BTreeMap<K, V>>) -> GenTimeSeries<T, K, V> {
         GenTimeSeries { name, time_series }
     }
+    /// Name of the TimeSeries, for example "MSFT".
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    /// For testing purposes
+    pub(crate) fn empty() -> GenTimeSeries<T, K, V> {
+        GenTimeSeries::new(DEFAULT_TIME_SERIES_NAME.to_string(), BTreeMap::new())
+    }
+    /// Move to new instance with different name
     pub fn with_name(self, name: &str) -> GenTimeSeries<T, K, V> {
         GenTimeSeries {
             name: name.to_string(),
             time_series: self.time_series,
         }
+    }
+    /// Number of dates `T` in outer index
+    pub fn len(&self) -> usize {
+        self.time_series.len()
     }
 
     /// Performs inner join with another instance and returns new (dense) joined instance
@@ -184,8 +226,23 @@ where
             time_series: out,
         }
     }
-
-    pub fn apply(self, other: Self, fun: fn(V, V) -> GenResult<V>) -> GenResult<Self> {
+    /// Filters inner `BTreeMap` instances to a single `K`.
+    pub fn select(self, selector: K) -> GenResult<GenTimeSeries<T, K, V>> {
+        let out: GenTimeSeries<T, K, V> = self
+            .time_series
+            .iter()
+            .flat_map(|(t, m)| match m.get(&selector) {
+                Some(v) => Ok((
+                    t.clone(),
+                    BTreeMap::<_, _>::from_iter(IntoIter::new([(selector.clone(), v.clone())])),
+                )),
+                None => Err(TimeSeriesError::new("".to_string())),
+            })
+            .collect();
+        Ok(out)
+    }
+    /// Used by `Add`, `Sub`, `Mul`, and `Div`.
+    fn apply(self, other: Self, fun: fn(V, V) -> GenResult<V>) -> GenResult<Self> {
         match self.time_series.keys().eq(other.time_series.keys()) {
             false => Err(TimeSeriesError::new(format!(
                 "Error: unable to add: {} + {}; inconsistent time indices",
@@ -273,6 +330,31 @@ where
         let mut time_series = BTreeMap::new();
         for tuple in iter {
             time_series.insert(tuple.0, tuple.1.into_iter().collect());
+        }
+        Self {
+            name: DEFAULT_TIME_SERIES_NAME.to_string(),
+            time_series,
+        }
+    }
+}
+
+impl<T, K, V> FromIterator<(T, BTreeMap<K, V>)> for GenTimeSeries<T, K, V>
+where
+    T: Sized + Debug + Clone + PartialEq + Ord,
+    K: Sized + Debug + Clone + Eq + Ord,
+    V: Sized
+        + Debug
+        + Clone
+        + PartialEq
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Div<Output = V>,
+{
+    fn from_iter<I: IntoIterator<Item = (T, BTreeMap<K, V>)>>(iter: I) -> Self {
+        let mut time_series = BTreeMap::new();
+        for tuple in iter {
+            time_series.insert(tuple.0, tuple.1);
         }
         Self {
             name: DEFAULT_TIME_SERIES_NAME.to_string(),
@@ -436,172 +518,198 @@ mod test {
         assert_eq!(ts.time_series[&3].get(DEFAULT_KEY).unwrap(), &12.3);
     }
 
-    #[test]
-    fn join_eq_end() {
-        let lhs_name = "LHS";
-        let lhs: GenTimeSeries<i32, &str, f64> = vec![
-            (2, vec![(lhs_name, 10.3)]),
-            (3, vec![(lhs_name, 10.3)]),
-            (10, vec![(lhs_name, 10.3)]),
-            (11, vec![(lhs_name, 10.3)]),
-            (13, vec![(lhs_name, 10.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let rhs_name = "RHS";
-        let rhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(rhs_name, 5.3)]),
-            (3, vec![(rhs_name, 5.3)]),
-            (4, vec![(rhs_name, 5.3)]),
-            (10, vec![(rhs_name, 5.3)]),
-            (13, vec![(rhs_name, 5.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let out: GenTimeSeries<i32, &str, f64> = vec![
-            (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-            (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-            (13, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
-        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+    mod join {
+        use crate::time_series::generic_time_series::{GenTimeSeries, DEFAULT_KEY};
+
+        #[test]
+        fn join_eq_end() {
+            let lhs_name = "LHS";
+            let lhs: GenTimeSeries<i32, &str, f64> = vec![
+                (2, vec![(lhs_name, 10.3)]),
+                (3, vec![(lhs_name, 10.3)]),
+                (10, vec![(lhs_name, 10.3)]),
+                (11, vec![(lhs_name, 10.3)]),
+                (13, vec![(lhs_name, 10.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let rhs_name = "RHS";
+            let rhs: GenTimeSeries<i32, &str, f64> = vec![
+                (1, vec![(rhs_name, 5.3)]),
+                (3, vec![(rhs_name, 5.3)]),
+                (4, vec![(rhs_name, 5.3)]),
+                (10, vec![(rhs_name, 5.3)]),
+                (13, vec![(rhs_name, 5.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let out: GenTimeSeries<i32, &str, f64> = vec![
+                (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+                (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+                (13, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+        }
+
+        #[test]
+        fn join_eq_start() {
+            let lhs_name = "LHS";
+            let lhs: GenTimeSeries<i32, &str, f64> = vec![
+                (1, vec![(lhs_name, 10.3)]),
+                (3, vec![(lhs_name, 10.3)]),
+                (10, vec![(lhs_name, 10.3)]),
+                (11, vec![(lhs_name, 10.3)]),
+                (12, vec![(lhs_name, 10.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let rhs_name = "RHS";
+            let rhs: GenTimeSeries<i32, &str, f64> = vec![
+                (1, vec![(rhs_name, 5.3)]),
+                (3, vec![(rhs_name, 5.3)]),
+                (4, vec![(rhs_name, 5.3)]),
+                (10, vec![(rhs_name, 5.3)]),
+                (13, vec![(rhs_name, 5.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let out: GenTimeSeries<i32, &str, f64> = vec![
+                (1, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+                (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+                (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+        }
+
+        #[test]
+        fn join_eq_ends() {
+            let lhs_name = "LHS";
+            let lhs: GenTimeSeries<i32, &str, f64> = vec![
+                (1, vec![(lhs_name, 10.3)]),
+                (3, vec![(lhs_name, 10.3)]),
+                (10, vec![(lhs_name, 10.3)]),
+                (11, vec![(lhs_name, 10.3)]),
+                (13, vec![(lhs_name, 10.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let rhs_name = "RHS";
+            let rhs: GenTimeSeries<i32, &str, f64> = vec![
+                (1, vec![(rhs_name, 5.3)]),
+                (3, vec![(rhs_name, 5.3)]),
+                (4, vec![(rhs_name, 5.3)]),
+                (10, vec![(rhs_name, 5.3)]),
+                (13, vec![(rhs_name, 5.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let out: GenTimeSeries<i32, &str, f64> = vec![
+                (1, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+                (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+                (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+                (13, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+        }
+
+        #[test]
+        fn join_ne_ends() {
+            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            let lhs_name = "LHS";
+            let lhs: GenTimeSeries<i32, &str, f64> = vec![
+                (0, vec![(lhs_name, 10.3)]),
+                (3, vec![(lhs_name, 10.3)]),
+                (10, vec![(lhs_name, 10.3)]),
+                (11, vec![(lhs_name, 10.3)]),
+                (12, vec![(lhs_name, 10.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let rhs_name = "RHS";
+            let rhs: GenTimeSeries<i32, &str, f64> = vec![
+                (1, vec![(rhs_name, 5.3)]),
+                (3, vec![(rhs_name, 5.3)]),
+                (4, vec![(rhs_name, 5.3)]),
+                (10, vec![(rhs_name, 5.3)]),
+                (13, vec![(rhs_name, 5.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let out: GenTimeSeries<i32, &str, f64> = vec![
+                (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+                (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
+            ]
+            .into_iter()
+            .collect();
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+        }
+
+        #[test]
+        fn join_empty_lhs() {
+            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            let lhs_name = "LHS";
+            let lhs: GenTimeSeries<i32, &str, f64> = vec![
+                (0, vec![(lhs_name, 10.3)]),
+                (3, vec![(lhs_name, 10.3)]),
+                (10, vec![(lhs_name, 10.3)]),
+                (11, vec![(lhs_name, 10.3)]),
+                (12, vec![(lhs_name, 10.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let rhs: GenTimeSeries<i32, &str, f64> = GenTimeSeries::empty();
+            let out: GenTimeSeries<i32, &str, f64> = GenTimeSeries::empty();
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+        }
+
+        #[test]
+        fn join_empty_rhs() {
+            let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
+            let lhs: GenTimeSeries<i32, &str, f64> = GenTimeSeries::empty();
+            let rhs_name = "RHS";
+            let rhs: GenTimeSeries<i32, &str, f64> = vec![
+                (1, vec![(rhs_name, 5.3)]),
+                (3, vec![(rhs_name, 5.3)]),
+                (4, vec![(rhs_name, 5.3)]),
+                (10, vec![(rhs_name, 5.3)]),
+                (13, vec![(rhs_name, 5.3)]),
+            ]
+            .into_iter()
+            .collect();
+            let out: GenTimeSeries<i32, &str, f64> = GenTimeSeries::empty();
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+        }
     }
 
     #[test]
-    fn join_eq_start() {
-        let lhs_name = "LHS";
-        let lhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(lhs_name, 10.3)]),
-            (3, vec![(lhs_name, 10.3)]),
-            (10, vec![(lhs_name, 10.3)]),
-            (11, vec![(lhs_name, 10.3)]),
-            (12, vec![(lhs_name, 10.3)]),
+    fn select() -> GenResult<()> {
+        let selector = "close";
+        let two_dim_time_series: GenTimeSeries<i32, &str, f64> = vec![
+            (3, vec![(selector, 10.3), ("other", 5.3)]),
+            (10, vec![(selector, 10.3), ("other", 5.3)]),
+            (13, vec![(selector, 10.3), ("other", 5.3)]),
         ]
         .into_iter()
         .collect();
-        let rhs_name = "RHS";
-        let rhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(rhs_name, 5.3)]),
-            (3, vec![(rhs_name, 5.3)]),
-            (4, vec![(rhs_name, 5.3)]),
-            (10, vec![(rhs_name, 5.3)]),
-            (13, vec![(rhs_name, 5.3)]),
+        let expected: GenTimeSeries<i32, &str, f64> = vec![
+            (3, vec![(selector, 10.3)]),
+            (10, vec![(selector, 10.3)]),
+            (13, vec![(selector, 10.3)]),
         ]
         .into_iter()
         .collect();
-        let out: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-            (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-            (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
-        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
-    }
-
-    #[test]
-    fn join_eq_ends() {
-        let lhs_name = "LHS";
-        let lhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(lhs_name, 10.3)]),
-            (3, vec![(lhs_name, 10.3)]),
-            (10, vec![(lhs_name, 10.3)]),
-            (11, vec![(lhs_name, 10.3)]),
-            (13, vec![(lhs_name, 10.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let rhs_name = "RHS";
-        let rhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(rhs_name, 5.3)]),
-            (3, vec![(rhs_name, 5.3)]),
-            (4, vec![(rhs_name, 5.3)]),
-            (10, vec![(rhs_name, 5.3)]),
-            (13, vec![(rhs_name, 5.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let out: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-            (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-            (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-            (13, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
-        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
-    }
-
-    #[test]
-    fn join_ne_ends() {
-        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
-        let lhs_name = "LHS";
-        let lhs: GenTimeSeries<i32, &str, f64> = vec![
-            (0, vec![(lhs_name, 10.3)]),
-            (3, vec![(lhs_name, 10.3)]),
-            (10, vec![(lhs_name, 10.3)]),
-            (11, vec![(lhs_name, 10.3)]),
-            (12, vec![(lhs_name, 10.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let rhs_name = "RHS";
-        let rhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(rhs_name, 5.3)]),
-            (3, vec![(rhs_name, 5.3)]),
-            (4, vec![(rhs_name, 5.3)]),
-            (10, vec![(rhs_name, 5.3)]),
-            (13, vec![(rhs_name, 5.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let out: GenTimeSeries<i32, &str, f64> = vec![
-            (3, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-            (10, vec![(lhs_name, 10.3), (rhs_name, 5.3)]),
-        ]
-        .into_iter()
-        .collect();
-        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
-    }
-
-    #[test]
-    fn join_empty_lhs() {
-        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
-        let lhs_name = "LHS";
-        let lhs: GenTimeSeries<i32, &str, f64> = vec![
-            (0, vec![(lhs_name, 10.3)]),
-            (3, vec![(lhs_name, 10.3)]),
-            (10, vec![(lhs_name, 10.3)]),
-            (11, vec![(lhs_name, 10.3)]),
-            (12, vec![(lhs_name, 10.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let rhs: GenTimeSeries<i32, &str, f64> = vec![].into_iter().collect();
-        let out: GenTimeSeries<i32, &str, f64> = vec![].into_iter().collect();
-        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
-    }
-
-    #[test]
-    fn join_empty_rhs() {
-        let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
-        let lhs: GenTimeSeries<i32, &str, f64> = vec![].into_iter().collect();
-        let rhs_name = "RHS";
-        let rhs: GenTimeSeries<i32, &str, f64> = vec![
-            (1, vec![(rhs_name, 5.3)]),
-            (3, vec![(rhs_name, 5.3)]),
-            (4, vec![(rhs_name, 5.3)]),
-            (10, vec![(rhs_name, 5.3)]),
-            (13, vec![(rhs_name, 5.3)]),
-        ]
-        .into_iter()
-        .collect();
-        let out: GenTimeSeries<i32, &str, f64> = vec![].into_iter().collect();
-        assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+        let selected = two_dim_time_series.clone().select(selector)?;
+        assert_eq!(expected, selected);
+        Ok(())
     }
 
     #[test]

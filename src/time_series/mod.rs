@@ -9,14 +9,14 @@ use chrono::{Duration, TimeZone};
 
 use crate::errors::{GenError, GenResult};
 
-mod generic_time_series;
-mod join;
+pub mod generic_time_series;
 
 pub type DataPointValue = f64;
 pub type TimeStamp = DateTime<Utc>;
 pub type Index = Vec<TimeStamp>;
 
 #[derive(Clone, Debug, PartialEq)]
+#[deprecated]
 pub struct TimeSeries1D {
     index: Index,
     values: Vec<DataPointValue>,
