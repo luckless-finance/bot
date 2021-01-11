@@ -1,7 +1,7 @@
 #![allow(unstable_features)]
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt::Debug;
 use std::iter::{FromIterator, FusedIterator};
 use std::ops::{Add, Div, Mul, Range, Sub};
@@ -12,27 +12,27 @@ use core::panicking::panic;
 use itertools::traits::HomogeneousTuple;
 use itertools::{zip, Itertools};
 use num_traits::real::Real;
+use num_traits::Num;
 use std::array::IntoIter;
 use std::borrow::Borrow;
+use std::collections::btree_map::{IntoKeys, Iter, Keys};
 use std::collections::hash_map::RandomState;
 use std::hash::Hash;
-// use rand_distr::num_traits::real::Real;
 
 /// Default for `K` in `GenTimeSeries<T, K, V>`
 const DEFAULT_INNER_KEY: &str = "DEFAULT";
 /// Default for `name` field in `GenTimeSeries`
 const DEFAULT_TIME_SERIES_NAME: &str = "DEFAULT";
 
-pub trait Time = Sized + Debug + Clone + PartialEq + Ord + Limits;
-pub trait InnerKey = Sized + Debug + Clone + Eq + Ord;
-pub trait Value<V> = Sized
-    + Debug
-    + Clone
-    + PartialEq
-    + Add<Output = V>
-    + Sub<Output = V>
-    + Mul<Output = V>
-    + Div<Output = V>;
+/// Outer key of [`GenTimeSeries`](struct.GenTimeSeries.html)
+pub trait Time = Sized + Debug + Clone + Ord + PartialEq + Limits;
+
+/// Inner key of [`GenTimeSeries`](struct.GenTimeSeries.html); inner series/dimension name
+pub trait InnerKey = Sized + Debug + Clone + Ord + Eq;
+
+/// Inner value of [`GenTimeSeries`](struct.GenTimeSeries.html)
+pub trait Value<V> = Sized + Debug + Clone + Num;
+
 /// n-dimensional time series structured as nested `BTreeMap`:
 /// - outer index is time `T` (eg "2021-01-10")
 /// - inner index is key `K` (eg "close")
@@ -238,6 +238,14 @@ where
     }
     /// Used to implement traits `Add`, `Sub`, `Mul`, and `Div`.
     pub fn apply(self, other: Self, fun: fn(V, V) -> GenResult<V>) -> GenResult<Self> {
+        match self.keys() == other.keys() {
+            true => Ok(()),
+            false => Err(TimeSeriesError::new(format!(
+                "Error: unable to add: {} + {}; inconsistent inner indices",
+                self.name, other.name
+            ))),
+        }?;
+
         match self.time_series.keys().eq(other.time_series.keys()) {
             false => Err(TimeSeriesError::new(format!(
                 "Error: unable to add: {} + {}; inconsistent time indices",
@@ -252,7 +260,7 @@ where
                     .map(|((t, lhs), (_, rhs))| {
                         (t.clone(), {
                             // TODO add informative message
-                            assert!(lhs.keys().eq(rhs.keys()));
+                            // assert!(lhs.keys().eq(rhs.keys()));
                             // zip on keys
                             lhs.iter()
                                 .zip(rhs.iter())
@@ -293,7 +301,7 @@ where
         self.name.eq(&other.name) && self.time_series.eq(&other.time_series)
     }
 }
-
+// TODO validate inner keys are consistent over time
 impl<T, K, V> FromIterator<(T, Vec<(K, V)>)> for GenTimeSeries<T, K, V>
 where
     T: Time,
@@ -655,6 +663,29 @@ mod test {
         .collect();
         let selected = two_dim_time_series.clone().select(selector)?;
         assert_eq!(expected, selected);
+        Ok(())
+    }
+
+    #[test]
+    fn arith_inconsistent_key() -> GenResult<()> {
+        let name = format!("add({},{})", DEFAULT_INNER_KEY, DEFAULT_INNER_KEY);
+        let lhs: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![("NOT DEFAULT_INNER_KEY", 12.3)]),
+            (3, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (10, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (11, vec![(DEFAULT_INNER_KEY, 12.2)]),
+        ]
+        .into_iter()
+        .collect();
+        let rhs: GenTimeSeries<i32, &str, f64> = vec![
+            (1, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (3, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (10, vec![(DEFAULT_INNER_KEY, 12.3)]),
+            (11, vec![(DEFAULT_INNER_KEY, 12.4)]),
+        ]
+        .into_iter()
+        .collect();
+
         Ok(())
     }
 
