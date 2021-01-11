@@ -6,6 +6,7 @@
 #![feature(core_panic)]
 #![feature(array_value_iter)]
 #![feature(map_into_keys_values)]
+#![feature(trait_alias)]
 #[cfg(test)]
 #[macro_use]
 extern crate approx;

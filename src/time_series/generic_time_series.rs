@@ -11,17 +11,28 @@ use chrono::{Date, DateTime, Utc, MAX_DATETIME, MIN_DATETIME};
 use core::panicking::panic;
 use itertools::traits::HomogeneousTuple;
 use itertools::{zip, Itertools};
-use petgraph::visit::Time;
+use num_traits::real::Real;
 use std::array::IntoIter;
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::hash::Hash;
+// use rand_distr::num_traits::real::Real;
 
 /// Default for `K` in `GenTimeSeries<T, K, V>`
 const DEFAULT_INNER_KEY: &str = "DEFAULT";
 /// Default for `name` field in `GenTimeSeries`
 const DEFAULT_TIME_SERIES_NAME: &str = "DEFAULT";
 
+pub trait Time = Sized + Debug + Clone + PartialEq + Ord + Limits;
+pub trait InnerKey = Sized + Debug + Clone + Eq + Ord;
+pub trait Value<V> = Sized
+    + Debug
+    + Clone
+    + PartialEq
+    + Add<Output = V>
+    + Sub<Output = V>
+    + Mul<Output = V>
+    + Div<Output = V>;
 /// n-dimensional time series structured as nested `BTreeMap`:
 /// - outer index is time `T` (eg "2021-01-10")
 /// - inner index is key `K` (eg "close")
@@ -58,16 +69,9 @@ const DEFAULT_TIME_SERIES_NAME: &str = "DEFAULT";
 #[derive(Debug, Clone)]
 pub struct GenTimeSeries<T, K, V>
 where
-    T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized
-        + Debug
-        + Clone
-        + PartialEq
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Div<Output = V>,
+    T: Time,
+    K: InnerKey,
+    V: Value<V>,
 {
     name: String,
     time_series: BTreeMap<T, BTreeMap<K, V>>,
@@ -87,15 +91,8 @@ trait Merge {
 
 impl<K, V> Merge for BTreeMap<K, V>
 where
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized
-        + Debug
-        + Clone
-        + PartialEq
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Div<Output = V>,
+    K: InnerKey,
+    V: Value<V>,
 {
     // TODO return GenResult, Err if keys are not disjoint
     fn merge(lhs: &Self, rhs: &Self) -> Self {
@@ -115,16 +112,9 @@ where
 
 impl<T, K, V> GenTimeSeries<T, K, V>
 where
-    T: Sized + Debug + Clone + PartialEq + Ord + Limits,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized
-        + Debug
-        + Clone
-        + PartialEq
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Div<Output = V>,
+    T: Time,
+    K: InnerKey,
+    V: Value<V>,
 {
     /// Create new instance from given time series data.
     pub fn new(name: String, time_series: BTreeMap<T, BTreeMap<K, V>>) -> GenTimeSeries<T, K, V> {
@@ -284,31 +274,17 @@ where
 
 impl<T, K, V: 'static> Eq for GenTimeSeries<T, K, V>
 where
-    T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized
-        + Debug
-        + Clone
-        + PartialEq
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Div<Output = V>,
+    T: Time,
+    K: InnerKey,
+    V: Value<V>,
 {
 }
 
 impl<T, K, V: 'static> PartialEq for GenTimeSeries<T, K, V>
 where
-    T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized
-        + Debug
-        + Clone
-        + PartialEq
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Div<Output = V>,
+    T: Time,
+    K: InnerKey,
+    V: Value<V>,
 {
     fn eq(&self, other: &Self) -> bool {
         self.name.eq(&other.name) && self.time_series.eq(&other.time_series)
@@ -320,16 +296,9 @@ where
 
 impl<T, K, V> FromIterator<(T, Vec<(K, V)>)> for GenTimeSeries<T, K, V>
 where
-    T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized
-        + Debug
-        + Clone
-        + PartialEq
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Div<Output = V>,
+    T: Time,
+    K: InnerKey,
+    V: Value<V>,
 {
     fn from_iter<I: IntoIterator<Item = (T, Vec<(K, V)>)>>(iter: I) -> Self {
         let mut time_series = BTreeMap::new();
@@ -345,16 +314,9 @@ where
 
 impl<T, K, V> FromIterator<(T, BTreeMap<K, V>)> for GenTimeSeries<T, K, V>
 where
-    T: Sized + Debug + Clone + PartialEq + Ord,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized
-        + Debug
-        + Clone
-        + PartialEq
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Div<Output = V>,
+    T: Time,
+    K: InnerKey,
+    V: Value<V>,
 {
     fn from_iter<I: IntoIterator<Item = (T, BTreeMap<K, V>)>>(iter: I) -> Self {
         let mut time_series = BTreeMap::new();
@@ -370,16 +332,9 @@ where
 
 impl<T, K, V> Add for GenTimeSeries<T, K, V>
 where
-    T: Sized + Debug + Clone + PartialEq + Ord + Limits,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized
-        + Debug
-        + Clone
-        + PartialEq
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Div<Output = V>,
+    T: Time,
+    K: InnerKey,
+    V: Value<V>,
 {
     type Output = GenResult<Self>;
 
@@ -399,16 +354,9 @@ where
 
 impl<T, K, V> Sub for GenTimeSeries<T, K, V>
 where
-    T: Sized + Debug + Clone + PartialEq + Ord + Limits,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized
-        + Debug
-        + Clone
-        + PartialEq
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Div<Output = V>,
+    T: Time,
+    K: InnerKey,
+    V: Value<V>,
 {
     type Output = GenResult<Self>;
 
@@ -428,16 +376,9 @@ where
 
 impl<T, K, V> Mul for GenTimeSeries<T, K, V>
 where
-    T: Sized + Debug + Clone + PartialEq + Ord + Limits,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized
-        + Debug
-        + Clone
-        + PartialEq
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Div<Output = V>,
+    T: Time,
+    K: InnerKey,
+    V: Value<V>,
 {
     type Output = GenResult<Self>;
 
@@ -457,16 +398,9 @@ where
 
 impl<T, K, V> Div for GenTimeSeries<T, K, V>
 where
-    T: Sized + Debug + Clone + PartialEq + Ord + Limits,
-    K: Sized + Debug + Clone + Eq + Ord,
-    V: Sized
-        + Debug
-        + Clone
-        + PartialEq
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Div<Output = V>,
+    T: Time,
+    K: InnerKey,
+    V: Value<V>,
 {
     type Output = GenResult<Self>;
 
