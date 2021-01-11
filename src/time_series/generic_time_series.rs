@@ -1,7 +1,7 @@
 #![allow(unstable_features)]
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 use std::iter::{FromIterator, FusedIterator};
 use std::ops::{Add, Div, Mul, Range, Sub};
@@ -73,8 +73,7 @@ where
     time_series: BTreeMap<T, BTreeMap<K, V>>,
 }
 
-/// Specify `min_value` and `max_value` for `T`
-/// Used in [`join`](struct.GenTimeSeries.html#method.join)
+/// Specify `min_value` and `max_value` for `T`; used in [`join`](struct.GenTimeSeries.html#method.join)
 pub trait Limits {
     /// minimum value allowed for this type
     fn min_value() -> Self;
@@ -150,7 +149,13 @@ where
     pub fn len(&self) -> usize {
         self.time_series.len()
     }
-
+    /// Set of `K` inner keys at each time in the outer index
+    pub fn keys(&self) -> BTreeSet<&K> {
+        match self.time_series.first_key_value() {
+            Some((_, m)) => m.keys().clone().into_iter().collect(),
+            None => BTreeSet::new(),
+        }
+    }
     /// Performs inner join with another instance and returns new (dense) joined instance
     /// Returned instance only contains `T` keys that are present in both `self` and `other`.
     /// Runtime: O(min(n,m)) where n,m are the lens of the TimeSeries instances
@@ -191,7 +196,6 @@ where
                 }
                 Ordering::Equal => {
                     // println!("\nlhs = rhs , {:?} = {:?}", lhs_t, rhs_t);
-                    // let x = lhs[&lhs_t].borrow();
                     out.insert(lhs_t.clone(), BTreeMap::merge(&rhs[&lhs_t], &lhs[&lhs_t]));
                     // println!("out = {:?}", out);
 
@@ -221,6 +225,7 @@ where
                 panic!("ERROR - infinite loop");
             }
         }
+        // TODO should this return Err instead of an empty GenTimeSeries
         Ok(Self {
             name: format!("join({},{})", self.name, other.name),
             time_series: out,

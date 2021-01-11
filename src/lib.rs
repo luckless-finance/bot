@@ -5,6 +5,7 @@
 #![feature(iter_advance_by)]
 #![feature(core_panic)]
 #![feature(array_value_iter)]
+#![feature(map_into_keys_values)]
 #[cfg(test)]
 #[macro_use]
 extern crate approx;
