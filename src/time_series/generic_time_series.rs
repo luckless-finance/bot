@@ -154,7 +154,7 @@ where
     /// Performs inner join with another instance and returns new (dense) joined instance
     /// Returned instance only contains `T` keys that are present in both `self` and `other`.
     /// Runtime: O(min(n,m)) where n,m are the lens of the TimeSeries instances
-    pub fn join(self, other: Self) -> Self {
+    pub fn join(self, other: Self) -> GenResult<Self> {
         let lhs = self.time_series;
         let rhs = other.time_series;
         let min_value = T::min_value();
@@ -221,10 +221,10 @@ where
                 panic!("ERROR - infinite loop");
             }
         }
-        Self {
+        Ok(Self {
             name: format!("join({},{})", self.name, other.name),
             time_series: out,
-        }
+        })
     }
     /// Filters inner `BTreeMap` instances to a single `K`.
     pub fn select(self, selector: K) -> GenResult<GenTimeSeries<T, K, V>> {
@@ -519,10 +519,11 @@ mod test {
     }
 
     mod join {
+        use crate::errors::GenResult;
         use crate::time_series::generic_time_series::{GenTimeSeries, DEFAULT_KEY};
 
         #[test]
-        fn join_eq_end() {
+        fn join_eq_end() -> GenResult<()> {
             let lhs_name = "LHS";
             let lhs: GenTimeSeries<i32, &str, f64> = vec![
                 (2, vec![(lhs_name, 10.3)]),
@@ -551,11 +552,12 @@ mod test {
             .into_iter()
             .collect();
             let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
-            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs)?);
+            Ok(())
         }
 
         #[test]
-        fn join_eq_start() {
+        fn join_eq_start() -> GenResult<()> {
             let lhs_name = "LHS";
             let lhs: GenTimeSeries<i32, &str, f64> = vec![
                 (1, vec![(lhs_name, 10.3)]),
@@ -584,11 +586,12 @@ mod test {
             .into_iter()
             .collect();
             let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
-            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs)?);
+            Ok(())
         }
 
         #[test]
-        fn join_eq_ends() {
+        fn join_eq_ends() -> GenResult<()> {
             let lhs_name = "LHS";
             let lhs: GenTimeSeries<i32, &str, f64> = vec![
                 (1, vec![(lhs_name, 10.3)]),
@@ -618,11 +621,12 @@ mod test {
             .into_iter()
             .collect();
             let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
-            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs)?);
+            Ok(())
         }
 
         #[test]
-        fn join_ne_ends() {
+        fn join_ne_ends() -> GenResult<()> {
             let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
             let lhs_name = "LHS";
             let lhs: GenTimeSeries<i32, &str, f64> = vec![
@@ -650,11 +654,12 @@ mod test {
             ]
             .into_iter()
             .collect();
-            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs)?);
+            Ok(())
         }
 
         #[test]
-        fn join_empty_lhs() {
+        fn join_empty_lhs() -> GenResult<()> {
             let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
             let lhs_name = "LHS";
             let lhs: GenTimeSeries<i32, &str, f64> = vec![
@@ -668,11 +673,12 @@ mod test {
             .collect();
             let rhs: GenTimeSeries<i32, &str, f64> = GenTimeSeries::empty();
             let out: GenTimeSeries<i32, &str, f64> = GenTimeSeries::empty();
-            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs)?);
+            Ok(())
         }
 
         #[test]
-        fn join_empty_rhs() {
+        fn join_empty_rhs() -> GenResult<()> {
             let name = format!("join({},{})", DEFAULT_KEY, DEFAULT_KEY);
             let lhs: GenTimeSeries<i32, &str, f64> = GenTimeSeries::empty();
             let rhs_name = "RHS";
@@ -686,7 +692,8 @@ mod test {
             .into_iter()
             .collect();
             let out: GenTimeSeries<i32, &str, f64> = GenTimeSeries::empty();
-            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs));
+            assert_eq!(out.with_name(name.as_str()), lhs.join(rhs)?);
+            Ok(())
         }
     }
 
