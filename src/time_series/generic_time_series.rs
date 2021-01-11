@@ -73,7 +73,7 @@ where
     time_series: BTreeMap<T, BTreeMap<K, V>>,
 }
 
-/// Specify `min_value` and `max_value` for `T`; used in [`join`](struct.GenTimeSeries.html#method.join)
+/// Specify `min_value` and `max_value` for `T`; used in [`join`](struct.GenTimeSeries.html#method.joinGenTimeSeries.html#method.join)
 pub trait Limits {
     /// minimum value allowed for this type
     fn min_value() -> Self;
@@ -246,8 +246,8 @@ where
             .collect();
         Ok(out)
     }
-    /// Used by `Add`, `Sub`, `Mul`, and `Div`.
-    fn apply(self, other: Self, fun: fn(V, V) -> GenResult<V>) -> GenResult<Self> {
+    /// Used to implement traits `Add`, `Sub`, `Mul`, and `Div`.
+    pub fn apply(self, other: Self, fun: fn(V, V) -> GenResult<V>) -> GenResult<Self> {
         match self.time_series.keys().eq(other.time_series.keys()) {
             false => Err(TimeSeriesError::new(format!(
                 "Error: unable to add: {} + {}; inconsistent time indices",
