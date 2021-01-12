@@ -1,5 +1,12 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![feature(map_first_last)]
+#![feature(array_zip)]
+#![feature(iter_advance_by)]
+#![feature(core_panic)]
+#![feature(array_value_iter)]
+#![feature(map_into_keys_values)]
+#![feature(trait_alias)]
 #[cfg(test)]
 #[macro_use]
 extern crate approx;
@@ -157,7 +164,7 @@ pub mod bot {
             fn execute(&mut self) -> GenResult<()> {
                 let calc_order = self.execution_order.clone();
                 for calc_name in calc_order {
-                    println!("\nexecuting {}", calc_name);
+                    // println!("\nexecuting {}", calc_name);
                     self.status(&calc_name, CalculationStatus::InProgress);
                     let calc = self.calcs.get(&calc_name).ok_or("calc not found")?;
 
@@ -283,7 +290,7 @@ pub mod bot {
                     status,
                 })
             }
-            fn asset(&self) -> &Asset {
+            pub fn asset(&self) -> &Asset {
                 &self.asset
             }
             fn timestamp(&self) -> &TimeStamp {
@@ -337,12 +344,12 @@ pub mod bot {
 
             #[test]
             fn asset_score() -> GenResult<()> {
-                let bot = compiled_strategy_fixture()?;
+                let compiled_strategy = compiled_strategy_fixture()?;
                 let asset = Asset::new(String::from("A"));
                 let timestamp = MockDataClient::today();
                 let data_client = MockDataClient::new();
                 let asset_score: AssetScore =
-                    bot.asset_score(asset, timestamp, Box::new(data_client))?;
+                    compiled_strategy.asset_score(asset, timestamp, Box::new(data_client))?;
                 assert_eq!(asset_score.status, AssetScoreStatus::Complete);
                 Ok(())
             }
@@ -554,7 +561,7 @@ pub mod bot {
                 assert!(upstream.contains(&String::from("sma_diff")));
                 assert!(upstream.contains(&String::from("sma50")));
 
-                println!("{:?}", upstream);
+                // println!("{:?}", upstream);
                 Ok(())
             }
 

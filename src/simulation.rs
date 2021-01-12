@@ -199,7 +199,7 @@ mod tests {
         let x = linspace(n, x0, xf);
         let amplitude = 1f64;
         let y = TimeSeries1D::sin(&x, amplitude);
-        println!("{:?}", y);
+        // println!("{:?}", y);
         assert_eq!(y.len(), n);
         assert_eq!(y.values()[0], 0f64);
         assert_abs_diff_eq!(y.values()[(n - 1) / 2], 0f64, epsilon = EPSILON);

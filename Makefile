@@ -19,13 +19,13 @@ format:
 	@echo "-------------------"
 	@echo "format source code"
 	@echo "-------------------"
-	rustfmt src/*;
+	rustfmt src/**/*;
 
 check:
 	@echo "-------------------"
 	@echo "check a local package and all of its dependencies for errors"
 	@echo "-------------------"
-	rustfmt --check --edition 2018 --quiet src/*;
+	rustfmt --check --edition 2018 --quiet src/**/*;
 	cargo check;
 
 fix:
@@ -44,7 +44,7 @@ pre-commit:
 	@echo "-------------------"
 	@echo "pre-commit validation: test, format, check"
 	@echo "-------------------"
-	make test && rustfmt src/* --check && make check
+	cargo test --quiet && rustfmt src/**/* --check && make check
 
 watch-test:
 	@echo "-------------------"

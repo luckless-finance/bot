@@ -20,10 +20,13 @@ pub fn get_strategy() -> StrategyDto {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::convert::TryInto;
 
+    use chrono::{DateTime, Utc};
+
     use yafa::bot::asset_score::*;
-    use yafa::data::{DataClient, plot_ts};
+    use yafa::data::{Asset, DataClient, plot_ts};
     use yafa::dto::strategy::{CalculationDto, OperandDto, OperandType, Operation, QueryCalculationDto};
     use yafa::errors::GenResult;
     use yafa::simulation::MockDataClient;
@@ -34,7 +37,7 @@ mod tests {
     #[test]
     fn back_test() -> GenResult<()> {
         let strategy = get_strategy();
-        let bot = CompiledStrategy::new(strategy)?;
+        let compiled_strategy = CompiledStrategy::new(strategy)?;
         let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         let query: Option<QueryCalculationDto> = Some(CalculationDto::new(
             "price".to_string(),
@@ -53,15 +56,17 @@ mod tests {
 
         let asset_scores: Vec<AssetScore> = data_client.assets().values()
             .flat_map(|a|
-                bot.asset_score(a.clone(),
-                                MockDataClient::today(),
-                                Box::new(MockDataClient::new()))
+                compiled_strategy.asset_score(a.clone(),
+                                              MockDataClient::today(),
+                                              Box::new(MockDataClient::new()))
             )
             .collect();
-        // println!("{:?}", asset_scores);
-        let asset_score_time_series: Vec<&TimeSeries1D> = asset_scores.iter()
-            .map(|asset_score| asset_score.score())
+
+        let asset_score_time_series: HashMap<&Asset, &TimeSeries1D> = asset_scores.iter()
+            .map(|asset_score| (asset_score.asset(), asset_score.score()))
             .collect();
+        let foo: Vec<(DateTime<Utc>, HashMap<&Asset, &DataPointValue>)> = Vec::new();
+
         // plot_ts(asset_score_time_series);
         Ok(())
     }
