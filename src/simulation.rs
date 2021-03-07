@@ -71,8 +71,14 @@ impl MockDataClient {
         let b_y0 = 5f64;
         let b_y = TimeSeries1D::sin(&b_x, amplitude).vertical_shift(b_y0);
 
+        let (c_x0, c_xf) = (PI, 7f64 * PI);
+        let c_x = linspace(n, c_x0, c_xf);
+        let c_slope = 0.1f64;
+        let c_y0 = 5f64;
+        let c_y = TimeSeries1D::polynomial(&c_x, vec![c_y0, c_slope]);
+
         let data: HashMap<Symbol, TimeSeries1D> =
-            vec![(Symbol::from("A"), a_y), (Symbol::from("B"), b_y)]
+            vec![(Symbol::from("A"), a_y), (Symbol::from("B"), b_y), (Symbol::from("C"), c_y)]
                 .into_iter()
                 .collect();
         let assets: HashMap<Symbol, Asset> = data
@@ -294,7 +300,7 @@ mod tests {
         // println!("{:?}", symbols);
         assert_eq!(
             symbols,
-            vec![Symbol::from("A"), Symbol::from("B")].iter().collect()
+            vec![Symbol::from("A"), Symbol::from("B"), Symbol::from("C")].iter().collect()
         )
     }
 

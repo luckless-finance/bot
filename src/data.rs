@@ -15,6 +15,7 @@ use gnuplot::{AxesCommon, Figure};
 use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::GenResult;
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
+use std::borrow::Borrow;
 
 pub type Symbol = String;
 
@@ -55,7 +56,9 @@ impl Display for Asset {
         write!(f, "{}", self.symbol)
     }
 }
-
+pub fn plot_ts_values(ts_vec: Vec<TimeSeries1D>) {
+    plot_ts(ts_vec.iter().collect())
+}
 pub fn plot_ts(ts_vec: Vec<&TimeSeries1D>) {
     let mut fg = Figure::new();
     let ys: Vec<&Vec<f64>> = ts_vec.iter().map(|ts| ts.values()).collect();

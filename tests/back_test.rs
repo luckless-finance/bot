@@ -20,31 +20,30 @@ pub fn get_strategy() -> StrategyDto {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Borrow;
     use std::collections::HashMap;
     use std::convert::TryInto;
 
     use chrono::{DateTime, Utc};
 
     use yafa::bot::asset_score::*;
-    use yafa::data::{Asset, DataClient, plot_ts};
+    use yafa::data::{Asset, DataClient, plot_ts, plot_ts_values};
     use yafa::dto::strategy::{CalculationDto, OperandDto, OperandType, Operation, QueryCalculationDto};
     use yafa::errors::GenResult;
     use yafa::simulation::MockDataClient;
-    use yafa::time_series::{DataPointValue, TimeSeries1D};
+    use yafa::time_series::{apply, DataPointValue, TimeSeries1D};
 
     use crate::get_strategy;
 
     #[test]
-    fn back_test() -> GenResult<()> {
-        let strategy = get_strategy();
-        let compiled_strategy = CompiledStrategy::new(strategy)?;
-        let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
+    fn plot_asset_prices() -> GenResult<()> {
         let query: Option<QueryCalculationDto> = Some(CalculationDto::new(
             "price".to_string(),
             Operation::QUERY,
             vec![
                 OperandDto::new("field".to_string(), OperandType::Text, "close".to_string())
             ]).try_into()?);
+        let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         let asset_price_time_series: Vec<&TimeSeries1D> = data_client.assets().values()
             .flat_map(|a| data_client.query(
                 a,
@@ -52,8 +51,18 @@ mod tests {
                 None,
             ))
             .collect();
-        // plot_ts(asset_price_time_series);
+        plot_ts(asset_price_time_series);
+        Ok(())
+    }
 
+    /// Mock Market contains Assets A, B, C
+    #[test]
+    fn back_test() -> GenResult<()> {
+        // apply strategy on market (DataClient) to determine score
+        let strategy = get_strategy();
+        let compiled_strategy = CompiledStrategy::new(strategy)?;
+        // symbols: "A", "B" and "C"
+        let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         let asset_scores: Vec<AssetScore> = data_client.assets().values()
             .flat_map(|a|
                 compiled_strategy.asset_score(a.clone(),
@@ -61,13 +70,30 @@ mod tests {
                                               Box::new(MockDataClient::new()))
             )
             .collect();
-
         let asset_score_time_series: HashMap<&Asset, &TimeSeries1D> = asset_scores.iter()
             .map(|asset_score| (asset_score.asset(), asset_score.score()))
             .collect();
-        let foo: Vec<(DateTime<Utc>, HashMap<&Asset, &DataPointValue>)> = Vec::new();
+        let score_time_series: Vec<&TimeSeries1D> = asset_score_time_series.values().cloned().collect();
+        plot_ts(
+            score_time_series.clone()
+        );
 
-        // plot_ts(asset_score_time_series);
+        // determine weightings of all assets in market
+        let zeroed: Vec<TimeSeries1D> = score_time_series.iter()
+            .map(|score_ts| score_ts.zero_negatives())
+            .collect();
+        plot_ts(
+            zeroed.iter().collect()
+        );
+        let ts_sum = apply(zeroed.iter().collect(), |values| values.iter().sum());
+        let weightings: Vec<TimeSeries1D> = zeroed.iter()
+            .map(|score_ts| score_ts.ts_div(&ts_sum))
+            .collect();
+        plot_ts(
+            weightings.iter().collect()
+        );
+
+
         Ok(())
     }
 }
