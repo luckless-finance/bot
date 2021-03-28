@@ -6,17 +6,15 @@ use std::ops::{Add, Div, Mul, Neg};
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
+use itertools::fold;
 
 use crate::errors::{GenError, GenResult};
-
-pub mod generic_time_series;
 
 pub type DataPointValue = f64;
 pub type TimeStamp = DateTime<Utc>;
 pub type Index = Vec<TimeStamp>;
 
 #[derive(Clone, Debug, PartialEq)]
-#[deprecated]
 pub struct TimeSeries1D {
     index: Index,
     values: Vec<DataPointValue>,
@@ -160,6 +158,38 @@ impl TimeSeries1D {
             .collect();
         TimeSeries1D::new(index, values)
     }
+    pub fn zero_negatives(&self) -> Self {
+        TimeSeries1D::new(
+            self.index.clone(),
+            self.values
+                .clone()
+                .into_iter()
+                .map(|value| if value < 0f64 { 0f64 } else { value })
+                .collect(),
+        )
+    }
+}
+
+pub fn apply(
+    ts_vec: Vec<&TimeSeries1D>,
+    func: fn(Vec<DataPointValue>) -> DataPointValue,
+) -> TimeSeries1D {
+    let index = ts_vec.get(0).unwrap().index().clone();
+    let ts_len = index.len();
+    TimeSeries1D::new(
+        index,
+        (0..ts_len)
+            .map(|idx| {
+                func(
+                    ts_vec
+                        .iter()
+                        .map(|ts| ts.values().get(idx).unwrap_or(&0f64))
+                        .cloned()
+                        .collect(),
+                )
+            })
+            .collect(),
+    )
 }
 
 #[cfg(test)]
@@ -537,5 +567,19 @@ mod tests {
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ]
         );
+    }
+
+    #[test]
+    fn zero_negatives() {
+        let values = vec![-5., 10., 0.];
+        let index = vec![
+            TimeSeries1D::epoch(),
+            TimeSeries1D::epoch() + TimeSeries1D::index_unit(),
+            TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
+        ];
+        let ts = TimeSeries1D::new(index.clone(), values);
+        assert_eq!(ts.len(), 3);
+        assert_eq!(ts.zero_negatives().values, &[0., 10., 0.]);
+        assert_eq!(ts.index, index);
     }
 }
