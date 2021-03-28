@@ -1,11 +1,13 @@
+use std::collections::HashMap;
+use std::f64::consts::PI;
+use std::io::{Error, ErrorKind};
+
+use chrono::prelude::*;
+
 use crate::data::{Asset, DataClient, Symbol};
 use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::{AssetNotFoundError, GenResult};
 use crate::time_series::{TimeSeries1D, TimeStamp};
-use chrono::prelude::*;
-use std::collections::HashMap;
-use std::f64::consts::PI;
-use std::io::{Error, ErrorKind};
 
 pub static DATA_SIZE: usize = 900;
 
@@ -56,23 +58,23 @@ impl DataClient for MockDataClient {
 }
 
 impl MockDataClient {
-    /// Create 2 `Asset` mock market
+    /// Create 3 `Asset` mock market
     pub fn new() -> Self {
-        let n: usize = DATA_SIZE;
+        // A
         let (a_x0, a_xf) = (0f64, 6f64 * PI);
-        let a_x = linspace(n, a_x0, a_xf);
+        let a_x = linspace(DATA_SIZE, a_x0, a_xf);
         let amplitude = 0.5f64;
         let a_y0 = 10f64;
         let a_y = TimeSeries1D::sin(&a_x, amplitude).vertical_shift(a_y0);
-
+        // B
         let (b_x0, b_xf) = (PI, 7f64 * PI);
-        let b_x = linspace(n, b_x0, b_xf);
+        let b_x = linspace(DATA_SIZE, b_x0, b_xf);
         let amplitude = 0.5f64;
         let b_y0 = 5f64;
         let b_y = TimeSeries1D::sin(&b_x, amplitude).vertical_shift(b_y0);
-
+        // C
         let (c_x0, c_xf) = (PI, 7f64 * PI);
-        let c_x = linspace(n, c_x0, c_xf);
+        let c_x = linspace(DATA_SIZE, c_x0, c_xf);
         let c_slope = 0.1f64;
         let c_y0 = 5f64;
         let c_y = TimeSeries1D::polynomial(&c_x, vec![c_y0, c_slope]);
@@ -172,11 +174,12 @@ impl TimeSeriesGenerators for TimeSeries1D {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+    use std::f64::consts::PI;
+
     use crate::data::{plot_ts, plots};
     use crate::simulation::*;
     use crate::time_series::TimeSeries1D;
-    use std::collections::HashSet;
-    use std::f64::consts::PI;
 
     const EPSILON: f64 = 1E-3;
 
