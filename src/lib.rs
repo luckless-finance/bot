@@ -15,6 +15,7 @@ pub mod data;
 pub mod errors;
 pub mod simulation;
 pub mod time_series;
+pub mod plot;
 
 pub mod bot {
     pub mod asset_score {

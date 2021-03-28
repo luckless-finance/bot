@@ -177,7 +177,6 @@ mod tests {
     use std::collections::HashSet;
     use std::f64::consts::PI;
 
-    use crate::data::{plot_ts, plots};
     use crate::simulation::*;
     use crate::time_series::TimeSeries1D;
 

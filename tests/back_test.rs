@@ -27,13 +27,14 @@ mod tests {
     use chrono::{DateTime, Utc};
 
     use yafa::bot::asset_score::*;
-    use yafa::data::{Asset, DataClient, plot_ts, plot_ts_values};
+    use yafa::data::{Asset, DataClient, };
     use yafa::dto::strategy::{CalculationDto, OperandDto, OperandType, Operation, QueryCalculationDto};
     use yafa::errors::GenResult;
     use yafa::simulation::MockDataClient;
     use yafa::time_series::{apply, DataPointValue, TimeSeries1D};
 
     use crate::get_strategy;
+    use yafa::plot::plot_ts;
 
     #[test]
     fn plot_asset_prices() -> GenResult<()> {
