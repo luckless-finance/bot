@@ -1,0 +1,38 @@
+@startuml
+'https://plantuml.com/activity-diagram-beta
+
+start
+
+repeat
+if (Stock Market Open?) then (yes)
+
+  if (Trade Orders Computed?) then (yes)
+
+    repeat
+    :GET submitted Trade Orders;
+    backward: POST Trade Orders;
+    repeat while (Trade Orders submitted?) is (no)
+    -> yes;
+
+    repeat
+    :GET executed Trades;
+    backward: sleep;
+    repeat while (Trade Orders executed?) is (no)
+    -> yes;
+
+    :sleep;
+
+    else (no)
+  endif
+
+else (no)
+    :compute Trade Orders;
+    :submit Trade Orders;
+endif
+
+:sleep;
+
+repeat while ()
+-> yes;
+
+@enduml
