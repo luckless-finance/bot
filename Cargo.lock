@@ -420,6 +420,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "luckless"
+version = "0.0.1"
+dependencies = [
+ "approx",
+ "cargo-watch",
+ "chrono",
+ "gnuplot",
+ "itertools",
+ "num-traits",
+ "petgraph",
+ "rand",
+ "rand_distr",
+ "serde",
+ "serde_yaml",
+]
+
+[[package]]
 name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -934,23 +951,6 @@ checksum = "d59cefebd0c892fa2dd6de581e937301d8552cb44489cdff035c6187cb63fa5e"
 dependencies = [
  "winapi 0.2.8",
  "winapi-build",
-]
-
-[[package]]
-name = "yafa"
-version = "0.1.0"
-dependencies = [
- "approx",
- "cargo-watch",
- "chrono",
- "gnuplot",
- "itertools",
- "num-traits",
- "petgraph",
- "rand",
- "rand_distr",
- "serde",
- "serde_yaml",
 ]
 
 [[package]]
