@@ -56,4 +56,3 @@ impl Display for Asset {
         write!(f, "{}", self.symbol)
     }
 }
-

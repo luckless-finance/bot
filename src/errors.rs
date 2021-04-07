@@ -84,7 +84,6 @@ impl std::error::Error for InvalidStrategyError {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct TimeSeriesError {
     reason: String,
@@ -92,19 +91,13 @@ pub struct TimeSeriesError {
 
 impl TimeSeriesError {
     pub fn new(reason: String) -> Box<Self> {
-        Box::new(TimeSeriesError {
-            reason,
-        })
+        Box::new(TimeSeriesError { reason })
     }
 }
 
 impl fmt::Display for TimeSeriesError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "TimeSeriesError: {}",
-            self.reason
-        )
+        write!(f, "TimeSeriesError: {}", self.reason)
     }
 }
 
