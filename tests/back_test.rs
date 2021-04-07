@@ -1,15 +1,15 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
-extern crate yafa;
+extern crate luckless;
 
 use std::env::current_dir;
 use std::path::Path;
 
-use yafa::bot::asset_score::*;
-use yafa::data;
-use yafa::dto::strategy::*;
-use yafa::simulation::MockDataClient;
-use yafa::time_series;
+use luckless::bot::asset_score::*;
+use luckless::data;
+use luckless::dto::strategy::*;
+use luckless::simulation::MockDataClient;
+use luckless::time_series;
 
 pub fn get_strategy() -> StrategyDto {
     let strategy_path = current_dir()
@@ -26,15 +26,15 @@ mod tests {
 
     use chrono::{DateTime, Utc};
 
-    use yafa::bot::asset_score::*;
-    use yafa::data::{Asset, DataClient, };
-    use yafa::dto::strategy::{CalculationDto, OperandDto, OperandType, Operation, QueryCalculationDto};
-    use yafa::errors::GenResult;
-    use yafa::simulation::MockDataClient;
-    use yafa::time_series::{apply, DataPointValue, TimeSeries1D};
+    use luckless::bot::asset_score::*;
+    use luckless::data::{Asset, DataClient, };
+    use luckless::dto::strategy::{CalculationDto, OperandDto, OperandType, Operation, QueryCalculationDto};
+    use luckless::errors::GenResult;
+    use luckless::simulation::MockDataClient;
+    use luckless::time_series::{apply, DataPointValue, TimeSeries1D};
 
     use crate::get_strategy;
-    use yafa::plot::plot_ts;
+    use luckless::plot::plot_ts;
 
     #[test]
     fn plot_asset_prices() -> GenResult<()> {
