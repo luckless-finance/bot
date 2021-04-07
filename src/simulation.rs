@@ -79,10 +79,13 @@ impl MockDataClient {
         let c_y0 = 5f64;
         let c_y = TimeSeries1D::polynomial(&c_x, vec![c_y0, c_slope]);
 
-        let data: HashMap<Symbol, TimeSeries1D> =
-            vec![(Symbol::from("A"), a_y), (Symbol::from("B"), b_y), (Symbol::from("C"), c_y)]
-                .into_iter()
-                .collect();
+        let data: HashMap<Symbol, TimeSeries1D> = vec![
+            (Symbol::from("A"), a_y),
+            (Symbol::from("B"), b_y),
+            (Symbol::from("C"), c_y),
+        ]
+        .into_iter()
+        .collect();
         let assets: HashMap<Symbol, Asset> = data
             .keys()
             .map(|x| (x.clone(), Asset::new(x.clone())))
@@ -302,7 +305,9 @@ mod tests {
         // println!("{:?}", symbols);
         assert_eq!(
             symbols,
-            vec![Symbol::from("A"), Symbol::from("B"), Symbol::from("C")].iter().collect()
+            vec![Symbol::from("A"), Symbol::from("B"), Symbol::from("C")]
+                .iter()
+                .collect()
         )
     }
 

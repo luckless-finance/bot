@@ -1,10 +1,10 @@
 use std::borrow::Borrow;
 
 use chrono::{DateTime, Utc};
-use gnuplot::{AxesCommon, Figure};
 use gnuplot::AutoOption::Fix;
 use gnuplot::Coordinate::Graph;
 use gnuplot::PlotOption::Caption;
+use gnuplot::{AxesCommon, Figure};
 
 use crate::time_series::TimeSeries1D;
 
