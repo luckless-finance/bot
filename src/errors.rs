@@ -103,6 +103,34 @@ impl fmt::Display for TimeSeriesError {
 
 impl std::error::Error for TimeSeriesError {
     fn description(&self) -> &str {
-        "Invalid strategy"
+        "TimeSeriesError"
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AccountClientError {
+    reason: String,
+}
+
+impl AccountClientError {
+    pub fn new(reason: String) -> Box<Self> {
+        Box::new(AccountClientError { reason })
+    }
+    pub fn unknown() -> Box<Self> {
+        Box::new(AccountClientError {
+            reason: String::from("unknown error."),
+        })
+    }
+}
+
+impl fmt::Display for AccountClientError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "AccountClientError: {}", self.reason)
+    }
+}
+
+impl std::error::Error for AccountClientError {
+    fn description(&self) -> &str {
+        "AccountClientError"
     }
 }

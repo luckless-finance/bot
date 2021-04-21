@@ -14,10 +14,13 @@ extern crate approx;
 pub mod data;
 pub mod errors;
 pub mod plot;
+pub mod rest_client;
 pub mod simulation;
 pub mod time_series;
 
-pub mod bot {
+pub mod bot {}
+
+pub mod engine {
     pub mod asset_score {
         #![allow(dead_code)]
 
@@ -28,12 +31,12 @@ pub mod bot {
 
         use serde::export::Formatter;
 
-        use crate::bot::dag::Dag;
         use crate::data::{Asset, DataClient};
         use crate::dto::strategy::{
             CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, Operation,
             QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
         };
+        use crate::engine::dag::Dag;
         use crate::errors::{GenResult, UpstreamNotFoundError};
         use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 
@@ -310,13 +313,13 @@ pub mod bot {
             use std::collections::HashMap;
             use std::path::Path;
 
-            use crate::bot::asset_score::{
-                AssetScore, AssetScoreStatus, CalculationStatus, CompiledStrategy,
-            };
             use crate::data::Asset;
             use crate::dto::strategy::{
                 from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto,
                 StrategyDto,
+            };
+            use crate::engine::asset_score::{
+                AssetScore, AssetScoreStatus, CalculationStatus, CompiledStrategy,
             };
             use crate::errors::GenResult;
             use crate::simulation::MockDataClient;
@@ -482,8 +485,8 @@ pub mod bot {
             use petgraph::algo::toposort;
             use petgraph::prelude::*;
 
-            use crate::bot::dag::{Dag, DiGraph};
             use crate::dto::strategy::{from_path, StrategyDto};
+            use crate::engine::dag::{Dag, DiGraph};
             use crate::errors::GenResult;
 
             fn strategy_fixture() -> StrategyDto {

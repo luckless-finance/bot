@@ -7,12 +7,14 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive", "serde_derive", "default"] }
 serde_yaml = "0.8"
 petgraph = "0.5.1"
 gnuplot = "0.0.37" # sudo apt-get install -y gnuplot
 itertools = "0.10.0"
 num-traits = { version = "0.2.14", features = ["std"] }
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+tokio = { version = "1", features = ["full"] }
 
 [dev-dependencies]
 rand = "0.7.3"

@@ -1,0 +1,25 @@
+@startuml
+'https://plantuml.com/activity-diagram-beta
+
+start
+
+repeat
+if (Stock Market Open?) then (yes)
+
+  :never submit Orders during trading hours,
+  sleep until pre-market;
+
+else (no)
+    :GET Holdings;
+    :DELETE Trade Orders;
+    :compute Trade Orders;
+    :POST Trade Orders;
+    :sleep until market close;
+
+endif
+
+
+repeat while ()
+-> yes;
+
+@enduml
