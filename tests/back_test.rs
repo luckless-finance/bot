@@ -5,7 +5,7 @@ extern crate luckless;
 use std::env::current_dir;
 use std::path::Path;
 
-use luckless::bot::asset_score::*;
+use luckless::engine::asset_score::*;
 use luckless::data;
 use luckless::dto::strategy::*;
 use luckless::simulation::MockDataClient;
@@ -26,7 +26,7 @@ mod tests {
 
     use chrono::{DateTime, Utc};
 
-    use luckless::bot::asset_score::*;
+    use luckless::engine::asset_score::*;
     use luckless::data::{Asset, DataClient, };
     use luckless::dto::strategy::{CalculationDto, OperandDto, OperandType, Operation, QueryCalculationDto};
     use luckless::errors::GenResult;
