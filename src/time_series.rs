@@ -14,6 +14,15 @@ pub type DataPointValue = f64;
 pub type TimeStamp = DateTime<Utc>;
 pub type Index = Vec<TimeStamp>;
 
+/// Used to filter
+pub enum Equality {
+    Less,
+    LessOrEqual,
+    Equal,
+    GreaterOrEqual,
+    Greater,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TimeSeries1D {
     index: Index,

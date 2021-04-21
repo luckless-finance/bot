@@ -27,14 +27,14 @@ mod tests {
     use chrono::{DateTime, Utc};
 
     use luckless::bot::asset_score::*;
-    use luckless::data::{Asset, DataClient, };
+    use luckless::data::{Asset, DataClient};
     use luckless::dto::strategy::{CalculationDto, OperandDto, OperandType, Operation, QueryCalculationDto};
     use luckless::errors::GenResult;
+    use luckless::plot::plot_ts;
     use luckless::simulation::MockDataClient;
     use luckless::time_series::{apply, DataPointValue, TimeSeries1D};
 
     use crate::get_strategy;
-    use luckless::plot::plot_ts;
 
     #[test]
     fn plot_asset_prices() -> GenResult<()> {

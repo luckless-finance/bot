@@ -11,6 +11,7 @@
 #[macro_use]
 extern crate approx;
 
+pub mod controller;
 pub mod data;
 pub mod errors;
 pub mod plot;
