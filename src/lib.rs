@@ -7,7 +7,6 @@
 #![feature(array_value_iter)]
 #![feature(map_into_keys_values)]
 #![feature(trait_alias)]
-#![feature(toowned_clone_into)]
 #[cfg(test)]
 #[macro_use]
 extern crate approx;
