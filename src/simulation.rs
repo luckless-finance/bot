@@ -11,7 +11,7 @@ use crate::time_series::{TimeSeries1D, TimeStamp};
 
 pub static DATA_SIZE: usize = 900;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MockDataClient {
     assets: HashMap<Symbol, Asset>,
     data: HashMap<Symbol, TimeSeries1D>,
@@ -32,6 +32,10 @@ fn simulate_time_series(n: usize) -> TimeSeries1D {
 }
 
 impl DataClient for MockDataClient {
+    fn duplicate(&self) -> Box<dyn DataClient> {
+        Box::new(self.clone())
+    }
+
     fn assets(&self) -> &HashMap<Symbol, Asset> {
         &self.assets
     }
