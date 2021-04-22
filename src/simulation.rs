@@ -19,7 +19,7 @@ pub struct MockDataClient {
 
 impl MockDataClient {
     pub fn today() -> DateTime<Utc> {
-        TimeSeries1D::epoch() + TimeSeries1D::index_unit() * DATA_SIZE as i32
+        TimeSeries1D::epoch() + TimeSeries1D::index_unit() * (DATA_SIZE - 1) as i32
     }
 }
 
@@ -49,9 +49,9 @@ impl DataClient for MockDataClient {
         asset: &Asset,
         timestamp: &TimeStamp,
         query_dto: Option<QueryCalculationDto>,
-    ) -> GenResult<&TimeSeries1D> {
+    ) -> GenResult<TimeSeries1D> {
         match self.data.get(&asset.symbol().to_string()) {
-            Some(ts) => Ok(ts),
+            Some(ts) => Ok(ts.filter_le(timestamp)),
             None => Err(Box::new(Error::new(ErrorKind::NotFound, "Asset not found"))),
         }
     }
@@ -163,12 +163,12 @@ impl TimeSeriesGenerators for TimeSeries1D {
             .zip(self.values())
             .map(|(y1, y2)| y1 + y2)
             .collect();
-        TimeSeries1D::new(self.index().clone(), y)
+        TimeSeries1D::from_vec(self.index().clone(), y)
     }
 
     /// Shift `TimeSeries` vertically by `delta`.
     fn vertical_shift(&self, delta: f64) -> Self {
-        TimeSeries1D::new(
+        TimeSeries1D::from_vec(
             self.index().clone(),
             self.values().iter().map(|v| v + delta).collect(),
         )
@@ -314,12 +314,22 @@ mod tests {
     #[test]
     fn mock_data_client_query() {
         let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
-        // println!("{:?}", client);
         let asset = Asset::new(Symbol::from("A"));
         let ts = client
             .query(&asset, &MockDataClient::today(), None)
             .unwrap();
-        // println!("{:?}", ts);
         assert_eq!(ts.len(), DATA_SIZE);
+        assert_eq!(ts.index().last().unwrap(), &MockDataClient::today());
+    }
+
+    #[test]
+    fn mock_data_client_query_with_timestamp() {
+        let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
+        let yesterday = MockDataClient::today() - TimeSeries1D::index_unit() * 1 as i32;
+        let asset = Asset::new(Symbol::from("A"));
+        let ts = client.query(&asset, &yesterday, None).unwrap();
+
+        assert_eq!(ts.len(), DATA_SIZE - 1);
+        assert_eq!(ts.index().last().unwrap(), &yesterday);
     }
 }

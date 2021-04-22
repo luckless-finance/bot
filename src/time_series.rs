@@ -2,13 +2,15 @@
 
 use std::cmp::Ordering;
 use std::convert::TryFrom;
-use std::ops::{Add, Div, Mul, Neg};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
-use itertools::fold;
+use itertools::{fold, zip};
 
 use crate::errors::{GenError, GenResult};
+use std::borrow::Borrow;
+use std::collections::BTreeMap;
 
 pub type DataPointValue = f64;
 pub type TimeStamp = DateTime<Utc>;
@@ -16,8 +18,7 @@ pub type Index = Vec<TimeStamp>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TimeSeries1D {
-    index: Index,
-    values: Vec<DataPointValue>,
+    data: BTreeMap<TimeStamp, DataPointValue>,
 }
 
 impl TimeSeries1D {
@@ -27,8 +28,11 @@ impl TimeSeries1D {
     pub fn index_unit() -> Duration {
         Duration::days(1)
     }
+    pub fn new(data: BTreeMap<TimeStamp, DataPointValue>) -> Self {
+        TimeSeries1D { data }
+    }
     /// Create new `TimeSeries` from given `index` and `values` vectors
-    pub fn new(index: Index, values: Vec<DataPointValue>) -> Self {
+    pub fn from_vec(index: Index, values: Vec<DataPointValue>) -> Self {
         assert_eq!(
             index.len(),
             values.len(),
@@ -36,11 +40,13 @@ impl TimeSeries1D {
             index.len(),
             values.len()
         );
-        TimeSeries1D { index, values }
+        TimeSeries1D {
+            data: zip(index, values).collect(),
+        }
     }
-    /// Create new `TimeSeries` with given `values` and an index containing `(0..values.len())`
+    /// Create new `TimeSeries` with given `values` and an index containing `(0..values().len())`
     pub fn from_values(values: Vec<DataPointValue>) -> Self {
-        TimeSeries1D::new(
+        TimeSeries1D::from_vec(
             (0..values.len())
                 .map(|x| TimeSeries1D::epoch() + Duration::days(x as i64))
                 .collect(),
@@ -48,24 +54,24 @@ impl TimeSeries1D {
         )
     }
     /// Borrow `values`
-    pub fn values(&self) -> &Vec<DataPointValue> {
-        &self.values
+    pub fn values(&self) -> Vec<DataPointValue> {
+        self.data.values().cloned().collect()
     }
-    pub fn index(&self) -> &Index {
-        &self.index
+    pub fn index(&self) -> Index {
+        self.data.keys().cloned().collect()
     }
     pub fn len(&self) -> usize {
-        self.index.len()
+        self.index().len()
     }
     /// Align the indices of 2 `TimeSeries`, only values with indices in both `TimeSeries` are included.
     /// Creates 2 new `TimeSeries` instances.
     pub fn intersect(&self, rhs: &TimeSeries1D) -> (Self, Self) {
         let mut l_i = 0;
-        let lhs_i = &self.index;
-        let lhs_v = &self.values;
+        let lhs_i = &self.index();
+        let lhs_v = &self.values();
         let mut r_i = 0;
-        let rhs_i = &rhs.index;
-        let rhs_v = &rhs.values;
+        let rhs_i = &rhs.index();
+        let rhs_v = &rhs.values();
 
         let mut both_ri: Index = Vec::new();
         let mut both_li: Index = Vec::new();
@@ -87,86 +93,119 @@ impl TimeSeries1D {
             };
         }
         (
-            TimeSeries1D::new(both_li, both_l),
-            TimeSeries1D::new(both_ri, both_r),
+            TimeSeries1D::from_vec(both_li, both_l),
+            TimeSeries1D::from_vec(both_ri, both_r),
         )
     }
     pub fn add(&self, rhs: DataPointValue) -> Self {
-        let product_idx: Index = self.index.clone();
-        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x + rhs).collect();
-        TimeSeries1D::new(product_idx, product_values)
+        let product_idx: Index = self.index().clone();
+        let product_values: Vec<DataPointValue> = self.values().iter().map(|x| x + rhs).collect();
+        TimeSeries1D::from_vec(product_idx, product_values)
     }
     pub fn sub(&self, rhs: DataPointValue) -> Self {
         self.add(rhs.neg())
     }
     pub fn mul(&self, rhs: DataPointValue) -> Self {
-        let product_idx: Index = self.index.clone();
-        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x * rhs).collect();
-        TimeSeries1D::new(product_idx, product_values)
+        let product_idx: Index = self.index().clone();
+        let product_values: Vec<DataPointValue> = self.values().iter().map(|x| x * rhs).collect();
+        TimeSeries1D::from_vec(product_idx, product_values)
     }
     pub fn div(&self, rhs: DataPointValue) -> Self {
-        let product_idx: Index = self.index.clone();
-        let product_values: Vec<DataPointValue> = self.values.iter().map(|x| x / rhs).collect();
-        TimeSeries1D::new(product_idx, product_values)
+        let product_idx: Index = self.index().clone();
+        let product_values: Vec<DataPointValue> = self.values().iter().map(|x| x / rhs).collect();
+        TimeSeries1D::from_vec(product_idx, product_values)
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     pub fn ts_add(&self, rhs: &TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.intersect(&rhs);
-        for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
-            *l += *r;
-        }
-        TimeSeries1D::new(lhs.index, lhs.values)
+        let (lhs, rhs) = self.intersect(&rhs);
+        let values: Vec<DataPointValue> = zip(lhs.values(), rhs.values())
+            .map(|(l, r)| l + r)
+            .collect();
+        TimeSeries1D::from_vec(lhs.index(), values)
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     pub fn ts_sub(&self, rhs: &TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.intersect(&rhs);
-        for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
-            *l -= *r;
-        }
-        TimeSeries1D::new(lhs.index, lhs.values)
+        let (lhs, rhs) = self.intersect(&rhs);
+        let values: Vec<DataPointValue> = zip(lhs.values(), rhs.values())
+            .map(|(l, r)| l - r)
+            .collect();
+        TimeSeries1D::from_vec(lhs.index(), values)
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     pub fn ts_mul(&self, rhs: &TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.intersect(&rhs);
-        for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
-            *l *= *r;
-        }
-        TimeSeries1D::new(lhs.index, lhs.values)
+        let (lhs, rhs) = self.intersect(&rhs);
+        let values: Vec<DataPointValue> = zip(lhs.values(), rhs.values())
+            .map(|(l, r)| l * r)
+            .collect();
+        TimeSeries1D::from_vec(lhs.index(), values)
     }
     // taken from https://stackoverflow.com/a/53825685
     // generic solution https://stackoverflow.com/a/41207820
     pub fn ts_div(&self, rhs: &TimeSeries1D) -> Self {
-        let (mut lhs, rhs) = self.intersect(&rhs);
-        for (l, r) in lhs.values.iter_mut().zip(&rhs.values) {
-            *l /= *r;
-        }
-        TimeSeries1D::new(lhs.index, lhs.values)
+        let (lhs, rhs) = self.intersect(&rhs);
+        let values: Vec<DataPointValue> = zip(lhs.values(), rhs.values())
+            .map(|(l, r)| l / r)
+            .collect();
+        TimeSeries1D::from_vec(lhs.index(), values)
     }
     pub fn sma(&self, window_size: usize) -> Self {
-        let mut index = self.index.clone();
+        let mut index = self.index().clone();
         index.reverse();
         index.truncate(self.len() - window_size + 1);
         index.reverse();
         let values = self
-            .values
+            .values()
             .windows(window_size)
             .map(|x| x.iter().sum::<DataPointValue>())
             .map(|x| x.div(window_size as DataPointValue))
             .collect();
-        TimeSeries1D::new(index, values)
+        TimeSeries1D::from_vec(index, values)
     }
     pub fn zero_negatives(&self) -> Self {
-        TimeSeries1D::new(
-            self.index.clone(),
-            self.values
+        TimeSeries1D::from_vec(
+            self.index().clone(),
+            self.values()
                 .clone()
                 .into_iter()
                 .map(|value| if value < 0f64 { 0f64 } else { value })
                 .collect(),
         )
+    }
+    pub fn filter_le(&self, timestamp: &TimeStamp) -> Self {
+        let tree: BTreeMap<TimeStamp, DataPointValue> = self
+            .data
+            .range(..=timestamp)
+            .map(|(timestamp, value)| (timestamp.clone(), value.clone()))
+            .collect();
+        TimeSeries1D::new(tree)
+    }
+    pub fn filter_lt(&self, timestamp: &TimeStamp) -> Self {
+        let tree: BTreeMap<TimeStamp, DataPointValue> = self
+            .data
+            .range(..timestamp)
+            .map(|(timestamp, value)| (timestamp.clone(), value.clone()))
+            .collect();
+        TimeSeries1D::new(tree)
+    }
+    pub fn filter_ge(&self, timestamp: &TimeStamp) -> Self {
+        let tree: BTreeMap<TimeStamp, DataPointValue> = self
+            .data
+            .range(timestamp..)
+            .map(|(timestamp, value)| (timestamp.clone(), value.clone()))
+            .collect();
+        TimeSeries1D::new(tree)
+    }
+    pub fn filter_gt(&self, timestamp: &TimeStamp) -> Self {
+        let tree: BTreeMap<TimeStamp, DataPointValue> = self
+            .data
+            .range(timestamp..)
+            .skip(1)
+            .map(|(timestamp, value)| (timestamp.clone(), value.clone()))
+            .collect();
+        TimeSeries1D::new(tree)
     }
 }
 
@@ -176,15 +215,18 @@ pub fn apply(
 ) -> TimeSeries1D {
     let index = ts_vec.get(0).unwrap().index().clone();
     let ts_len = index.len();
-    TimeSeries1D::new(
+    TimeSeries1D::from_vec(
         index,
         (0..ts_len)
             .map(|idx| {
                 func(
                     ts_vec
                         .iter()
-                        .map(|ts| ts.values().get(idx).unwrap_or(&0f64))
-                        .cloned()
+                        .map(|ts| {
+                            let values = ts.values();
+                            let value = values.get(idx);
+                            value.unwrap_or(&0f64).clone()
+                        })
                         .collect(),
                 )
             })
@@ -207,11 +249,11 @@ mod tests {
             TimeSeries1D::epoch() + TimeSeries1D::index_unit(),
             TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
         ];
-        let ts = TimeSeries1D::new(index.clone(), values);
+        let ts = TimeSeries1D::from_vec(index.clone(), values);
 
         assert_eq!(ts.len(), 3);
-        assert_eq!(ts.values, &[5., 10., 15.]);
-        assert_eq!(ts.index, index);
+        assert_eq!(ts.values(), &[5., 10., 15.]);
+        assert_eq!(ts.index(), index);
     }
 
     #[test]
@@ -220,9 +262,9 @@ mod tests {
         let ts = TimeSeries1D::from_values(values);
 
         assert_eq!(ts.len(), 3);
-        assert_eq!(ts.values, &[5., 10., 15.]);
+        assert_eq!(ts.values(), &[5., 10., 15.]);
         assert_eq!(
-            ts.index,
+            ts.index(),
             vec![
                 TimeSeries1D::epoch(),
                 TimeSeries1D::epoch() + Duration::days(1),
@@ -233,7 +275,7 @@ mod tests {
 
     #[test]
     fn intersect() {
-        let l_in = TimeSeries1D::new(
+        let l_in = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -244,7 +286,7 @@ mod tests {
             ],
             vec![1., 2., 3., 4., 5., 8.],
         );
-        let r_in = TimeSeries1D::new(
+        let r_in = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
@@ -254,7 +296,7 @@ mod tests {
             ],
             vec![1., 2., 3., 4., 8.],
         );
-        let expected_l_out = TimeSeries1D::new(
+        let expected_l_out = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -262,7 +304,7 @@ mod tests {
             ],
             vec![1., 2., 4.],
         );
-        let expected_r_out = TimeSeries1D::new(
+        let expected_r_out = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -272,14 +314,15 @@ mod tests {
         );
         let (l_out, r_out) = l_in.intersect(&r_in);
         assert_eq!(
-            l_out.index, r_out.index,
+            l_out.index(),
+            r_out.index(),
             "both TimeSeries should have same indices"
         );
-        assert_eq!(l_out.index, expected_l_out.index);
-        assert_eq!(r_out.index, expected_r_out.index);
+        assert_eq!(l_out.index(), expected_l_out.index());
+        assert_eq!(r_out.index(), expected_r_out.index());
         // only keep values with intersecting indices
-        assert_eq!(l_out.values, expected_l_out.values);
-        assert_eq!(r_out.values, expected_r_out.values);
+        assert_eq!(l_out.values(), expected_l_out.values());
+        assert_eq!(r_out.values(), expected_r_out.values());
         // high level sanity check
         assert_eq!(l_out, expected_l_out);
         assert_eq!(r_out, expected_r_out);
@@ -287,7 +330,7 @@ mod tests {
 
     #[test]
     fn len() {
-        let ts = TimeSeries1D::new(
+        let ts = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -304,7 +347,7 @@ mod tests {
 
     #[test]
     fn add() {
-        let ts = TimeSeries1D::new(
+        let ts = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -314,7 +357,7 @@ mod tests {
             ],
             vec![1., 2., 3., 4., 5.],
         );
-        let expected = TimeSeries1D::new(
+        let expected = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -331,7 +374,7 @@ mod tests {
 
     #[test]
     fn sub() {
-        let ts = TimeSeries1D::new(
+        let ts = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -341,7 +384,7 @@ mod tests {
             ],
             vec![1., 2., 3., 4., 5.],
         );
-        let expected = TimeSeries1D::new(
+        let expected = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -358,7 +401,7 @@ mod tests {
 
     #[test]
     fn mul() {
-        let ts = TimeSeries1D::new(
+        let ts = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -368,7 +411,7 @@ mod tests {
             ],
             vec![1., 2., 3., 4., 5.],
         );
-        let expected = TimeSeries1D::new(
+        let expected = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -385,7 +428,7 @@ mod tests {
 
     #[test]
     fn div() {
-        let ts = TimeSeries1D::new(
+        let ts = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -395,7 +438,7 @@ mod tests {
             ],
             vec![1., 2., 3., 4., 5.],
         );
-        let expected = TimeSeries1D::new(
+        let expected = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -412,7 +455,7 @@ mod tests {
 
     #[test]
     fn ts_add() {
-        let lhs = TimeSeries1D::new(
+        let lhs = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -422,7 +465,7 @@ mod tests {
             ],
             vec![1., 2., 3., 4., 5.],
         );
-        let rhs = TimeSeries1D::new(
+        let rhs = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
@@ -431,13 +474,17 @@ mod tests {
             ],
             vec![-5., 4., 3., 2.],
         );
-        let expected = TimeSeries1D::new(
+        let expected = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
             ],
-            vec![-3., 7., 6.],
+            vec![
+                2. + -5., // -3 @ 4
+                3. + 4.,  // 7 @ 5
+                4. + 2.,  // 6 @ 7
+            ],
         );
         let actual = lhs.ts_add(&rhs);
         assert_eq!(actual, expected);
@@ -445,7 +492,7 @@ mod tests {
 
     #[test]
     fn ts_sub() {
-        let lhs = TimeSeries1D::new(
+        let lhs = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -455,7 +502,7 @@ mod tests {
             ],
             vec![1., 2., 3., 4., 5.],
         );
-        let rhs = TimeSeries1D::new(
+        let rhs = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
@@ -464,7 +511,7 @@ mod tests {
             ],
             vec![-5., 4., 3., 2.],
         );
-        let expected = TimeSeries1D::new(
+        let expected = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
@@ -478,7 +525,7 @@ mod tests {
 
     #[test]
     fn ts_mul() {
-        let lhs = TimeSeries1D::new(
+        let lhs = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -488,7 +535,7 @@ mod tests {
             ],
             vec![1., 2., 3., 4., 5.],
         );
-        let rhs = TimeSeries1D::new(
+        let rhs = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
@@ -497,7 +544,7 @@ mod tests {
             ],
             vec![-5., 4., 3., 2.],
         );
-        let expected = TimeSeries1D::new(
+        let expected = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
@@ -511,7 +558,7 @@ mod tests {
 
     #[test]
     fn ts_div() {
-        let lhs = TimeSeries1D::new(
+        let lhs = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -521,7 +568,7 @@ mod tests {
             ],
             vec![1., 2., 3., 4., 5.],
         );
-        let rhs = TimeSeries1D::new(
+        let rhs = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
@@ -530,7 +577,7 @@ mod tests {
             ],
             vec![-5., 4., 3., 2.],
         );
-        let expected = TimeSeries1D::new(
+        let expected = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
@@ -544,7 +591,7 @@ mod tests {
 
     #[test]
     fn sma() {
-        let ts = TimeSeries1D::new(
+        let ts = TimeSeries1D::from_vec(
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
@@ -557,9 +604,9 @@ mod tests {
         let sma = ts.sma(2);
 
         assert_eq!(sma.len(), 4);
-        assert_eq!(sma.values, &[1.5, 2.5, 3.5, 4.5]);
+        assert_eq!(sma.values(), &[1.5, 2.5, 3.5, 4.5]);
         assert_eq!(
-            sma.index,
+            sma.index(),
             vec![
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
@@ -577,9 +624,101 @@ mod tests {
             TimeSeries1D::epoch() + TimeSeries1D::index_unit(),
             TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
         ];
-        let ts = TimeSeries1D::new(index.clone(), values);
+        let ts = TimeSeries1D::from_vec(index.clone(), values);
         assert_eq!(ts.len(), 3);
-        assert_eq!(ts.zero_negatives().values, &[0., 10., 0.]);
-        assert_eq!(ts.index, index);
+        assert_eq!(ts.zero_negatives().values(), &[0., 10., 0.]);
+        assert_eq!(ts.index(), index);
+    }
+
+    #[test]
+    fn filter_le() {
+        let ts = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
+            ],
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+            ],
+            vec![1., 2., 3., 4.],
+        );
+        let actual = ts.filter_le(&(TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7));
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn filter_lt() {
+        let ts = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
+            ],
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+            ],
+            vec![1., 2., 3.],
+        );
+        let actual = ts.filter_lt(&(TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7));
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn filter_ge() {
+        let ts = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
+            ],
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
+            ],
+            vec![4., 5.],
+        );
+        let actual = ts.filter_ge(&(TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7));
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn filter_gt() {
+        let ts = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
+            ],
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::from_vec(
+            vec![TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9],
+            vec![5.],
+        );
+        let actual = ts.filter_gt(&(TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7));
+        assert_eq!(actual, expected);
     }
 }

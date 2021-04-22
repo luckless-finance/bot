@@ -2,4 +2,4 @@
 .vscode
 debug
 target
-/tmp.png
+*.png
