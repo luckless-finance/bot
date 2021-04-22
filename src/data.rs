@@ -28,7 +28,7 @@ pub trait DataClient {
         asset: &Asset,
         timestamp: &TimeStamp,
         query: Option<QueryCalculationDto>,
-    ) -> GenResult<&TimeSeries1D>;
+    ) -> GenResult<TimeSeries1D>;
 }
 impl fmt::Debug for dyn DataClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

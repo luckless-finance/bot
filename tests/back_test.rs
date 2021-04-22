@@ -36,7 +36,7 @@ mod tests {
     use luckless::time_series::{apply, DataPointValue, TimeSeries1D};
 
     use crate::get_strategy;
-    use luckless::plot::plot_ts;
+    use luckless::plot::{plot_ts, plot_ts_values};
 
     #[test]
     fn plot_asset_prices() -> GenResult<()> {
@@ -53,12 +53,12 @@ mod tests {
             .try_into()?,
         );
         let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
-        let asset_price_time_series: Vec<&TimeSeries1D> = data_client
+        let asset_price_time_series: Vec<TimeSeries1D> = data_client
             .assets()
             .values()
             .flat_map(|a| data_client.query(a, &MockDataClient::today(), None))
             .collect();
-        plot_ts(asset_price_time_series);
+        plot_ts_values(asset_price_time_series);
         Ok(())
     }
 
