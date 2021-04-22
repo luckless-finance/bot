@@ -22,6 +22,7 @@ const PLOT_PDF: &'static str = "pdfcairo";
 const PLOT_EPS: &'static str = "epscairo";
 const PLOT_SVG: &'static str = "svg";
 const PLOT_HTML: &'static str = "canvas";
+const OUTPUT_FILENAME: &'static str = "plot.png";
 
 pub fn plot_ts_values(ts_vec: Vec<TimeSeries1D>) {
     plot_ts(ts_vec.iter().collect())
@@ -29,7 +30,7 @@ pub fn plot_ts_values(ts_vec: Vec<TimeSeries1D>) {
 
 pub fn plot_ts(ts_vec: Vec<&TimeSeries1D>) {
     let mut fg = Figure::new();
-    let ys: Vec<&Vec<f64>> = ts_vec.iter().map(|ts| ts.values()).collect();
+    let ys: Vec<Vec<f64>> = ts_vec.iter().map(|ts| ts.values()).collect();
     let y_max: f64 = ys
         .as_slice()
         .iter()
@@ -43,7 +44,7 @@ pub fn plot_ts(ts_vec: Vec<&TimeSeries1D>) {
         .fold(f64::NAN, |a, b| f64::min(a, *b).clone());
     // handle negative y-values
     y_min = f64::min(y_min - y_min.abs() * 0.1, 0f64);
-    let xs: Vec<&Vec<DateTime<Utc>>> = ts_vec.iter().map(|ts| ts.index()).collect();
+    let xs: Vec<Vec<DateTime<Utc>>> = ts_vec.iter().map(|ts| ts.index()).collect();
     let x_max: DateTime<Utc> = xs
         .iter()
         .flat_map(|x| x.iter())
@@ -68,8 +69,7 @@ pub fn plot_ts(ts_vec: Vec<&TimeSeries1D>) {
             &[Caption(&format!("{}", i))],
         );
     }
-    // TODO better file name
-    fg.set_terminal(PLOT_PNG, "tmp.png");
+    fg.set_terminal(PLOT_PNG, OUTPUT_FILENAME);
     fg.show().unwrap();
 }
 

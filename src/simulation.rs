@@ -163,12 +163,12 @@ impl TimeSeriesGenerators for TimeSeries1D {
             .zip(self.values())
             .map(|(y1, y2)| y1 + y2)
             .collect();
-        TimeSeries1D::new(self.index().clone(), y)
+        TimeSeries1D::from_vec(self.index().clone(), y)
     }
 
     /// Shift `TimeSeries` vertically by `delta`.
     fn vertical_shift(&self, delta: f64) -> Self {
-        TimeSeries1D::new(
+        TimeSeries1D::from_vec(
             self.index().clone(),
             self.values().iter().map(|v| v + delta).collect(),
         )
