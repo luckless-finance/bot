@@ -9,6 +9,7 @@ use chrono::{Duration, TimeZone};
 use itertools::{fold, zip};
 
 use crate::errors::{GenError, GenResult};
+use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
 pub type DataPointValue = f64;
@@ -26,6 +27,9 @@ impl TimeSeries1D {
     }
     pub fn index_unit() -> Duration {
         Duration::days(1)
+    }
+    pub fn new(data: BTreeMap<TimeStamp, DataPointValue>) -> Self {
+        TimeSeries1D { data }
     }
     /// Create new `TimeSeries` from given `index` and `values` vectors
     pub fn from_vec(index: Index, values: Vec<DataPointValue>) -> Self {
@@ -169,6 +173,39 @@ impl TimeSeries1D {
                 .map(|value| if value < 0f64 { 0f64 } else { value })
                 .collect(),
         )
+    }
+    pub fn filter_le(&self, timestamp: &TimeStamp) -> Self {
+        let tree: BTreeMap<TimeStamp, DataPointValue> = self
+            .data
+            .range(..=timestamp)
+            .map(|(timestamp, value)| (timestamp.clone(), value.clone()))
+            .collect();
+        TimeSeries1D::new(tree)
+    }
+    pub fn filter_lt(&self, timestamp: &TimeStamp) -> Self {
+        let tree: BTreeMap<TimeStamp, DataPointValue> = self
+            .data
+            .range(..timestamp)
+            .map(|(timestamp, value)| (timestamp.clone(), value.clone()))
+            .collect();
+        TimeSeries1D::new(tree)
+    }
+    pub fn filter_ge(&self, timestamp: &TimeStamp) -> Self {
+        let tree: BTreeMap<TimeStamp, DataPointValue> = self
+            .data
+            .range(timestamp..)
+            .map(|(timestamp, value)| (timestamp.clone(), value.clone()))
+            .collect();
+        TimeSeries1D::new(tree)
+    }
+    pub fn filter_gt(&self, timestamp: &TimeStamp) -> Self {
+        let tree: BTreeMap<TimeStamp, DataPointValue> = self
+            .data
+            .range(timestamp..)
+            .skip(1)
+            .map(|(timestamp, value)| (timestamp.clone(), value.clone()))
+            .collect();
+        TimeSeries1D::new(tree)
     }
 }
 
@@ -591,5 +628,97 @@ mod tests {
         assert_eq!(ts.len(), 3);
         assert_eq!(ts.zero_negatives().values(), &[0., 10., 0.]);
         assert_eq!(ts.index(), index);
+    }
+
+    #[test]
+    fn filter_le() {
+        let ts = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
+            ],
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+            ],
+            vec![1., 2., 3., 4.],
+        );
+        let actual = ts.filter_le(&(TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7));
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn filter_lt() {
+        let ts = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
+            ],
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+            ],
+            vec![1., 2., 3.],
+        );
+        let actual = ts.filter_lt(&(TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7));
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn filter_ge() {
+        let ts = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
+            ],
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
+            ],
+            vec![4., 5.],
+        );
+        let actual = ts.filter_ge(&(TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7));
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn filter_gt() {
+        let ts = TimeSeries1D::from_vec(
+            vec![
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 1,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 4,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 5,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7,
+                TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
+            ],
+            vec![1., 2., 3., 4., 5.],
+        );
+        let expected = TimeSeries1D::from_vec(
+            vec![TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9],
+            vec![5.],
+        );
+        let actual = ts.filter_gt(&(TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 7));
+        assert_eq!(actual, expected);
     }
 }
