@@ -23,7 +23,7 @@ pub mod bot {
         #![allow(dead_code)]
 
         use std;
-        use std::collections::HashMap;
+        use std::collections::{BTreeMap, HashMap};
         use std::convert::TryInto;
         use std::fmt;
 
@@ -36,7 +36,7 @@ pub mod bot {
             QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
         };
         use crate::errors::{GenResult, UpstreamNotFoundError};
-        use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
+        use crate::time_series::{apply, DataPointValue, TimeSeries1D, TimeStamp};
 
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub enum CalculationStatus {
@@ -55,40 +55,44 @@ pub mod bot {
         }
 
         /// Wraps several Dtos required traverse and consume a strategy
-        #[derive(Debug, Clone)]
-        pub struct CompiledStrategy {
+        #[derive(Debug)]
+        pub struct RunnableStrategy {
+            data_client: Box<dyn DataClient>,
             strategy: StrategyDto,
             dag: Dag,
             calcs: HashMap<TimeSeriesName, CalculationDto>,
         }
 
-        impl CompiledStrategy {
-            pub fn new(strategy: StrategyDto) -> GenResult<Self> {
+        impl RunnableStrategy {
+            pub fn new(strategy: StrategyDto, data_client: Box<dyn DataClient>) -> GenResult<Self> {
                 let dag = Dag::new(strategy.clone())?;
                 let calcs: HashMap<String, CalculationDto> = strategy
                     .calcs()
                     .iter()
                     .map(|calc| (calc.name().to_string(), calc.clone()))
                     .collect();
-                Ok(CompiledStrategy {
+                Ok(RunnableStrategy {
+                    data_client,
                     strategy,
                     dag,
                     calcs,
                 })
             }
+            pub fn duplicate(&self) -> GenResult<Self> {
+                RunnableStrategy::new(self.strategy.clone(), self.data_client.duplicate())
+            }
             /// Computes the score of the given `Asset` at the given `TimeStamp`
-            pub fn asset_score(
+            pub fn run_on_asset(
                 &self,
                 asset: Asset,
                 timestamp: TimeStamp,
-                data_client: Box<dyn DataClient>,
             ) -> GenResult<AssetScore> {
                 let mut scorable_asset = ScorableAsset {
                     asset,
                     timestamp,
                     execution_order: self.dag.execution_order().clone(),
                     calcs: self.calcs.clone(),
-                    data_client,
+                    data_client: self.data_client.duplicate(),
                     calc_status: self
                         .calcs
                         .keys()
@@ -98,6 +102,43 @@ pub mod bot {
                 };
                 scorable_asset.execute()?;
                 Ok(AssetScore::new(scorable_asset)?)
+            }
+            pub fn compute_allocations(&self, timestamp: TimeStamp) -> GenResult<AssetAllocations> {
+                let asset_scores: Vec<AssetScore> = self
+                    .data_client
+                    .assets()
+                    .values()
+                    .cloned()
+                    .flat_map(|asset| self.run_on_asset(asset.clone(), timestamp))
+                    .collect();
+                let zeroed: HashMap<Asset, TimeSeries1D> = asset_scores
+                    .iter()
+                    .map(|asset_score| {
+                        (
+                            asset_score.asset().clone(),
+                            asset_score.score().zero_negatives(),
+                        )
+                    })
+                    .collect();
+                // daily sums
+                let ts_sum = apply(zeroed.values().collect(), |values| values.iter().sum());
+                // allocations
+                let weightings: BTreeMap<Asset, DataPointValue> = zeroed
+                    .iter()
+                    .map(|asset_score| {
+                        (
+                            asset_score.0.clone(),
+                            asset_score
+                                .1
+                                .ts_div(&ts_sum)
+                                .values()
+                                .last()
+                                .unwrap()
+                                .clone(),
+                        )
+                    })
+                    .collect();
+                Ok(AssetAllocations::new(timestamp, weightings))
             }
         }
 
@@ -307,21 +348,46 @@ pub mod bot {
             }
         }
 
+        #[derive(Clone, Debug, PartialEq)]
+        pub struct AssetAllocations {
+            timestamp: TimeStamp,
+            allocations: BTreeMap<Asset, DataPointValue>,
+        }
+
+        impl AssetAllocations {
+            pub fn new(timestamp: TimeStamp, allocations: BTreeMap<Asset, f64>) -> Self {
+                AssetAllocations {
+                    timestamp,
+                    allocations,
+                }
+            }
+            pub fn timestamp(&self) -> TimeStamp {
+                self.timestamp
+            }
+            pub fn allocations(&self) -> &BTreeMap<Asset, f64> {
+                &self.allocations
+            }
+        }
+
         #[cfg(test)]
         mod tests {
             use std::collections::HashMap;
             use std::path::Path;
 
             use crate::bot::asset_score::{
-                AssetScore, AssetScoreStatus, CalculationStatus, CompiledStrategy,
+                AssetAllocations, AssetScore, AssetScoreStatus, CalculationStatus, RunnableStrategy,
             };
-            use crate::data::Asset;
+            use crate::data::{Asset, DataClient};
             use crate::dto::strategy::{
                 from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto,
                 StrategyDto,
             };
             use crate::errors::GenResult;
             use crate::simulation::MockDataClient;
+
+            fn data_client_fixture() -> Box<dyn DataClient> {
+                Box::new(MockDataClient::new())
+            }
 
             fn strategy_fixture() -> StrategyDto {
                 StrategyDto::new(
@@ -339,21 +405,30 @@ pub mod bot {
                 )
             }
 
-            fn compiled_strategy_fixture() -> GenResult<CompiledStrategy> {
+            fn compiled_strategy_fixture() -> GenResult<RunnableStrategy> {
                 let strategy =
                     from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
-                CompiledStrategy::new(strategy)
+                RunnableStrategy::new(strategy, data_client_fixture())
             }
 
             #[test]
-            fn asset_score() -> GenResult<()> {
-                let compiled_strategy = compiled_strategy_fixture()?;
+            fn run_on_asset() -> GenResult<()> {
+                let runnable_strategy = compiled_strategy_fixture()?;
                 let asset = Asset::new(String::from("A"));
                 let timestamp = MockDataClient::today();
-                let data_client = MockDataClient::new();
-                let asset_score: AssetScore =
-                    compiled_strategy.asset_score(asset, timestamp, Box::new(data_client))?;
+                let asset_score: AssetScore = runnable_strategy.run_on_asset(asset, timestamp)?;
                 assert_eq!(asset_score.status, AssetScoreStatus::Complete);
+                Ok(())
+            }
+
+            #[test]
+            fn compute_allocations() -> GenResult<()> {
+                let runnable_strategy = compiled_strategy_fixture()?;
+                let timestamp = MockDataClient::today();
+                let asset_allocations: AssetAllocations =
+                    runnable_strategy.compute_allocations(timestamp)?;
+                assert_eq!(asset_allocations.timestamp, timestamp);
+                assert_eq!(asset_allocations.allocations.len(), 3);
                 Ok(())
             }
         }

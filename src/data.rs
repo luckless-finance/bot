@@ -21,11 +21,12 @@ use std::convert::TryFrom;
 
 pub type Symbol = String;
 
+// TODO
 pub struct Query {}
 
 impl TryFrom<QueryCalculationDto> for Query {
     type Error = GenError;
-    fn try_from(query_calculation_dto: QueryCalculationDto) -> GenResult<Self> {
+    fn try_from(_query_calculation_dto: QueryCalculationDto) -> GenResult<Self> {
         GenResult::Ok(Query {})
     }
 }

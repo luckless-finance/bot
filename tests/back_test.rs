@@ -67,19 +67,13 @@ mod tests {
     fn back_test() -> GenResult<()> {
         // apply strategy on market (DataClient) to determine score
         let strategy = get_strategy();
-        let compiled_strategy = CompiledStrategy::new(strategy)?;
+        let runnable_strategy = RunnableStrategy::new(strategy, Box::new(MockDataClient::new()))?;
         // symbols: "A", "B" and "C"
         let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         let asset_scores: Vec<AssetScore> = data_client
             .assets()
             .values()
-            .flat_map(|a| {
-                compiled_strategy.asset_score(
-                    a.clone(),
-                    MockDataClient::today(),
-                    Box::new(MockDataClient::new()),
-                )
-            })
+            .flat_map(|a| runnable_strategy.run_on_asset(a.clone(), MockDataClient::today()))
             .collect();
         let asset_score_time_series: HashMap<&Asset, &TimeSeries1D> = asset_scores
             .iter()
