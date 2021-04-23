@@ -13,6 +13,8 @@ use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
 pub type DataPointValue = f64;
+// TODO enforce allocations 0 <= a <= 1
+pub type Allocation = f64;
 pub type TimeStamp = DateTime<Utc>;
 pub type Index = Vec<TimeStamp>;
 
@@ -55,15 +57,19 @@ impl TimeSeries1D {
             values,
         )
     }
-    /// Borrow `values`
+    /// get clone of `values`
     pub fn values(&self) -> Vec<DataPointValue> {
         self.data.values().cloned().collect()
     }
+    /// get clone of `index`
     pub fn index(&self) -> Index {
         self.data.keys().cloned().collect()
     }
     pub fn len(&self) -> usize {
         self.index().len()
+    }
+    pub fn get(&self, timestamp: &TimeStamp) -> Option<&DataPointValue> {
+        self.data.get(timestamp)
     }
     /// Align the indices of 2 `TimeSeries`, only values with indices in both `TimeSeries` are included.
     /// Creates 2 new `TimeSeries` instances.
@@ -163,6 +169,20 @@ impl TimeSeries1D {
             .windows(window_size)
             .map(|x| x.iter().sum::<DataPointValue>())
             .map(|x| x.div(window_size as DataPointValue))
+            .collect();
+        TimeSeries1D::from_vec(index, values)
+    }
+    // TODO test me
+    pub fn relative_change(&self) -> Self {
+        let mut index = self.index().clone();
+        index.reverse();
+        index.truncate(self.len() - 1);
+        index.reverse();
+        let values = self
+            .values()
+            .windows(2)
+            // TODO handle divide by 0
+            .map(|x| (x[1] - x[0]) / x[0])
             .collect();
         TimeSeries1D::from_vec(index, values)
     }

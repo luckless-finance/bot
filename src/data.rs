@@ -21,13 +21,30 @@ use std::convert::TryFrom;
 
 pub type Symbol = String;
 
-// TODO
-pub struct Query {}
+pub enum QueryType {
+    AbsolutePrice,
+    RelativePriceChange,
+}
+
+pub struct Query {
+    query_type: QueryType,
+}
+
+impl Query {
+    pub fn new(query_type: QueryType) -> Self {
+        Query { query_type }
+    }
+    pub fn query_type(&self) -> &QueryType {
+        &self.query_type
+    }
+}
 
 impl TryFrom<QueryCalculationDto> for Query {
     type Error = GenError;
     fn try_from(_query_calculation_dto: QueryCalculationDto) -> GenResult<Self> {
-        GenResult::Ok(Query {})
+        GenResult::Ok(Query {
+            query_type: QueryType::AbsolutePrice,
+        })
     }
 }
 
@@ -36,10 +53,13 @@ pub trait DataClient {
     fn duplicate(&self) -> Box<dyn DataClient>;
     fn assets(&self) -> &HashMap<Symbol, Asset>;
     fn asset(&self, symbol: &Symbol) -> GenResult<&Asset>;
+    // TODO encapsulate params in struct
+    // TODO support date ranges to minimize payloads
     fn query(
         &self,
         asset: &Asset,
         timestamp: &TimeStamp,
+        // TODO make required
         query: Option<Query>,
     ) -> GenResult<TimeSeries1D>;
 }

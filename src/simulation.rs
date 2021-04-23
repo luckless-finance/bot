@@ -4,7 +4,7 @@ use std::io::{Error, ErrorKind};
 
 use chrono::prelude::*;
 
-use crate::data::{Asset, DataClient, Query, Symbol};
+use crate::data::{Asset, DataClient, Query, QueryType, Symbol};
 use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::{AssetNotFoundError, GenResult};
 use crate::time_series::{TimeSeries1D, TimeStamp};
@@ -54,9 +54,17 @@ impl DataClient for MockDataClient {
         timestamp: &TimeStamp,
         query_dto: Option<Query>,
     ) -> GenResult<TimeSeries1D> {
-        match self.data.get(&asset.symbol().to_string()) {
-            Some(ts) => Ok(ts.filter_le(timestamp)),
-            None => Err(Box::new(Error::new(ErrorKind::NotFound, "Asset not found"))),
+        let absolute_prices: GenResult<TimeSeries1D> =
+            match self.data.get(&asset.symbol().to_string()) {
+                Some(ts) => Ok(ts.filter_le(timestamp)),
+                None => Err(Box::new(Error::new(ErrorKind::NotFound, "Asset not found"))),
+            };
+        match query_dto {
+            Some(query) => match query.query_type() {
+                QueryType::AbsolutePrice => absolute_prices,
+                QueryType::RelativePriceChange => Ok(absolute_prices.unwrap().relative_change()),
+            },
+            None => absolute_prices,
         }
     }
 }
