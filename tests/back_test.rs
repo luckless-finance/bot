@@ -62,6 +62,10 @@ mod tests {
         Ok(())
     }
 
+    /// Executes a strategy over time
+    ///
+    /// 1. Build runnable strategy
+    /// 2. Replay strategy against historical data
     ///
     /// Mock Market contains Assets A, B, C
     #[test]
@@ -74,7 +78,7 @@ mod tests {
         // build executable strategy
         let runnable_strategy = RunnableStrategy::new(strategy, data_client.clone())?;
 
-        // 1. Replay strategy of historical data
+        // 2. Replay strategy against historical data
         let back_test_days = 3;
         let back_test_end = MockDataClient::today();
         let back_test_start = back_test_end - TimeSeries1D::index_unit() * back_test_days;
