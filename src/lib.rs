@@ -29,8 +29,8 @@ pub mod bot {
 
         use serde::export::Formatter;
 
-        use crate::bot::dag::Dag;
-        use crate::data::{Asset, DataClient};
+        use crate::data::{Asset, DataClient, Query};
+        use crate::dto::dag::Dag;
         use crate::dto::strategy::{
             CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, Operation,
             QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
@@ -103,7 +103,7 @@ pub mod bot {
 
         /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
         #[derive(Debug)]
-        pub struct ScorableAsset {
+        pub(crate) struct ScorableAsset {
             asset: Asset,
             timestamp: TimeStamp,
             execution_order: Vec<TimeSeriesName>,
@@ -151,7 +151,7 @@ pub mod bot {
                 }
             }
 
-            pub fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
+            pub(crate) fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
                 match self.calc_time_series.get(calc_name) {
                     Some(time_series_) => Ok(time_series_),
                     None => Err(UpstreamNotFoundError::new(calc_name.to_string())),
@@ -199,9 +199,10 @@ pub mod bot {
             fn handle_query(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
                 assert_eq!(*calculation_dto.operation(), Operation::QUERY);
                 let query_dto: QueryCalculationDto = calculation_dto.clone().try_into()?;
+                let query: Query = query_dto.try_into()?;
                 Ok(self
                     .data_client
-                    .query(&self.asset, &self.timestamp, Some(query_dto))?
+                    .query(&self.asset, &self.timestamp, Some(query))?
                     .clone())
             }
             fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
@@ -357,7 +358,9 @@ pub mod bot {
             }
         }
     }
+}
 
+pub mod dto {
     pub mod dag {
         #![allow(dead_code)]
 
@@ -379,13 +382,13 @@ pub mod bot {
 
         /// Directed acyclic graph where vertices/nodes represent calculations and edges represent dependencies.
         #[derive(Debug, Clone)]
-        pub struct Dag {
+        pub(crate) struct Dag {
             dag_dto: DiGraph<String, String>,
             node_lkup: HashMap<String, NodeIndex>,
         }
 
         impl Dag {
-            pub fn new(strategy_dto: StrategyDto) -> GenResult<Self> {
+            pub(crate) fn new(strategy_dto: StrategyDto) -> GenResult<Self> {
                 let dag_dto: DiGraph<String, String> = strategy_dto.try_into()?;
                 let node_lkup: HashMap<String, NodeIndex<u32>> = dag_dto
                     .node_indices()
@@ -394,7 +397,7 @@ pub mod bot {
                     .collect();
                 Ok(Dag { dag_dto, node_lkup })
             }
-            pub fn execution_order(&self) -> Vec<String> {
+            pub(crate) fn execution_order(&self) -> Vec<String> {
                 toposort(&self.dag_dto, None)
                     .expect("unable to toposort")
                     .iter()
@@ -403,7 +406,7 @@ pub mod bot {
                     })
                     .collect()
             }
-            pub fn upstream(&self, node: &String) -> Vec<String> {
+            pub(crate) fn upstream(&self, node: &String) -> Vec<String> {
                 self.dag_dto
                     .neighbors_directed(
                         self.node_lkup.get(node).expect("node not found").clone(),
@@ -483,7 +486,7 @@ pub mod bot {
             use petgraph::algo::toposort;
             use petgraph::prelude::*;
 
-            use crate::bot::dag::{Dag, DiGraph};
+            use crate::dto::dag::{Dag, DiGraph};
             use crate::dto::strategy::{from_path, StrategyDto};
             use crate::errors::GenResult;
 
@@ -636,11 +639,6 @@ pub mod bot {
             }
         }
     }
-}
-
-pub mod dto {
-    // TODO trade DTOs for messages to external broker service
-    pub mod trade {}
 
     pub mod strategy {
         use std::borrow::BorrowMut;
@@ -656,6 +654,41 @@ pub mod dto {
 
         pub type TimeSeriesReference = String;
         pub type TimeSeriesName = String;
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+        pub struct StrategyDto {
+            name: String,
+            score: ScoreDto,
+            calcs: Vec<CalculationDto>,
+        }
+
+        impl StrategyDto {
+            pub(crate) fn new(name: String, score: ScoreDto, calcs: Vec<CalculationDto>) -> Self {
+                &calcs
+                    .iter()
+                    .find(|c| c.name == score.calc)
+                    .expect("Invalid strategy, score calc not found");
+                StrategyDto { name, score, calcs }
+            }
+            pub(crate) fn name(&self) -> &str {
+                &self.name
+            }
+            pub(crate) fn score(&self) -> &ScoreDto {
+                &self.score
+            }
+            pub(crate) fn calcs(&self) -> &Vec<CalculationDto> {
+                &self.calcs
+            }
+        }
+
+        pub fn from_path(file_path: &Path) -> Result<StrategyDto, serde_yaml::Error> {
+            let mut strategy_file: File = File::open(file_path).expect("unable to open file");
+            let mut strategy_yaml = String::new();
+            strategy_file
+                .read_to_string(strategy_yaml.borrow_mut())
+                .expect("unable to read strategy file");
+            serde_yaml::from_str(&strategy_yaml)
+        }
 
         #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
         #[allow(non_camel_case_types)]
@@ -695,15 +728,15 @@ pub mod dto {
         }
 
         #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-        pub struct ScoreDto {
+        pub(crate) struct ScoreDto {
             calc: String,
         }
 
         impl ScoreDto {
-            pub fn new(calc: String) -> Self {
+            pub(crate) fn new(calc: String) -> Self {
                 ScoreDto { calc }
             }
-            pub fn calc(&self) -> &str {
+            pub(crate) fn calc(&self) -> &str {
                 &self.calc
             }
         }
@@ -717,6 +750,9 @@ pub mod dto {
         }
 
         impl OperandDto {
+            pub fn new(name: String, _type: OperandType, value: String) -> Self {
+                OperandDto { name, _type, value }
+            }
             pub fn name(&self) -> &str {
                 &self.name
             }
@@ -728,29 +764,11 @@ pub mod dto {
             }
         }
 
-        impl OperandDto {
-            pub fn new(name: String, _type: OperandType, value: String) -> Self {
-                OperandDto { name, _type, value }
-            }
-        }
-
         #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
         pub struct CalculationDto {
             name: String,
             operation: Operation,
             operands: Vec<OperandDto>,
-        }
-
-        impl CalculationDto {
-            pub fn name(&self) -> &str {
-                &self.name
-            }
-            pub fn operation(&self) -> &Operation {
-                &self.operation
-            }
-            pub fn operands(&self) -> &Vec<OperandDto> {
-                &self.operands
-            }
         }
 
         impl CalculationDto {
@@ -760,6 +778,15 @@ pub mod dto {
                     operation,
                     operands,
                 }
+            }
+            pub fn name(&self) -> &str {
+                &self.name
+            }
+            pub fn operation(&self) -> &Operation {
+                &self.operation
+            }
+            pub fn operands(&self) -> &Vec<OperandDto> {
+                &self.operands
             }
         }
 
@@ -945,44 +972,6 @@ pub mod dto {
                     })
                 }
             }
-        }
-
-        #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-        pub struct StrategyDto {
-            name: String,
-            score: ScoreDto,
-            calcs: Vec<CalculationDto>,
-        }
-
-        impl StrategyDto {
-            pub fn name(&self) -> &str {
-                &self.name
-            }
-            pub fn score(&self) -> &ScoreDto {
-                &self.score
-            }
-            pub fn calcs(&self) -> &Vec<CalculationDto> {
-                &self.calcs
-            }
-        }
-
-        impl StrategyDto {
-            pub fn new(name: String, score: ScoreDto, calcs: Vec<CalculationDto>) -> Self {
-                &calcs
-                    .iter()
-                    .find(|c| c.name == score.calc)
-                    .expect("Invalid strategy, score calc not found");
-                StrategyDto { name, score, calcs }
-            }
-        }
-
-        pub fn from_path(file_path: &Path) -> Result<StrategyDto, serde_yaml::Error> {
-            let mut strategy_file: File = File::open(file_path).expect("unable to open file");
-            let mut strategy_yaml = String::new();
-            strategy_file
-                .read_to_string(strategy_yaml.borrow_mut())
-                .expect("unable to read strategy file");
-            serde_yaml::from_str(&strategy_yaml)
         }
 
         #[cfg(test)]

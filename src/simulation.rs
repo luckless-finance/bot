@@ -4,7 +4,7 @@ use std::io::{Error, ErrorKind};
 
 use chrono::prelude::*;
 
-use crate::data::{Asset, DataClient, Symbol};
+use crate::data::{Asset, DataClient, Query, Symbol};
 use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::{AssetNotFoundError, GenResult};
 use crate::time_series::{TimeSeries1D, TimeStamp};
@@ -52,7 +52,7 @@ impl DataClient for MockDataClient {
         &self,
         asset: &Asset,
         timestamp: &TimeStamp,
-        query_dto: Option<QueryCalculationDto>,
+        query_dto: Option<Query>,
     ) -> GenResult<TimeSeries1D> {
         match self.data.get(&asset.symbol().to_string()) {
             Some(ts) => Ok(ts.filter_le(timestamp)),

@@ -21,6 +21,15 @@ use std::convert::TryFrom;
 
 pub type Symbol = String;
 
+pub struct Query {}
+
+impl TryFrom<QueryCalculationDto> for Query {
+    type Error = GenError;
+    fn try_from(query_calculation_dto: QueryCalculationDto) -> GenResult<Self> {
+        GenResult::Ok(Query {})
+    }
+}
+
 // TODO query memoization/caching
 pub trait DataClient {
     fn duplicate(&self) -> Box<dyn DataClient>;
@@ -30,7 +39,7 @@ pub trait DataClient {
         &self,
         asset: &Asset,
         timestamp: &TimeStamp,
-        query: Option<QueryCalculationDto>,
+        query: Option<Query>,
     ) -> GenResult<TimeSeries1D>;
 }
 
