@@ -44,6 +44,12 @@ pub trait DataClient {
     ) -> GenResult<TimeSeries1D>;
 }
 
+impl Clone for Box<dyn DataClient> {
+    fn clone(&self) -> Box<dyn DataClient> {
+        self.duplicate()
+    }
+}
+
 impl fmt::Debug for dyn DataClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DataClient")

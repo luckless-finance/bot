@@ -78,7 +78,7 @@ pub mod bot {
                 })
             }
             pub fn duplicate(&self) -> GenResult<Self> {
-                RunnableStrategy::new(self.strategy.clone(), self.data_client.duplicate())
+                RunnableStrategy::new(self.strategy.clone(), self.data_client.clone())
             }
             /// Computes the score of the given `Asset` at the given `TimeStamp`
             pub fn run_on_asset(
@@ -91,7 +91,7 @@ pub mod bot {
                     timestamp,
                     execution_order: self.dag.execution_order().clone(),
                     calcs: self.calcs.clone(),
-                    data_client: self.data_client.duplicate(),
+                    data_client: self.data_client.clone(),
                     calc_status: self
                         .calcs
                         .keys()
@@ -138,6 +138,13 @@ pub mod bot {
                     })
                     .collect();
                 Ok(AssetAllocations::new(timestamp, weightings))
+            }
+        }
+
+        impl Clone for RunnableStrategy {
+            fn clone(&self) -> RunnableStrategy {
+                // FIXME make RunnableStrategy::new not return GenResult
+                self.duplicate().unwrap()
             }
         }
 

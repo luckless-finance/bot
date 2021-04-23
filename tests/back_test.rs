@@ -62,39 +62,28 @@ mod tests {
         Ok(())
     }
 
+    ///
     /// Mock Market contains Assets A, B, C
     #[test]
     fn back_test() -> GenResult<()> {
-        // apply strategy on market (DataClient) to determine score
+        // 1. Build runnable strategy
+        // load strategy yaml config
         let strategy = get_strategy();
-        let runnable_strategy = RunnableStrategy::new(strategy, Box::new(MockDataClient::new()))?;
-        // symbols: "A", "B" and "C"
+        // init data client
         let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
-        let asset_scores: Vec<AssetScore> = data_client
-            .assets()
-            .values()
-            .flat_map(|a| runnable_strategy.run_on_asset(a.clone(), MockDataClient::today()))
-            .collect();
-        let asset_score_time_series: HashMap<&Asset, &TimeSeries1D> = asset_scores
-            .iter()
-            .map(|asset_score| (asset_score.asset(), asset_score.score()))
-            .collect();
-        let score_time_series: Vec<&TimeSeries1D> =
-            asset_score_time_series.values().cloned().collect();
-        plot_ts(score_time_series.clone());
+        // build executable strategy
+        let runnable_strategy = RunnableStrategy::new(strategy, data_client.clone())?;
 
-        // determine weightings of all assets in market
-        let zeroed: Vec<TimeSeries1D> = score_time_series
-            .iter()
-            .map(|score_ts| score_ts.zero_negatives())
-            .collect();
-        plot_ts(zeroed.iter().collect());
-        let ts_sum = apply(zeroed.iter().collect(), |values| values.iter().sum());
-        let weightings: Vec<TimeSeries1D> = zeroed
-            .iter()
-            .map(|score_ts| score_ts.ts_div(&ts_sum))
-            .collect();
-        plot_ts(weightings.iter().collect());
+        // 1. Replay strategy of historical data
+        let back_test_days = 3;
+        let back_test_end = MockDataClient::today();
+        let back_test_start = back_test_end - TimeSeries1D::index_unit() * back_test_days;
+        for time_index in 0..back_test_days {
+            let today = back_test_start + TimeSeries1D::index_unit() * time_index;
+            let allocations = runnable_strategy.compute_allocations(today)?;
+
+            assert_eq!(allocations.allocations().len(), data_client.assets().len())
+        }
 
         Ok(())
     }
