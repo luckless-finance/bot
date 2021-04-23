@@ -22,9 +22,11 @@ pub struct TimeSeries1D {
 }
 
 impl TimeSeries1D {
+    // TODO abstraction leak: TimeSeries1D should not know about constraints imposed on time
     pub fn epoch() -> DateTime<Utc> {
         Utc.ymd(2010, 1, 1).and_hms(0, 0, 0)
     }
+    // TODO abstraction leak: TimeSeries1D should not know about constraints imposed on time
     pub fn index_unit() -> Duration {
         Duration::days(1)
     }

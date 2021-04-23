@@ -4,14 +4,14 @@ use std::io::{Error, ErrorKind};
 
 use chrono::prelude::*;
 
-use crate::data::{Asset, DataClient, Symbol};
+use crate::data::{Asset, DataClient, Query, Symbol};
 use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::{AssetNotFoundError, GenResult};
 use crate::time_series::{TimeSeries1D, TimeStamp};
 
 pub static DATA_SIZE: usize = 900;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MockDataClient {
     assets: HashMap<Symbol, Asset>,
     data: HashMap<Symbol, TimeSeries1D>,
@@ -32,6 +32,10 @@ fn simulate_time_series(n: usize) -> TimeSeries1D {
 }
 
 impl DataClient for MockDataClient {
+    fn duplicate(&self) -> Box<dyn DataClient> {
+        Box::new(self.clone())
+    }
+
     fn assets(&self) -> &HashMap<Symbol, Asset> {
         &self.assets
     }
@@ -48,7 +52,7 @@ impl DataClient for MockDataClient {
         &self,
         asset: &Asset,
         timestamp: &TimeStamp,
-        query_dto: Option<QueryCalculationDto>,
+        query_dto: Option<Query>,
     ) -> GenResult<TimeSeries1D> {
         match self.data.get(&asset.symbol().to_string()) {
             Some(ts) => Ok(ts.filter_le(timestamp)),

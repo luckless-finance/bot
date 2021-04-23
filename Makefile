@@ -42,16 +42,21 @@ test:
 	@echo "-------------------"
 	cargo test;
 
-pre-commit:
+pre-commit: check
 	@echo "-------------------"
 	@echo "pre-commit validation: test, format, check"
 	@echo "-------------------"
-	cargo test --quiet && rustfmt src/* --check && make check
-	cargo test --quiet && rustfmt tests/* --check && make check
+	cargo test --quiet
 
 watch-test:
 	@echo "-------------------"
 	@echo "run tests whenever files change (see .ignore)"
 	@echo "-------------------"
 	cargo watch -x test
+
+release:
+	@echo "-------------------"
+	@echo "build release binary (see ./target/release)"
+	@echo "-------------------"
+	cargo build --release --all-targets
 

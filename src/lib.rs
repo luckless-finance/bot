@@ -22,20 +22,20 @@ pub mod bot {
         #![allow(dead_code)]
 
         use std;
-        use std::collections::HashMap;
+        use std::collections::{BTreeMap, HashMap};
         use std::convert::TryInto;
         use std::fmt;
 
         use serde::export::Formatter;
 
-        use crate::bot::dag::Dag;
-        use crate::data::{Asset, DataClient};
+        use crate::data::{Asset, DataClient, Query};
+        use crate::dto::dag::Dag;
         use crate::dto::strategy::{
             CalculationDto, DyadicScalarCalculationDto, DyadicTsCalculationDto, Operation,
             QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
         };
         use crate::errors::{GenResult, UpstreamNotFoundError};
-        use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
+        use crate::time_series::{apply, DataPointValue, TimeSeries1D, TimeStamp};
 
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub enum CalculationStatus {
@@ -54,40 +54,44 @@ pub mod bot {
         }
 
         /// Wraps several Dtos required traverse and consume a strategy
-        #[derive(Debug, Clone)]
-        pub struct CompiledStrategy {
+        #[derive(Debug)]
+        pub struct RunnableStrategy {
+            data_client: Box<dyn DataClient>,
             strategy: StrategyDto,
             dag: Dag,
             calcs: HashMap<TimeSeriesName, CalculationDto>,
         }
 
-        impl CompiledStrategy {
-            pub fn new(strategy: StrategyDto) -> GenResult<Self> {
+        impl RunnableStrategy {
+            pub fn new(strategy: StrategyDto, data_client: Box<dyn DataClient>) -> GenResult<Self> {
                 let dag = Dag::new(strategy.clone())?;
                 let calcs: HashMap<String, CalculationDto> = strategy
                     .calcs()
                     .iter()
                     .map(|calc| (calc.name().to_string(), calc.clone()))
                     .collect();
-                Ok(CompiledStrategy {
+                Ok(RunnableStrategy {
+                    data_client,
                     strategy,
                     dag,
                     calcs,
                 })
             }
+            pub fn duplicate(&self) -> GenResult<Self> {
+                RunnableStrategy::new(self.strategy.clone(), self.data_client.clone())
+            }
             /// Computes the score of the given `Asset` at the given `TimeStamp`
-            pub fn asset_score(
+            pub fn run_on_asset(
                 &self,
                 asset: Asset,
                 timestamp: TimeStamp,
-                data_client: Box<dyn DataClient>,
             ) -> GenResult<AssetScore> {
                 let mut scorable_asset = ScorableAsset {
                     asset,
                     timestamp,
                     execution_order: self.dag.execution_order().clone(),
                     calcs: self.calcs.clone(),
-                    data_client,
+                    data_client: self.data_client.clone(),
                     calc_status: self
                         .calcs
                         .keys()
@@ -98,11 +102,55 @@ pub mod bot {
                 scorable_asset.execute()?;
                 Ok(AssetScore::new(scorable_asset)?)
             }
+            pub fn compute_allocations(&self, timestamp: TimeStamp) -> GenResult<AssetAllocations> {
+                let asset_scores: Vec<AssetScore> = self
+                    .data_client
+                    .assets()
+                    .values()
+                    .cloned()
+                    .flat_map(|asset| self.run_on_asset(asset.clone(), timestamp))
+                    .collect();
+                let zeroed: HashMap<Asset, TimeSeries1D> = asset_scores
+                    .iter()
+                    .map(|asset_score| {
+                        (
+                            asset_score.asset().clone(),
+                            asset_score.score().zero_negatives(),
+                        )
+                    })
+                    .collect();
+                // daily sums
+                let ts_sum = apply(zeroed.values().collect(), |values| values.iter().sum());
+                // allocations
+                let weightings: BTreeMap<Asset, DataPointValue> = zeroed
+                    .iter()
+                    .map(|asset_score| {
+                        (
+                            asset_score.0.clone(),
+                            asset_score
+                                .1
+                                .ts_div(&ts_sum)
+                                .values()
+                                .last()
+                                .unwrap()
+                                .clone(),
+                        )
+                    })
+                    .collect();
+                Ok(AssetAllocations::new(timestamp, weightings))
+            }
+        }
+
+        impl Clone for RunnableStrategy {
+            fn clone(&self) -> RunnableStrategy {
+                // FIXME make RunnableStrategy::new not return GenResult
+                self.duplicate().unwrap()
+            }
         }
 
         /// Composes a `Bot` with a `Asset`, `Timestamp` and `DataClient`.
         #[derive(Debug)]
-        pub struct ScorableAsset {
+        pub(crate) struct ScorableAsset {
             asset: Asset,
             timestamp: TimeStamp,
             execution_order: Vec<TimeSeriesName>,
@@ -150,7 +198,7 @@ pub mod bot {
                 }
             }
 
-            pub fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
+            pub(crate) fn upstream(&self, calc_name: &str) -> GenResult<&TimeSeries1D> {
                 match self.calc_time_series.get(calc_name) {
                     Some(time_series_) => Ok(time_series_),
                     None => Err(UpstreamNotFoundError::new(calc_name.to_string())),
@@ -198,9 +246,10 @@ pub mod bot {
             fn handle_query(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
                 assert_eq!(*calculation_dto.operation(), Operation::QUERY);
                 let query_dto: QueryCalculationDto = calculation_dto.clone().try_into()?;
+                let query: Query = query_dto.try_into()?;
                 Ok(self
                     .data_client
-                    .query(&self.asset, &self.timestamp, Some(query_dto))?
+                    .query(&self.asset, &self.timestamp, Some(query))?
                     .clone())
             }
             fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
@@ -305,21 +354,46 @@ pub mod bot {
             }
         }
 
+        #[derive(Clone, Debug, PartialEq)]
+        pub struct AssetAllocations {
+            timestamp: TimeStamp,
+            allocations: BTreeMap<Asset, DataPointValue>,
+        }
+
+        impl AssetAllocations {
+            pub fn new(timestamp: TimeStamp, allocations: BTreeMap<Asset, f64>) -> Self {
+                AssetAllocations {
+                    timestamp,
+                    allocations,
+                }
+            }
+            pub fn timestamp(&self) -> TimeStamp {
+                self.timestamp
+            }
+            pub fn allocations(&self) -> &BTreeMap<Asset, f64> {
+                &self.allocations
+            }
+        }
+
         #[cfg(test)]
         mod tests {
             use std::collections::HashMap;
             use std::path::Path;
 
             use crate::bot::asset_score::{
-                AssetScore, AssetScoreStatus, CalculationStatus, CompiledStrategy,
+                AssetAllocations, AssetScore, AssetScoreStatus, CalculationStatus, RunnableStrategy,
             };
-            use crate::data::Asset;
+            use crate::data::{Asset, DataClient};
             use crate::dto::strategy::{
                 from_path, CalculationDto, OperandDto, OperandType, Operation, ScoreDto,
                 StrategyDto,
             };
             use crate::errors::GenResult;
             use crate::simulation::MockDataClient;
+
+            fn data_client_fixture() -> Box<dyn DataClient> {
+                Box::new(MockDataClient::new())
+            }
 
             fn strategy_fixture() -> StrategyDto {
                 StrategyDto::new(
@@ -337,26 +411,37 @@ pub mod bot {
                 )
             }
 
-            fn compiled_strategy_fixture() -> GenResult<CompiledStrategy> {
+            fn compiled_strategy_fixture() -> GenResult<RunnableStrategy> {
                 let strategy =
                     from_path(Path::new("strategy.yaml")).expect("unable to load strategy");
-                CompiledStrategy::new(strategy)
+                RunnableStrategy::new(strategy, data_client_fixture())
             }
 
             #[test]
-            fn asset_score() -> GenResult<()> {
-                let compiled_strategy = compiled_strategy_fixture()?;
+            fn run_on_asset() -> GenResult<()> {
+                let runnable_strategy = compiled_strategy_fixture()?;
                 let asset = Asset::new(String::from("A"));
                 let timestamp = MockDataClient::today();
-                let data_client = MockDataClient::new();
-                let asset_score: AssetScore =
-                    compiled_strategy.asset_score(asset, timestamp, Box::new(data_client))?;
+                let asset_score: AssetScore = runnable_strategy.run_on_asset(asset, timestamp)?;
                 assert_eq!(asset_score.status, AssetScoreStatus::Complete);
+                Ok(())
+            }
+
+            #[test]
+            fn compute_allocations() -> GenResult<()> {
+                let runnable_strategy = compiled_strategy_fixture()?;
+                let timestamp = MockDataClient::today();
+                let asset_allocations: AssetAllocations =
+                    runnable_strategy.compute_allocations(timestamp)?;
+                assert_eq!(asset_allocations.timestamp, timestamp);
+                assert_eq!(asset_allocations.allocations.len(), 3);
                 Ok(())
             }
         }
     }
+}
 
+pub mod dto {
     pub mod dag {
         #![allow(dead_code)]
 
@@ -378,13 +463,13 @@ pub mod bot {
 
         /// Directed acyclic graph where vertices/nodes represent calculations and edges represent dependencies.
         #[derive(Debug, Clone)]
-        pub struct Dag {
+        pub(crate) struct Dag {
             dag_dto: DiGraph<String, String>,
             node_lkup: HashMap<String, NodeIndex>,
         }
 
         impl Dag {
-            pub fn new(strategy_dto: StrategyDto) -> GenResult<Self> {
+            pub(crate) fn new(strategy_dto: StrategyDto) -> GenResult<Self> {
                 let dag_dto: DiGraph<String, String> = strategy_dto.try_into()?;
                 let node_lkup: HashMap<String, NodeIndex<u32>> = dag_dto
                     .node_indices()
@@ -393,7 +478,7 @@ pub mod bot {
                     .collect();
                 Ok(Dag { dag_dto, node_lkup })
             }
-            pub fn execution_order(&self) -> Vec<String> {
+            pub(crate) fn execution_order(&self) -> Vec<String> {
                 toposort(&self.dag_dto, None)
                     .expect("unable to toposort")
                     .iter()
@@ -402,7 +487,7 @@ pub mod bot {
                     })
                     .collect()
             }
-            pub fn upstream(&self, node: &String) -> Vec<String> {
+            pub(crate) fn upstream(&self, node: &String) -> Vec<String> {
                 self.dag_dto
                     .neighbors_directed(
                         self.node_lkup.get(node).expect("node not found").clone(),
@@ -482,7 +567,7 @@ pub mod bot {
             use petgraph::algo::toposort;
             use petgraph::prelude::*;
 
-            use crate::bot::dag::{Dag, DiGraph};
+            use crate::dto::dag::{Dag, DiGraph};
             use crate::dto::strategy::{from_path, StrategyDto};
             use crate::errors::GenResult;
 
@@ -635,11 +720,6 @@ pub mod bot {
             }
         }
     }
-}
-
-pub mod dto {
-    // TODO trade DTOs for messages to external broker service
-    pub mod trade {}
 
     pub mod strategy {
         use std::borrow::BorrowMut;
@@ -655,6 +735,41 @@ pub mod dto {
 
         pub type TimeSeriesReference = String;
         pub type TimeSeriesName = String;
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+        pub struct StrategyDto {
+            name: String,
+            score: ScoreDto,
+            calcs: Vec<CalculationDto>,
+        }
+
+        impl StrategyDto {
+            pub(crate) fn new(name: String, score: ScoreDto, calcs: Vec<CalculationDto>) -> Self {
+                &calcs
+                    .iter()
+                    .find(|c| c.name == score.calc)
+                    .expect("Invalid strategy, score calc not found");
+                StrategyDto { name, score, calcs }
+            }
+            pub(crate) fn name(&self) -> &str {
+                &self.name
+            }
+            pub(crate) fn score(&self) -> &ScoreDto {
+                &self.score
+            }
+            pub(crate) fn calcs(&self) -> &Vec<CalculationDto> {
+                &self.calcs
+            }
+        }
+
+        pub fn from_path(file_path: &Path) -> Result<StrategyDto, serde_yaml::Error> {
+            let mut strategy_file: File = File::open(file_path).expect("unable to open file");
+            let mut strategy_yaml = String::new();
+            strategy_file
+                .read_to_string(strategy_yaml.borrow_mut())
+                .expect("unable to read strategy file");
+            serde_yaml::from_str(&strategy_yaml)
+        }
 
         #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
         #[allow(non_camel_case_types)]
@@ -694,15 +809,15 @@ pub mod dto {
         }
 
         #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-        pub struct ScoreDto {
+        pub(crate) struct ScoreDto {
             calc: String,
         }
 
         impl ScoreDto {
-            pub fn new(calc: String) -> Self {
+            pub(crate) fn new(calc: String) -> Self {
                 ScoreDto { calc }
             }
-            pub fn calc(&self) -> &str {
+            pub(crate) fn calc(&self) -> &str {
                 &self.calc
             }
         }
@@ -716,6 +831,9 @@ pub mod dto {
         }
 
         impl OperandDto {
+            pub fn new(name: String, _type: OperandType, value: String) -> Self {
+                OperandDto { name, _type, value }
+            }
             pub fn name(&self) -> &str {
                 &self.name
             }
@@ -727,29 +845,11 @@ pub mod dto {
             }
         }
 
-        impl OperandDto {
-            pub fn new(name: String, _type: OperandType, value: String) -> Self {
-                OperandDto { name, _type, value }
-            }
-        }
-
         #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
         pub struct CalculationDto {
             name: String,
             operation: Operation,
             operands: Vec<OperandDto>,
-        }
-
-        impl CalculationDto {
-            pub fn name(&self) -> &str {
-                &self.name
-            }
-            pub fn operation(&self) -> &Operation {
-                &self.operation
-            }
-            pub fn operands(&self) -> &Vec<OperandDto> {
-                &self.operands
-            }
         }
 
         impl CalculationDto {
@@ -759,6 +859,15 @@ pub mod dto {
                     operation,
                     operands,
                 }
+            }
+            pub fn name(&self) -> &str {
+                &self.name
+            }
+            pub fn operation(&self) -> &Operation {
+                &self.operation
+            }
+            pub fn operands(&self) -> &Vec<OperandDto> {
+                &self.operands
             }
         }
 
@@ -944,44 +1053,6 @@ pub mod dto {
                     })
                 }
             }
-        }
-
-        #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-        pub struct StrategyDto {
-            name: String,
-            score: ScoreDto,
-            calcs: Vec<CalculationDto>,
-        }
-
-        impl StrategyDto {
-            pub fn name(&self) -> &str {
-                &self.name
-            }
-            pub fn score(&self) -> &ScoreDto {
-                &self.score
-            }
-            pub fn calcs(&self) -> &Vec<CalculationDto> {
-                &self.calcs
-            }
-        }
-
-        impl StrategyDto {
-            pub fn new(name: String, score: ScoreDto, calcs: Vec<CalculationDto>) -> Self {
-                &calcs
-                    .iter()
-                    .find(|c| c.name == score.calc)
-                    .expect("Invalid strategy, score calc not found");
-                StrategyDto { name, score, calcs }
-            }
-        }
-
-        pub fn from_path(file_path: &Path) -> Result<StrategyDto, serde_yaml::Error> {
-            let mut strategy_file: File = File::open(file_path).expect("unable to open file");
-            let mut strategy_yaml = String::new();
-            strategy_file
-                .read_to_string(strategy_yaml.borrow_mut())
-                .expect("unable to read strategy file");
-            serde_yaml::from_str(&strategy_yaml)
         }
 
         #[cfg(test)]
