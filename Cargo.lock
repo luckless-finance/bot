@@ -430,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "luckless"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "approx",
  "cargo-watch",
