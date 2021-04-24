@@ -1,7 +1,8 @@
 // cli library
-use chrono::{Date, DateTime, Utc};
+use chrono::{DateTime, Utc};
 use luckless::back_test::{BackTest, BackTestConfig};
 use luckless::dto::strategy::{from_path, StrategyDto};
+use luckless::errors::GenResult;
 use luckless::simulation::MockDataClient;
 use luckless::time_series::TimeSeries1D;
 use std::path::PathBuf;
@@ -83,30 +84,33 @@ fn parse_args() -> Result<BackTestConfig, String> {
     Ok(BackTestConfig::new(timestamps, opt.strategy, data_client))
 }
 
-fn main() {
+fn main() -> GenResult<()> {
     let parse_result = parse_args();
     if parse_result.is_err() {
         println!("{:?}", parse_result.err().expect("Unknown Error"))
     } else {
         let back_test_config: BackTestConfig = parse_result.unwrap();
-        // print!("back_test_config: {:?}", back_test_config);
-        let performance = back_test_config.compute_performance();
+        println!("back_test_config: {:?}\n", back_test_config);
+        let back_test_result = back_test_config.compute_result(None)?;
+        println!("back_test_result: {:?}\n", back_test_result);
     }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{parse_date, parse_strategy_yaml};
     use chrono::{DateTime, Utc};
-    use luckless::back_test::BackTestConfig;
+    use luckless::back_test::{BackTest, BackTestConfig};
+    use luckless::errors::GenResult;
     use luckless::simulation::MockDataClient;
     use luckless::time_series::TimeSeries1D;
 
     #[test]
-    fn foo() -> Result<(), String> {
-        let start_str = "2019-12-01T00:00:00UTC";
+    fn main() -> GenResult<()> {
+        let start_str = "2011-12-01T00:00:00UTC";
         let start = parse_date(start_str)?;
-        let end_str = "2020-01-01T00:00:00UTC";
+        let end_str = "2012-01-01T00:00:00UTC";
         let end = parse_date(end_str)?;
         let strategy_str = "./strategy.yaml";
         let strategy = parse_strategy_yaml(strategy_str)?;
@@ -116,7 +120,8 @@ mod tests {
             .collect();
         let data_client = Box::new(MockDataClient::new());
         let back_test_config = BackTestConfig::new(timestamps, strategy, data_client);
-
+        let allocations = back_test_config.compute_allocations()?;
+        let back_test_result = back_test_config.compute_result(Some(allocations))?;
         Ok(())
     }
 }

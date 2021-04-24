@@ -65,8 +65,11 @@ impl TimeSeries1D {
     pub fn index(&self) -> Index {
         self.data.keys().cloned().collect()
     }
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
     pub fn len(&self) -> usize {
-        self.index().len()
+        self.data.len()
     }
     pub fn get(&self, timestamp: &TimeStamp) -> Option<&DataPointValue> {
         self.data.get(timestamp)
