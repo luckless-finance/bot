@@ -63,28 +63,28 @@ impl BackTest for BackTestConfig {
             let yesterday = timestamps.get(time_index - 1).unwrap();
             let today = timestamps.get(time_index).unwrap();
             let yesterday_allocations = allocations.get(yesterday).unwrap();
-            println!("today: {:?}", today);
+            // println!("today: {:?}", today);
 
             let mut today_return = 0f64;
             // TODO optimize to skip 0 allocations
             for asset in yesterday_allocations.keys() {
-                println!("asset: {:?}", asset);
+                // println!("asset: {:?}", asset);
                 // TODO optimize for only 1 timestamp
                 let relative_price_changes = self.data_client().query(
                     asset,
                     today,
                     Some(Query::new(QueryType::RelativePriceChange)),
                 )?;
-                println!("relative_price_changes: {:?}", relative_price_changes);
+                // println!("relative_price_changes: {:?}", relative_price_changes);
                 let asset_price_change = relative_price_changes.get(today).unwrap();
-                println!("asset_price_change: {:?}", asset_price_change);
+                // println!("asset_price_change: {:?}", asset_price_change);
                 let asset_allocation = yesterday_allocations.get(asset).unwrap();
-                println!("asset_allocation: {:?}", asset_allocation);
+                // println!("asset_allocation: {:?}", asset_allocation);
                 let allocation_return = asset_price_change * asset_allocation;
                 today_return += allocation_return;
-                println!("allocation_return: {:?}", allocation_return);
+                // println!("allocation_return: {:?}", allocation_return);
             }
-            println!("today_return: {:?}", today_return);
+            // println!("today_return: {:?}", today_return);
             performance.entry(*today.clone()).or_insert(today_return);
         }
         Ok(TimeSeries1D::new(performance))

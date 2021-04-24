@@ -57,22 +57,22 @@ fn parse_date(arg: &str) -> Result<DateTime<Utc>, String> {
 #[structopt(about = "Back test a financial stock picking strategy.")]
 struct Opt {
     /// first date in back test in RFC3339/ISO8601 format.
-    #[structopt(short = "s", long = "start", parse(try_from_str = parse_date), default_value = "2019-12-01T00:00:00UTC")]
+    #[structopt(short = "s", long = "start", parse(try_from_str = parse_date), default_value = "2011-12-01T00:00:00UTC")]
     start: DateTime<Utc>,
 
     /// first date in back test in RFC3339/ISO8601 format.
-    #[structopt(short = "e", long = "end", parse(try_from_str = parse_date), default_value = "2020-01-01T00:00:00UTC")]
+    #[structopt(short = "e", long = "end", parse(try_from_str = parse_date), default_value = "2012-01-01T00:00:00UTC")]
     end: DateTime<Utc>,
     /// path to strategy yaml file
     #[structopt(short = "f", long = "file", parse(try_from_str = parse_strategy_yaml), default_value = "./strategy.yaml")]
-    strategy_dto: StrategyDto,
+    strategy: StrategyDto,
 }
 
 fn parse_args() -> Result<BackTestConfig, String> {
     let opt: Opt = Opt::from_args();
-    println!("strategy: {:?}", opt.strategy_dto);
-    println!("start: {:?}", opt.start);
-    println!("end: {:?}", opt.end);
+    // println!("strategy: {:?}", opt.strategy);
+    // println!("start: {:?}", opt.start);
+    // println!("end: {:?}", opt.end);
     if !(opt.start < opt.end) {
         return Err("!(start < end)".to_string());
     }
@@ -80,11 +80,7 @@ fn parse_args() -> Result<BackTestConfig, String> {
         .map(|i| opt.start + TimeSeries1D::index_unit() * i as i32)
         .collect();
     let data_client = Box::new(MockDataClient::new());
-    Ok(BackTestConfig::new(
-        timestamps,
-        opt.strategy_dto,
-        data_client,
-    ))
+    Ok(BackTestConfig::new(timestamps, opt.strategy, data_client))
 }
 
 fn main() {
@@ -93,7 +89,34 @@ fn main() {
         println!("{:?}", parse_result.err().expect("Unknown Error"))
     } else {
         let back_test_config: BackTestConfig = parse_result.unwrap();
-        print!("back_test_config: {:?}", back_test_config);
+        // print!("back_test_config: {:?}", back_test_config);
         let performance = back_test_config.compute_performance();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{parse_date, parse_strategy_yaml};
+    use chrono::{DateTime, Utc};
+    use luckless::back_test::BackTestConfig;
+    use luckless::simulation::MockDataClient;
+    use luckless::time_series::TimeSeries1D;
+
+    #[test]
+    fn foo() -> Result<(), String> {
+        let start_str = "2019-12-01T00:00:00UTC";
+        let start = parse_date(start_str)?;
+        let end_str = "2020-01-01T00:00:00UTC";
+        let end = parse_date(end_str)?;
+        let strategy_str = "./strategy.yaml";
+        let strategy = parse_strategy_yaml(strategy_str)?;
+
+        let timestamps: Vec<DateTime<Utc>> = (0..(end - start).num_days())
+            .map(|i| start + TimeSeries1D::index_unit() * i as i32)
+            .collect();
+        let data_client = Box::new(MockDataClient::new());
+        let back_test_config = BackTestConfig::new(timestamps, strategy, data_client);
+
+        Ok(())
     }
 }
