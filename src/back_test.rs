@@ -5,7 +5,7 @@ use crate::errors::GenResult;
 use crate::time_series::{Allocation, DataPointValue, TimeSeries1D, TimeStamp};
 use std::collections::BTreeMap;
 
-struct BackTestConfig {
+pub struct BackTestConfig {
     timestamps: Vec<TimeStamp>,
     strategy: StrategyDto,
     data_client: Box<dyn DataClient>,
@@ -34,7 +34,7 @@ impl BackTestConfig {
     }
 }
 
-trait BackTest {
+pub trait BackTest {
     fn compute_allocations(&self) -> GenResult<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>>;
     fn compute_performance(&self) -> GenResult<TimeSeries1D>;
 }
