@@ -172,17 +172,61 @@ impl TimeSeries1D {
             .collect();
         TimeSeries1D::from_vec(index, values)
     }
-    // TODO test me
-    pub fn relative_change(&self) -> Self {
+    /// Compute element-wise slope with window length 2
+    /// ```text
+    ///         final - initial
+    /// slope = ───────────────
+    ///            initial
+    ///```
+    /// # Example
+    /// ```
+    /// use luckless::time_series::TimeSeries1D;
+    /// let ts = TimeSeries1D::from_values(vec![1.,4.,3.,4.]);
+    /// let slope = ts.slope();
+    /// assert_eq!(slope.len(), 3);
+    /// assert_eq!(slope.values(), vec![3.,-0.25,1./3.]);
+    /// ```
+    pub fn slope(&self) -> Self {
         let mut index = self.index().clone();
-        index.reverse();
-        index.truncate(self.len() - 1);
-        index.reverse();
+        index.drain(..1);
         let values = self
             .values()
             .windows(2)
             // TODO handle divide by 0
             .map(|x| (x[1] - x[0]) / x[0])
+            .collect();
+        TimeSeries1D::from_vec(index, values)
+    }
+
+    /// Compute element-wise slope with window length 2
+    /// ```text
+    ///                    final
+    /// relative_change = ───────
+    ///                   initial
+    ///```
+    ///  # Example
+    ///  ```
+    ///  use luckless::time_series::TimeSeries1D;
+    ///  let ts = TimeSeries1D::from_values(vec![1.,4.,3.,1.5]);
+    ///  let relative_change = ts.relative_change();
+    ///  assert_eq!(relative_change.len(), 3);
+    ///  assert_eq!(relative_change.values(), vec![4., 0.75, 0.5]);
+    /// /// relative_change can be used to compute overall_change
+    ///  let overall_change: f64 = relative_change.values().iter().product();
+    ///  assert_eq!(overall_change, 1.5);
+    /// /// overall_change can be used to compute the last value from the first
+    ///  assert_eq!(ts.values().first().unwrap() * overall_change, *ts.values().last().unwrap());
+    /// /// overall_change can be used to compute the first value from the last
+    ///  assert_eq!(ts.values().last().unwrap() / overall_change, *ts.values().first().unwrap());
+    ///  ```
+    pub fn relative_change(&self) -> Self {
+        let mut index = self.index().clone();
+        index.drain(..1);
+        let values = self
+            .values()
+            .windows(2)
+            // TODO handle divide by 0
+            .map(|x| x[1] / x[0])
             .collect();
         TimeSeries1D::from_vec(index, values)
     }
@@ -636,6 +680,20 @@ mod tests {
                 TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 9,
             ]
         );
+    }
+
+    #[test]
+    fn slope() {
+        let values = vec![1., 4., 3., 6.];
+        let index = vec![
+            TimeSeries1D::epoch(),
+            TimeSeries1D::epoch() + TimeSeries1D::index_unit(),
+            TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 2,
+            TimeSeries1D::epoch() + TimeSeries1D::index_unit() * 3,
+        ];
+        let ts = TimeSeries1D::from_vec(index.clone(), values).slope();
+        assert_eq!(ts.len(), 3);
+        assert_eq!(ts.values(), &[3., -0.25, 1.]);
     }
 
     #[test]

@@ -57,7 +57,7 @@ fn parse_date(arg: &str) -> Result<DateTime<Utc>, String> {
 #[structopt(about = "Back test a financial stock picking strategy.")]
 struct Opt {
     /// first date in back test in RFC3339/ISO8601 format.
-    #[structopt(short = "s", long = "start", parse(try_from_str = parse_date), default_value = "2010-01-01T00:00:00UTC")]
+    #[structopt(short = "s", long = "start", parse(try_from_str = parse_date), default_value = "2019-12-01T00:00:00UTC")]
     start: DateTime<Utc>,
 
     /// first date in back test in RFC3339/ISO8601 format.
@@ -93,6 +93,7 @@ fn main() {
         println!("{:?}", parse_result.err().expect("Unknown Error"))
     } else {
         let back_test_config: BackTestConfig = parse_result.unwrap();
-        // let performance = back_test_config.compute_performance();
+        print!("back_test_config: {:?}", back_test_config);
+        let performance = back_test_config.compute_performance();
     }
 }

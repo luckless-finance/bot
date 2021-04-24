@@ -62,7 +62,7 @@ impl DataClient for MockDataClient {
         match query_dto {
             Some(query) => match query.query_type() {
                 QueryType::AbsolutePrice => absolute_prices,
-                QueryType::RelativePriceChange => Ok(absolute_prices.unwrap().relative_change()),
+                QueryType::RelativePriceChange => Ok(absolute_prices.unwrap().slope()),
             },
             None => absolute_prices,
         }

@@ -5,6 +5,7 @@ use crate::errors::GenResult;
 use crate::time_series::{Allocation, DataPointValue, TimeSeries1D, TimeStamp};
 use std::collections::BTreeMap;
 
+#[derive(Clone, Debug)]
 pub struct BackTestConfig {
     timestamps: Vec<TimeStamp>,
     strategy: StrategyDto,
@@ -67,19 +68,20 @@ impl BackTest for BackTestConfig {
             let mut today_return = 0f64;
             // TODO optimize to skip 0 allocations
             for asset in yesterday_allocations.keys() {
+                println!("asset: {:?}", asset);
                 // TODO optimize for only 1 timestamp
                 let relative_price_changes = self.data_client().query(
                     asset,
                     today,
                     Some(Query::new(QueryType::RelativePriceChange)),
                 )?;
+                println!("relative_price_changes: {:?}", relative_price_changes);
                 let asset_price_change = relative_price_changes.get(today).unwrap();
+                println!("asset_price_change: {:?}", asset_price_change);
                 let asset_allocation = yesterday_allocations.get(asset).unwrap();
+                println!("asset_allocation: {:?}", asset_allocation);
                 let allocation_return = asset_price_change * asset_allocation;
                 today_return += allocation_return;
-                println!("asset: {:?}", asset);
-                println!("asset_price_change: {:?}", asset_price_change);
-                println!("asset_allocation: {:?}", asset_allocation);
                 println!("allocation_return: {:?}", allocation_return);
             }
             println!("today_return: {:?}", today_return);
