@@ -86,7 +86,7 @@ mod tests {
             let today = back_test_start + TimeSeries1D::index_unit() * time_index;
             let allocations = runnable_strategy.compute_allocations(today)?;
 
-            assert_eq!(allocations.allocations().len(), data_client.assets().len())
+            assert_eq!(allocations.len(), data_client.assets().len())
         }
 
         Ok(())

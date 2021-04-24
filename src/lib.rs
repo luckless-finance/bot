@@ -11,6 +11,7 @@
 #[macro_use]
 extern crate approx;
 
+pub mod back_test;
 pub mod data;
 pub mod errors;
 pub mod plot;
@@ -35,7 +36,7 @@ pub mod bot {
             QueryCalculationDto, SmaCalculationDto, StrategyDto, TimeSeriesName,
         };
         use crate::errors::{GenResult, UpstreamNotFoundError};
-        use crate::time_series::{apply, DataPointValue, TimeSeries1D, TimeStamp};
+        use crate::time_series::{apply, Allocation, DataPointValue, TimeSeries1D, TimeStamp};
 
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub enum CalculationStatus {
@@ -102,7 +103,10 @@ pub mod bot {
                 scorable_asset.execute()?;
                 Ok(AssetScore::new(scorable_asset)?)
             }
-            pub fn compute_allocations(&self, timestamp: TimeStamp) -> GenResult<AssetAllocations> {
+            pub fn compute_allocations(
+                &self,
+                timestamp: TimeStamp,
+            ) -> GenResult<BTreeMap<Asset, Allocation>> {
                 let asset_scores: Vec<AssetScore> = self
                     .data_client
                     .assets()
@@ -137,7 +141,7 @@ pub mod bot {
                         )
                     })
                     .collect();
-                Ok(AssetAllocations::new(timestamp, weightings))
+                Ok(weightings)
             }
         }
 
@@ -377,7 +381,7 @@ pub mod bot {
 
         #[cfg(test)]
         mod tests {
-            use std::collections::HashMap;
+            use std::collections::{BTreeMap, HashMap};
             use std::path::Path;
 
             use crate::bot::asset_score::{
@@ -390,6 +394,7 @@ pub mod bot {
             };
             use crate::errors::GenResult;
             use crate::simulation::MockDataClient;
+            use crate::time_series::DataPointValue;
 
             fn data_client_fixture() -> Box<dyn DataClient> {
                 Box::new(MockDataClient::new())
@@ -431,10 +436,9 @@ pub mod bot {
             fn compute_allocations() -> GenResult<()> {
                 let runnable_strategy = compiled_strategy_fixture()?;
                 let timestamp = MockDataClient::today();
-                let asset_allocations: AssetAllocations =
+                let asset_allocations: BTreeMap<Asset, DataPointValue> =
                     runnable_strategy.compute_allocations(timestamp)?;
-                assert_eq!(asset_allocations.timestamp, timestamp);
-                assert_eq!(asset_allocations.allocations.len(), 3);
+                assert_eq!(asset_allocations.len(), 3);
                 Ok(())
             }
         }
