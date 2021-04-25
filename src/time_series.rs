@@ -7,8 +7,10 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
 use itertools::{fold, zip};
+use serde::{Deserialize, Serialize, Serializer};
 
 use crate::errors::{GenError, GenResult};
+use serde::ser::{SerializeSeq, SerializeStruct};
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
@@ -21,6 +23,20 @@ pub type Index = Vec<TimeStamp>;
 #[derive(Clone, Debug, PartialEq)]
 pub struct TimeSeries1D {
     data: BTreeMap<TimeStamp, DataPointValue>,
+}
+
+/// Serialize as list of key,value pairs
+impl Serialize for TimeSeries1D {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_seq(Some(self.len()))?;
+        for (timestamp, value) in &self.data {
+            s.serialize_element(&(timestamp, value))?;
+        }
+        s.end()
+    }
 }
 
 impl TimeSeries1D {

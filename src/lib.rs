@@ -514,6 +514,7 @@ pub mod dto {
                 output_file
                     .write_all(dot_text.as_bytes())
                     .expect("unable to write file");
+                output_file.sync_all().unwrap();
             }
         }
 
@@ -633,10 +634,10 @@ pub mod dto {
                 let strategy = strategy_fixture();
                 let dag = Dag::new(strategy)?;
                 dag.save_dot_file();
-                let expected_output =
-                    read_to_string("expected_output.dot").expect("expected_output.dot not found.");
-                let output = read_to_string("output.dot").expect("output.dot not found.");
-                assert_eq!(output, expected_output);
+                assert_eq!(
+                    read_to_string("output.dot").expect("output.dot not found."),
+                    read_to_string("expected_output.dot").expect("expected_output.dot not found.")
+                );
                 Ok(())
             }
 

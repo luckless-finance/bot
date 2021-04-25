@@ -1,6 +1,6 @@
 // cli library
 use chrono::{DateTime, Utc};
-use luckless::back_test::{BackTest, BackTestConfig};
+use luckless::back_test::{dump_result, BackTest, BackTestConfig};
 use luckless::dto::strategy::{from_path, StrategyDto};
 use luckless::errors::GenResult;
 use luckless::simulation::MockDataClient;
@@ -93,6 +93,7 @@ fn main() -> GenResult<()> {
         println!("back_test_config: {:?}\n", back_test_config);
         let back_test_result = back_test_config.compute_result(None)?;
         println!("back_test_result: {:?}\n", back_test_result);
+        dump_result(&back_test_result);
     }
     Ok(())
 }
@@ -101,7 +102,7 @@ fn main() -> GenResult<()> {
 mod tests {
     use crate::{parse_date, parse_strategy_yaml};
     use chrono::{DateTime, Utc};
-    use luckless::back_test::{BackTest, BackTestConfig};
+    use luckless::back_test::{dump_result, BackTest, BackTestConfig};
     use luckless::errors::GenResult;
     use luckless::simulation::MockDataClient;
     use luckless::time_series::TimeSeries1D;
@@ -122,6 +123,7 @@ mod tests {
         let back_test_config = BackTestConfig::new(timestamps, strategy, data_client);
         let allocations = back_test_config.compute_allocations()?;
         let back_test_result = back_test_config.compute_result(Some(allocations))?;
+        dump_result(&back_test_result);
         Ok(())
     }
 }

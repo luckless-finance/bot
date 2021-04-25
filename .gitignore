@@ -3,3 +3,9 @@
 debug
 target
 *.png
+
+output
+
+perf.data
+perf.data.old
+flamegraph.svg
