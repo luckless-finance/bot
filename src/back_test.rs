@@ -217,7 +217,7 @@ pub fn dump_result(back_test_result: &BackTestResult) {
         ),
     };
     match serde_json::to_writer_pretty(&allocation_file, &back_test_result) {
-        Ok(_) => (),
+        Ok(_) => println!("OK back test result dumped to: {:?}", allocation_path),
         Err(e) => panic!(
             "ERROR unable to dump back_test_result {:?}\n{}",
             output_root.to_str(),
