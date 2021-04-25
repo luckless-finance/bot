@@ -121,7 +121,7 @@ mod tests {
         let data_client = Box::new(MockDataClient::new());
         let back_test_config = BackTestConfig::new(timestamps, strategy, data_client);
         let allocations = back_test_config.compute_allocations()?;
-        let back_test_result = back_test_config.compute_result(Some(allocations))?;
+        let _back_test_result = back_test_config.compute_result(Some(allocations))?;
         Ok(())
     }
 }

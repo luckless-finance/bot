@@ -15,6 +15,8 @@ use gnuplot::{AxesCommon, Figure};
 use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::{GenError, GenResult};
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::convert::TryFrom;
@@ -78,7 +80,7 @@ impl fmt::Debug for dyn DataClient {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone, Ord)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Ord, Serialize)]
 pub struct Asset {
     symbol: Symbol,
 }
