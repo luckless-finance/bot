@@ -11,11 +11,13 @@ based on a user defined stocking picking strategy.
 - back testing a stock picking strategy
 - managing a real world stock trading account (future)
 
-## Quick Start
+## Back Test Quick Start
+
+> Note, `luckless` currently used mock data.
 
 ```bash
 $ ./luckless --help
-# luckless 0.0.3
+# luckless x.y.z
 # Back test a financial stock picking strategy.
 # 
 # USAGE:
