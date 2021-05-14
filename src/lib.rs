@@ -15,6 +15,10 @@ pub mod back_test;
 pub mod data;
 pub mod errors;
 pub mod plot;
+pub mod query;
+pub mod query_client;
+pub mod query_demo;
+pub mod query_grpc;
 pub mod simulation;
 pub mod time_series;
 
@@ -26,8 +30,6 @@ pub mod bot {
         use std::collections::{BTreeMap, HashMap};
         use std::convert::TryInto;
         use std::fmt;
-
-        use serde::export::Formatter;
 
         use crate::data::{Asset, DataClient, Query};
         use crate::dto::dag::Dag;
@@ -1201,7 +1203,8 @@ calcs:
     operands:
       - name: field
         type: Text
-        value: close"#,
+        value: close
+"#,
                 )
             }
 

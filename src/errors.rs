@@ -106,3 +106,26 @@ impl std::error::Error for TimeSeriesError {
         "Invalid strategy"
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct QueryError {
+    reason: String,
+}
+
+impl QueryError {
+    pub fn new(reason: String) -> Box<Self> {
+        Box::new(QueryError { reason })
+    }
+}
+
+impl fmt::Display for QueryError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "QueryError: {}", self.reason)
+    }
+}
+
+impl std::error::Error for QueryError {
+    fn description(&self) -> &str {
+        "Invalid query"
+    }
+}

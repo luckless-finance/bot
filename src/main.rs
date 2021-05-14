@@ -60,7 +60,6 @@ struct Opt {
     /// first date in back test in RFC3339/ISO8601 format.
     #[structopt(short = "s", long = "start", parse(try_from_str = parse_date), default_value = "2011-12-01T00:00:00UTC")]
     start: DateTime<Utc>,
-
     /// first date in back test in RFC3339/ISO8601 format.
     #[structopt(short = "e", long = "end", parse(try_from_str = parse_date), default_value = "2012-01-01T00:00:00UTC")]
     end: DateTime<Utc>,
@@ -100,12 +99,14 @@ fn main() -> GenResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse_date, parse_strategy_yaml};
     use chrono::{DateTime, Utc};
+
     use luckless::back_test::{dump_result, BackTest, BackTestConfig};
     use luckless::errors::GenResult;
     use luckless::simulation::MockDataClient;
     use luckless::time_series::TimeSeries1D;
+
+    use crate::{parse_date, parse_strategy_yaml};
 
     #[test]
     fn main() -> GenResult<()> {
