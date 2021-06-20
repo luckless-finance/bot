@@ -34,12 +34,7 @@ impl DataClient for QueryClient {
         }
     }
 
-    fn query(
-        &self,
-        asset: &Asset,
-        timestamp: &TimeStamp,
-        query: Option<Query>,
-    ) -> GenResult<TimeSeries1D> {
+    fn query(&self, asset: &Asset, timestamp: &TimeStamp, query: Query) -> GenResult<TimeSeries1D> {
         let foo = executor::block_on(async {
             let mut request = RangeRequest::new();
             request.symbol = "A".to_string();

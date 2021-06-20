@@ -27,16 +27,16 @@ mod tests {
     use chrono::{DateTime, Utc};
 
     use luckless::bot::asset_score::*;
-    use luckless::data::{Asset, DataClient};
+    use luckless::data::{Asset, DataClient, Query, QueryType};
     use luckless::dto::strategy::{
         CalculationDto, OperandDto, OperandType, Operation, QueryCalculationDto,
     };
     use luckless::errors::GenResult;
+    use luckless::plot::{plot_ts, plot_ts_values};
     use luckless::simulation::MockDataClient;
     use luckless::time_series::{apply, DataPointValue, TimeSeries1D};
 
     use crate::get_strategy;
-    use luckless::plot::{plot_ts, plot_ts_values};
 
     #[test]
     fn plot_asset_prices() -> GenResult<()> {
@@ -56,7 +56,13 @@ mod tests {
         let asset_price_time_series: Vec<TimeSeries1D> = data_client
             .assets()
             .values()
-            .flat_map(|a| data_client.query(a, &MockDataClient::today(), None))
+            .flat_map(|a| {
+                data_client.query(
+                    a,
+                    &MockDataClient::today(),
+                    Query::new(QueryType::AbsolutePrice),
+                )
+            })
             .collect();
         plot_ts_values(asset_price_time_series);
         Ok(())

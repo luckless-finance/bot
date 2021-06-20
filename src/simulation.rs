@@ -48,23 +48,15 @@ impl DataClient for MockDataClient {
     }
 
     #[allow(unused_variables)]
-    fn query(
-        &self,
-        asset: &Asset,
-        timestamp: &TimeStamp,
-        query_dto: Option<Query>,
-    ) -> GenResult<TimeSeries1D> {
+    fn query(&self, asset: &Asset, timestamp: &TimeStamp, query: Query) -> GenResult<TimeSeries1D> {
         let absolute_prices: GenResult<TimeSeries1D> =
             match self.data.get(&asset.symbol().to_string()) {
                 Some(ts) => Ok(ts.filter_le(timestamp)),
                 None => Err(Box::new(Error::new(ErrorKind::NotFound, "Asset not found"))),
             };
-        match query_dto {
-            Some(query) => match query.query_type() {
-                QueryType::AbsolutePrice => absolute_prices,
-                QueryType::RelativePriceChange => Ok(absolute_prices.unwrap().slope()),
-            },
-            None => absolute_prices,
+        match query.query_type() {
+            QueryType::AbsolutePrice => absolute_prices,
+            QueryType::RelativePriceChange => Ok(absolute_prices.unwrap().slope()),
         }
     }
 }
@@ -328,7 +320,11 @@ mod tests {
         let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         let asset = Asset::new(Symbol::from("A"));
         let ts = client
-            .query(&asset, &MockDataClient::today(), None)
+            .query(
+                &asset,
+                &MockDataClient::today(),
+                Query::new(QueryType::AbsolutePrice),
+            )
             .unwrap();
         assert_eq!(ts.len(), DATA_SIZE);
         assert_eq!(ts.index().last().unwrap(), &MockDataClient::today());
@@ -339,7 +335,9 @@ mod tests {
         let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         let yesterday = MockDataClient::today() - TimeSeries1D::index_unit() * 1 as i32;
         let asset = Asset::new(Symbol::from("A"));
-        let ts = client.query(&asset, &yesterday, None).unwrap();
+        let ts = client
+            .query(&asset, &yesterday, Query::new(QueryType::AbsolutePrice))
+            .unwrap();
 
         assert_eq!(ts.len(), DATA_SIZE - 1);
         assert_eq!(ts.index().last().unwrap(), &yesterday);

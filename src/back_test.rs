@@ -94,7 +94,7 @@ impl BackTest for BackTestConfig {
                 let relative_price_changes = self.data_client().query(
                     asset,
                     today,
-                    Some(Query::new(QueryType::RelativePriceChange)),
+                    Query::new(QueryType::RelativePriceChange),
                 )?;
                 // println!("relative_price_changes: {:?}", relative_price_changes);
                 let asset_price_change = relative_price_changes.get(today).unwrap();

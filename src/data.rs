@@ -57,13 +57,7 @@ pub trait DataClient {
     fn asset(&self, symbol: &Symbol) -> GenResult<&Asset>;
     // TODO encapsulate params in struct
     // TODO support date ranges to minimize payloads
-    fn query(
-        &self,
-        asset: &Asset,
-        timestamp: &TimeStamp,
-        // TODO make required
-        query: Option<Query>,
-    ) -> GenResult<TimeSeries1D>;
+    fn query(&self, asset: &Asset, timestamp: &TimeStamp, query: Query) -> GenResult<TimeSeries1D>;
 }
 
 impl Clone for Box<dyn DataClient> {

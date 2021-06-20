@@ -255,7 +255,7 @@ pub mod bot {
                 let query: Query = query_dto.try_into()?;
                 Ok(self
                     .data_client
-                    .query(&self.asset, &self.timestamp, Some(query))?
+                    .query(&self.asset, &self.timestamp, query)?
                     .clone())
             }
             fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
