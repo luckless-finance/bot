@@ -24,25 +24,25 @@
 // const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_2_18_2;
 
 #[derive(PartialEq,Clone,Default)]
-pub struct RangeRequest {
+pub struct RangedRequest {
     // message fields
     pub symbol: ::std::string::String,
+    pub series: ::std::string::String,
     pub first: ::protobuf::SingularPtrField<::protobuf::well_known_types::Timestamp>,
     pub last: ::protobuf::SingularPtrField<::protobuf::well_known_types::Timestamp>,
-    pub calendar: Calendar,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
 }
 
-impl<'a> ::std::default::Default for &'a RangeRequest {
-    fn default() -> &'a RangeRequest {
-        <RangeRequest as ::protobuf::Message>::default_instance()
+impl<'a> ::std::default::Default for &'a RangedRequest {
+    fn default() -> &'a RangedRequest {
+        <RangedRequest as ::protobuf::Message>::default_instance()
     }
 }
 
-impl RangeRequest {
-    pub fn new() -> RangeRequest {
+impl RangedRequest {
+    pub fn new() -> RangedRequest {
         ::std::default::Default::default()
     }
 
@@ -72,7 +72,33 @@ impl RangeRequest {
         ::std::mem::replace(&mut self.symbol, ::std::string::String::new())
     }
 
-    // .google.protobuf.Timestamp first = 2;
+    // string series = 2;
+
+
+    pub fn get_series(&self) -> &str {
+        &self.series
+    }
+    pub fn clear_series(&mut self) {
+        self.series.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_series(&mut self, v: ::std::string::String) {
+        self.series = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_series(&mut self) -> &mut ::std::string::String {
+        &mut self.series
+    }
+
+    // Take field
+    pub fn take_series(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.series, ::std::string::String::new())
+    }
+
+    // .google.protobuf.Timestamp first = 3;
 
 
     pub fn get_first(&self) -> &::protobuf::well_known_types::Timestamp {
@@ -105,7 +131,7 @@ impl RangeRequest {
         self.first.take().unwrap_or_else(|| ::protobuf::well_known_types::Timestamp::new())
     }
 
-    // .google.protobuf.Timestamp last = 3;
+    // .google.protobuf.Timestamp last = 4;
 
 
     pub fn get_last(&self) -> &::protobuf::well_known_types::Timestamp {
@@ -137,24 +163,9 @@ impl RangeRequest {
     pub fn take_last(&mut self) -> ::protobuf::well_known_types::Timestamp {
         self.last.take().unwrap_or_else(|| ::protobuf::well_known_types::Timestamp::new())
     }
-
-    // .query.Calendar calendar = 4;
-
-
-    pub fn get_calendar(&self) -> Calendar {
-        self.calendar
-    }
-    pub fn clear_calendar(&mut self) {
-        self.calendar = Calendar::COMPLETE;
-    }
-
-    // Param is passed by value, moved
-    pub fn set_calendar(&mut self, v: Calendar) {
-        self.calendar = v;
-    }
 }
 
-impl ::protobuf::Message for RangeRequest {
+impl ::protobuf::Message for RangedRequest {
     fn is_initialized(&self) -> bool {
         for v in &self.first {
             if !v.is_initialized() {
@@ -177,13 +188,13 @@ impl ::protobuf::Message for RangeRequest {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.symbol)?;
                 },
                 2 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.first)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.series)?;
                 },
                 3 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.last)?;
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.first)?;
                 },
                 4 => {
-                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.calendar, 4, &mut self.unknown_fields)?
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.last)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -200,6 +211,9 @@ impl ::protobuf::Message for RangeRequest {
         if !self.symbol.is_empty() {
             my_size += ::protobuf::rt::string_size(1, &self.symbol);
         }
+        if !self.series.is_empty() {
+            my_size += ::protobuf::rt::string_size(2, &self.series);
+        }
         if let Some(ref v) = self.first.as_ref() {
             let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
@@ -207,9 +221,6 @@ impl ::protobuf::Message for RangeRequest {
         if let Some(ref v) = self.last.as_ref() {
             let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-        }
-        if self.calendar != Calendar::COMPLETE {
-            my_size += ::protobuf::rt::enum_size(4, self.calendar);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -220,18 +231,18 @@ impl ::protobuf::Message for RangeRequest {
         if !self.symbol.is_empty() {
             os.write_string(1, &self.symbol)?;
         }
-        if let Some(ref v) = self.first.as_ref() {
-            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-            os.write_raw_varint32(v.get_cached_size())?;
-            v.write_to_with_cached_sizes(os)?;
+        if !self.series.is_empty() {
+            os.write_string(2, &self.series)?;
         }
-        if let Some(ref v) = self.last.as_ref() {
+        if let Some(ref v) = self.first.as_ref() {
             os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
         }
-        if self.calendar != Calendar::COMPLETE {
-            os.write_enum(4, ::protobuf::ProtobufEnum::value(&self.calendar))?;
+        if let Some(ref v) = self.last.as_ref() {
+            os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -263,8 +274,8 @@ impl ::protobuf::Message for RangeRequest {
         Self::descriptor_static()
     }
 
-    fn new() -> RangeRequest {
-        RangeRequest::new()
+    fn new() -> RangedRequest {
+        RangedRequest::new()
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
@@ -273,55 +284,55 @@ impl ::protobuf::Message for RangeRequest {
             let mut fields = ::std::vec::Vec::new();
             fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                 "symbol",
-                |m: &RangeRequest| { &m.symbol },
-                |m: &mut RangeRequest| { &mut m.symbol },
+                |m: &RangedRequest| { &m.symbol },
+                |m: &mut RangedRequest| { &mut m.symbol },
+            ));
+            fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                "series",
+                |m: &RangedRequest| { &m.series },
+                |m: &mut RangedRequest| { &mut m.series },
             ));
             fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<::protobuf::well_known_types::Timestamp>>(
                 "first",
-                |m: &RangeRequest| { &m.first },
-                |m: &mut RangeRequest| { &mut m.first },
+                |m: &RangedRequest| { &m.first },
+                |m: &mut RangedRequest| { &mut m.first },
             ));
             fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<::protobuf::well_known_types::Timestamp>>(
                 "last",
-                |m: &RangeRequest| { &m.last },
-                |m: &mut RangeRequest| { &mut m.last },
+                |m: &RangedRequest| { &m.last },
+                |m: &mut RangedRequest| { &mut m.last },
             ));
-            fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Calendar>>(
-                "calendar",
-                |m: &RangeRequest| { &m.calendar },
-                |m: &mut RangeRequest| { &mut m.calendar },
-            ));
-            ::protobuf::reflect::MessageDescriptor::new_pb_name::<RangeRequest>(
-                "RangeRequest",
+            ::protobuf::reflect::MessageDescriptor::new_pb_name::<RangedRequest>(
+                "RangedRequest",
                 fields,
                 file_descriptor_proto()
             )
         })
     }
 
-    fn default_instance() -> &'static RangeRequest {
-        static instance: ::protobuf::rt::LazyV2<RangeRequest> = ::protobuf::rt::LazyV2::INIT;
-        instance.get(RangeRequest::new)
+    fn default_instance() -> &'static RangedRequest {
+        static instance: ::protobuf::rt::LazyV2<RangedRequest> = ::protobuf::rt::LazyV2::INIT;
+        instance.get(RangedRequest::new)
     }
 }
 
-impl ::protobuf::Clear for RangeRequest {
+impl ::protobuf::Clear for RangedRequest {
     fn clear(&mut self) {
         self.symbol.clear();
+        self.series.clear();
         self.first.clear();
         self.last.clear();
-        self.calendar = Calendar::COMPLETE;
         self.unknown_fields.clear();
     }
 }
 
-impl ::std::fmt::Debug for RangeRequest {
+impl ::std::fmt::Debug for RangedRequest {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-impl ::protobuf::reflect::ProtobufValue for RangeRequest {
+impl ::protobuf::reflect::ProtobufValue for RangedRequest {
     fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
         ::protobuf::reflect::ReflectValueRef::Message(self)
     }
@@ -331,7 +342,7 @@ impl ::protobuf::reflect::ProtobufValue for RangeRequest {
 pub struct DataPoint {
     // message fields
     pub timestamp: ::protobuf::SingularPtrField<::protobuf::well_known_types::Timestamp>,
-    pub double: f64,
+    pub value: f64,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -381,19 +392,19 @@ impl DataPoint {
         self.timestamp.take().unwrap_or_else(|| ::protobuf::well_known_types::Timestamp::new())
     }
 
-    // double double = 2;
+    // double value = 2;
 
 
-    pub fn get_double(&self) -> f64 {
-        self.double
+    pub fn get_value(&self) -> f64 {
+        self.value
     }
-    pub fn clear_double(&mut self) {
-        self.double = 0.;
+    pub fn clear_value(&mut self) {
+        self.value = 0.;
     }
 
     // Param is passed by value, moved
-    pub fn set_double(&mut self, v: f64) {
-        self.double = v;
+    pub fn set_value(&mut self, v: f64) {
+        self.value = v;
     }
 }
 
@@ -419,7 +430,7 @@ impl ::protobuf::Message for DataPoint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
                     let tmp = is.read_double()?;
-                    self.double = tmp;
+                    self.value = tmp;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -437,7 +448,7 @@ impl ::protobuf::Message for DataPoint {
             let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         }
-        if self.double != 0. {
+        if self.value != 0. {
             my_size += 9;
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -451,8 +462,8 @@ impl ::protobuf::Message for DataPoint {
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
         }
-        if self.double != 0. {
-            os.write_double(2, self.double)?;
+        if self.value != 0. {
+            os.write_double(2, self.value)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -498,9 +509,9 @@ impl ::protobuf::Message for DataPoint {
                 |m: &mut DataPoint| { &mut m.timestamp },
             ));
             fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeDouble>(
-                "double",
-                |m: &DataPoint| { &m.double },
-                |m: &mut DataPoint| { &mut m.double },
+                "value",
+                |m: &DataPoint| { &m.value },
+                |m: &mut DataPoint| { &mut m.value },
             ));
             ::protobuf::reflect::MessageDescriptor::new_pb_name::<DataPoint>(
                 "DataPoint",
@@ -519,7 +530,7 @@ impl ::protobuf::Message for DataPoint {
 impl ::protobuf::Clear for DataPoint {
     fn clear(&mut self) {
         self.timestamp.clear();
-        self.double = 0.;
+        self.value = 0.;
         self.unknown_fields.clear();
     }
 }
@@ -702,73 +713,19 @@ impl ::protobuf::reflect::ProtobufValue for TimeSeries {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
-pub enum Calendar {
-    COMPLETE = 0,
-    NYSE = 1,
-    TSX = 2,
-}
-
-impl ::protobuf::ProtobufEnum for Calendar {
-    fn value(&self) -> i32 {
-        *self as i32
-    }
-
-    fn from_i32(value: i32) -> ::std::option::Option<Calendar> {
-        match value {
-            0 => ::std::option::Option::Some(Calendar::COMPLETE),
-            1 => ::std::option::Option::Some(Calendar::NYSE),
-            2 => ::std::option::Option::Some(Calendar::TSX),
-            _ => ::std::option::Option::None
-        }
-    }
-
-    fn values() -> &'static [Self] {
-        static values: &'static [Calendar] = &[
-            Calendar::COMPLETE,
-            Calendar::NYSE,
-            Calendar::TSX,
-        ];
-        values
-    }
-
-    fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static descriptor: ::protobuf::rt::LazyV2<::protobuf::reflect::EnumDescriptor> = ::protobuf::rt::LazyV2::INIT;
-        descriptor.get(|| {
-            ::protobuf::reflect::EnumDescriptor::new_pb_name::<Calendar>("Calendar", file_descriptor_proto())
-        })
-    }
-}
-
-impl ::std::marker::Copy for Calendar {
-}
-
-impl ::std::default::Default for Calendar {
-    fn default() -> Self {
-        Calendar::COMPLETE
-    }
-}
-
-impl ::protobuf::reflect::ProtobufValue for Calendar {
-    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
-        ::protobuf::reflect::ReflectValueRef::Enum(::protobuf::ProtobufEnum::descriptor(self))
-    }
-}
-
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x0bquery.proto\x12\x05query\x1a\x1fgoogle/protobuf/timestamp.proto\"\
-    \xb5\x01\n\x0cRangeRequest\x12\x16\n\x06symbol\x18\x01\x20\x01(\tR\x06sy\
-    mbol\x120\n\x05first\x18\x02\x20\x01(\x0b2\x1a.google.protobuf.Timestamp\
-    R\x05first\x12.\n\x04last\x18\x03\x20\x01(\x0b2\x1a.google.protobuf.Time\
-    stampR\x04last\x12+\n\x08calendar\x18\x04\x20\x01(\x0e2\x0f.query.Calend\
-    arR\x08calendar\"]\n\tDataPoint\x128\n\ttimestamp\x18\x01\x20\x01(\x0b2\
-    \x1a.google.protobuf.TimestampR\ttimestamp\x12\x16\n\x06double\x18\x02\
-    \x20\x01(\x01R\x06double\"2\n\nTimeSeries\x12$\n\x04data\x18\x01\x20\x03\
-    (\x0b2\x10.query.DataPointR\x04data*+\n\x08Calendar\x12\x0c\n\x08COMPLET\
-    E\x10\0\x12\x08\n\x04NYSE\x10\x01\x12\x07\n\x03TSX\x10\x022y\n\nMarketDa\
-    ta\x121\n\x05Query\x12\x13.query.RangeRequest\x1a\x11.query.TimeSeries\"\
-    \0\x128\n\x0bQueryStream\x12\x13.query.RangeRequest\x1a\x10.query.DataPo\
-    int\"\00\x01B$Z\"github.com/luckless-finance/marketb\x06proto3\
+    \xa1\x01\n\rRangedRequest\x12\x16\n\x06symbol\x18\x01\x20\x01(\tR\x06sym\
+    bol\x12\x16\n\x06series\x18\x02\x20\x01(\tR\x06series\x120\n\x05first\
+    \x18\x03\x20\x01(\x0b2\x1a.google.protobuf.TimestampR\x05first\x12.\n\
+    \x04last\x18\x04\x20\x01(\x0b2\x1a.google.protobuf.TimestampR\x04last\"[\
+    \n\tDataPoint\x128\n\ttimestamp\x18\x01\x20\x01(\x0b2\x1a.google.protobu\
+    f.TimestampR\ttimestamp\x12\x14\n\x05value\x18\x02\x20\x01(\x01R\x05valu\
+    e\"2\n\nTimeSeries\x12$\n\x04data\x18\x01\x20\x03(\x0b2\x10.query.DataPo\
+    intR\x04data2{\n\nMarketData\x122\n\x05Query\x12\x14.query.RangedRequest\
+    \x1a\x11.query.TimeSeries\"\0\x129\n\x0bQueryStream\x12\x14.query.Ranged\
+    Request\x1a\x10.query.DataPoint\"\00\x01B#Z!github.com/luckless-finance/\
+    queryb\x06proto3\
 ";
 
 static file_descriptor_proto_lazy: ::protobuf::rt::LazyV2<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::rt::LazyV2::INIT;

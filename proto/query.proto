@@ -1,27 +1,21 @@
 syntax = "proto3";
 
-option go_package = "github.com/luckless-finance/market";
+option go_package = "github.com/luckless-finance/query";
 
 package query;
 
 import "google/protobuf/timestamp.proto";
 
-enum Calendar {
-  COMPLETE = 0;
-  NYSE = 1;
-  TSX = 2;
-};
-
-message RangeRequest {
+message RangedRequest {
   string symbol = 1;
-  google.protobuf.Timestamp first = 2;
-  google.protobuf.Timestamp last = 3;
-  Calendar calendar = 4;
+  string series = 2;
+  google.protobuf.Timestamp first = 3;
+  google.protobuf.Timestamp last = 4;
 }
 
 message DataPoint {
   google.protobuf.Timestamp timestamp = 1;
-  double double = 2;
+  double value = 2;
 }
 
 message TimeSeries {
@@ -29,6 +23,6 @@ message TimeSeries {
 }
 
 service MarketData {
-  rpc Query (RangeRequest) returns (TimeSeries) {}
-  rpc QueryStream (RangeRequest) returns (stream DataPoint) {}
+  rpc Query (RangedRequest) returns (TimeSeries) {}
+  rpc QueryStream (RangedRequest) returns (stream DataPoint) {}
 }

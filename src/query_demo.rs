@@ -1,4 +1,4 @@
-use crate::query::RangeRequest;
+use crate::query::RangedRequest;
 use crate::query_grpc::MarketDataClient;
 use crate::time_series::TimeStamp;
 use chrono::format::Numeric::Timestamp;
@@ -6,8 +6,8 @@ use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use futures::StreamExt;
 use std::time::SystemTime;
 
-fn build_request() -> RangeRequest {
-    let mut request = RangeRequest::new();
+fn build_request() -> RangedRequest {
+    let mut request = RangedRequest::new();
     request.symbol = "hello from rust!".to_string();
     request
 }
@@ -29,7 +29,7 @@ pub async fn query_server(client: &MarketDataClient) {
             println!(
                 "timestamp: '{}', double: {:?}\n",
                 timestamp.to_rfc3339(),
-                data_point.double
+                data_point.value
             );
         }
     }
@@ -49,7 +49,7 @@ pub async fn stream_query_server(client: &MarketDataClient) {
                 println!(
                     "timestamp: '{}', double: {:?}\n",
                     timestamp.to_rfc3339(),
-                    data_point.double
+                    data_point.value
                 );
             }
             Err(e) => {

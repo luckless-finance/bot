@@ -7,7 +7,7 @@ use futures::executor;
 use crate::bot::asset_score::CalculationStatus::Error;
 use crate::data::{Asset, DataClient, Query, Symbol};
 use crate::errors::{GenError, GenResult, QueryError};
-use crate::query::{DataPoint, RangeRequest};
+use crate::query::{DataPoint, RangedRequest};
 use crate::query_grpc::MarketDataClient;
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
 use protobuf::well_known_types::Timestamp;
@@ -36,7 +36,7 @@ impl DataClient for QueryClient {
 
     fn query(&self, asset: &Asset, timestamp: &TimeStamp, query: Query) -> GenResult<TimeSeries1D> {
         let foo = executor::block_on(async {
-            let mut request = RangeRequest::new();
+            let mut request = RangedRequest::new();
             request.symbol = "A".to_string();
             let mut timestamp_pb = Timestamp::new();
 
@@ -55,7 +55,7 @@ impl DataClient for QueryClient {
                 let timestamp = data_point.clone().timestamp.unwrap();
                 let timestamp: TimeStamp =
                     Utc.timestamp(timestamp.seconds, timestamp.nanos.abs() as u32);
-                temp.entry(timestamp).or_insert(data_point.double);
+                temp.entry(timestamp).or_insert(data_point.value);
                 // println!(
                 //     "timestamp: '{}', double: {:?}\n",
                 //     timestamp.to_rfc3339(),

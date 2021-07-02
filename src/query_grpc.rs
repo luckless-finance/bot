@@ -22,9 +22,9 @@
 // server interface
 
 pub trait MarketData {
-    fn query(&self, o: ::grpc::ServerHandlerContext, req: ::grpc::ServerRequestSingle<super::query::RangeRequest>, resp: ::grpc::ServerResponseUnarySink<super::query::TimeSeries>) -> ::grpc::Result<()>;
+    fn query(&self, o: ::grpc::ServerHandlerContext, req: ::grpc::ServerRequestSingle<super::query::RangedRequest>, resp: ::grpc::ServerResponseUnarySink<super::query::TimeSeries>) -> ::grpc::Result<()>;
 
-    fn query_stream(&self, o: ::grpc::ServerHandlerContext, req: ::grpc::ServerRequestSingle<super::query::RangeRequest>, resp: ::grpc::ServerResponseSink<super::query::DataPoint>) -> ::grpc::Result<()>;
+    fn query_stream(&self, o: ::grpc::ServerHandlerContext, req: ::grpc::ServerRequestSingle<super::query::RangedRequest>, resp: ::grpc::ServerResponseSink<super::query::DataPoint>) -> ::grpc::Result<()>;
 }
 
 // client
@@ -42,7 +42,7 @@ impl ::grpc::ClientStub for MarketDataClient {
 }
 
 impl MarketDataClient {
-    pub fn query(&self, o: ::grpc::RequestOptions, req: super::query::RangeRequest) -> ::grpc::SingleResponse<super::query::TimeSeries> {
+    pub fn query(&self, o: ::grpc::RequestOptions, req: super::query::RangedRequest) -> ::grpc::SingleResponse<super::query::TimeSeries> {
         let descriptor = ::grpc::rt::ArcOrStatic::Static(&::grpc::rt::MethodDescriptor {
             name: ::grpc::rt::StringOrStatic::Static("/query.MarketData/Query"),
             streaming: ::grpc::rt::GrpcStreaming::Unary,
@@ -52,7 +52,7 @@ impl MarketDataClient {
         self.grpc_client.call_unary(o, req, descriptor)
     }
 
-    pub fn query_stream(&self, o: ::grpc::RequestOptions, req: super::query::RangeRequest) -> ::grpc::StreamingResponse<super::query::DataPoint> {
+    pub fn query_stream(&self, o: ::grpc::RequestOptions, req: super::query::RangedRequest) -> ::grpc::StreamingResponse<super::query::DataPoint> {
         let descriptor = ::grpc::rt::ArcOrStatic::Static(&::grpc::rt::MethodDescriptor {
             name: ::grpc::rt::StringOrStatic::Static("/query.MarketData/QueryStream"),
             streaming: ::grpc::rt::GrpcStreaming::ServerStreaming,
