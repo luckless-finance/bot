@@ -23,8 +23,6 @@
 
 pub trait MarketData {
     fn query(&self, o: ::grpc::ServerHandlerContext, req: ::grpc::ServerRequestSingle<super::query::RangedRequest>, resp: ::grpc::ServerResponseUnarySink<super::query::TimeSeries>) -> ::grpc::Result<()>;
-
-    fn query_stream(&self, o: ::grpc::ServerHandlerContext, req: ::grpc::ServerRequestSingle<super::query::RangedRequest>, resp: ::grpc::ServerResponseSink<super::query::DataPoint>) -> ::grpc::Result<()>;
 }
 
 // client
@@ -51,16 +49,6 @@ impl MarketDataClient {
         });
         self.grpc_client.call_unary(o, req, descriptor)
     }
-
-    pub fn query_stream(&self, o: ::grpc::RequestOptions, req: super::query::RangedRequest) -> ::grpc::StreamingResponse<super::query::DataPoint> {
-        let descriptor = ::grpc::rt::ArcOrStatic::Static(&::grpc::rt::MethodDescriptor {
-            name: ::grpc::rt::StringOrStatic::Static("/query.MarketData/QueryStream"),
-            streaming: ::grpc::rt::GrpcStreaming::ServerStreaming,
-            req_marshaller: ::grpc::rt::ArcOrStatic::Static(&::grpc_protobuf::MarshallerProtobuf),
-            resp_marshaller: ::grpc::rt::ArcOrStatic::Static(&::grpc_protobuf::MarshallerProtobuf),
-        });
-        self.grpc_client.call_server_streaming(o, req, descriptor)
-    }
 }
 
 // server
@@ -83,18 +71,6 @@ impl MarketDataServer {
                     {
                         let handler_copy = handler_arc.clone();
                         ::grpc::rt::MethodHandlerUnary::new(move |ctx, req, resp| (*handler_copy).query(ctx, req, resp))
-                    },
-                ),
-                ::grpc::rt::ServerMethod::new(
-                    ::grpc::rt::ArcOrStatic::Static(&::grpc::rt::MethodDescriptor {
-                        name: ::grpc::rt::StringOrStatic::Static("/query.MarketData/QueryStream"),
-                        streaming: ::grpc::rt::GrpcStreaming::ServerStreaming,
-                        req_marshaller: ::grpc::rt::ArcOrStatic::Static(&::grpc_protobuf::MarshallerProtobuf),
-                        resp_marshaller: ::grpc::rt::ArcOrStatic::Static(&::grpc_protobuf::MarshallerProtobuf),
-                    }),
-                    {
-                        let handler_copy = handler_arc.clone();
-                        ::grpc::rt::MethodHandlerServerStreaming::new(move |ctx, req, resp| (*handler_copy).query_stream(ctx, req, resp))
                     },
                 ),
             ],

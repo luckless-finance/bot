@@ -24,5 +24,4 @@ message TimeSeries {
 
 service MarketData {
   rpc Query (RangedRequest) returns (TimeSeries) {}
-  rpc QueryStream (RangedRequest) returns (stream DataPoint) {}
 }

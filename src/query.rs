@@ -722,10 +722,9 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \n\tDataPoint\x128\n\ttimestamp\x18\x01\x20\x01(\x0b2\x1a.google.protobu\
     f.TimestampR\ttimestamp\x12\x14\n\x05value\x18\x02\x20\x01(\x01R\x05valu\
     e\"2\n\nTimeSeries\x12$\n\x04data\x18\x01\x20\x03(\x0b2\x10.query.DataPo\
-    intR\x04data2{\n\nMarketData\x122\n\x05Query\x12\x14.query.RangedRequest\
-    \x1a\x11.query.TimeSeries\"\0\x129\n\x0bQueryStream\x12\x14.query.Ranged\
-    Request\x1a\x10.query.DataPoint\"\00\x01B#Z!github.com/luckless-finance/\
-    queryb\x06proto3\
+    intR\x04data2@\n\nMarketData\x122\n\x05Query\x12\x14.query.RangedRequest\
+    \x1a\x11.query.TimeSeries\"\0B#Z!github.com/luckless-finance/queryb\x06p\
+    roto3\
 ";
 
 static file_descriptor_proto_lazy: ::protobuf::rt::LazyV2<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::rt::LazyV2::INIT;

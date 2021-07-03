@@ -37,8 +37,10 @@ impl DataClient for QueryClient {
     fn query(&self, asset: &Asset, timestamp: &TimeStamp, query: Query) -> GenResult<TimeSeries1D> {
         let foo = executor::block_on(async {
             let mut request = RangedRequest::new();
-            request.symbol = "A".to_string();
-            let mut timestamp_pb = Timestamp::new();
+            request.symbol = "RUST".to_string();
+            request.symbol = "SERIES".to_string();
+            request.first = SingularPtrField::some(Timestamp::new());
+            request.last = SingularPtrField::some(Timestamp::new());
 
             let result = self
                 .market_data_client
