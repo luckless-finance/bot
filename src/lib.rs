@@ -105,6 +105,26 @@ pub mod bot {
                 scorable_asset.execute()?;
                 Ok(AssetScore::new(scorable_asset)?)
             }
+            pub fn run_on_assets(
+                &self,
+                assets: Vec<Asset>,
+                timestamp: TimeStamp,
+            ) -> GenResult<BTreeMap<Asset, AssetScore>> {
+                Ok(assets
+                    .iter()
+                    .flat_map(|asset| self.run_on_asset(asset.clone(), timestamp))
+                    .map(|asset_score| (asset_score.asset().clone(), asset_score))
+                    .collect())
+                //
+                // Ok(assets.iter()
+                //     .map(|asset| {
+                //         (asset.clone(),
+                //          self.run_on_asset(asset.clone(), timestamp)?
+                //         )
+                //     })
+                //     .collect()
+                // )
+            }
             pub fn compute_allocations(
                 &self,
                 timestamp: TimeStamp,

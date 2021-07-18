@@ -37,6 +37,7 @@ mod tests {
     use luckless::time_series::{DataPointValue, TimeSeries1D};
 
     use crate::get_strategy;
+    use luckless::query_grpc::MarketDataClient;
 
     #[test]
     fn plot_asset_prices() -> GenResult<()> {
@@ -61,7 +62,7 @@ mod tests {
         plot_ts_values(asset_price_time_series);
         Ok(())
     }
-    //
+
     // /// Executes a strategy over time
     // ///
     // /// 1. Build runnable strategy
@@ -74,7 +75,7 @@ mod tests {
     //     // load strategy yaml config
     //     let strategy = get_strategy();
     //     // init data client
-    //     let data_client: Box<dyn DataClient> = Box::new(MockDataClient::new());
+    //     let data_client: Box<dyn DataClient> = Box::new(MarketDataClient::new());
     //     // build executable strategy
     //     let runnable_strategy = RunnableStrategy::new(strategy, data_client.clone())?;
     //

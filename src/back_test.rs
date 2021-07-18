@@ -4,12 +4,12 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
-use itertools::zip;
+use itertools::{zip, Itertools};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::bot::asset_score::CalculationStatus::Error;
-use crate::bot::asset_score::{AssetAllocations, RunnableStrategy};
+use crate::bot::asset_score::{AssetAllocations, AssetScore, RunnableStrategy};
 use crate::data::{doomsday, epoch, Asset, DataClient, Query, Series, Symbol, DEFAULT_SERIES};
 use crate::dto::strategy::StrategyDto;
 use crate::errors::{GenError, GenResult};
@@ -17,25 +17,22 @@ use crate::time_series::{Allocation, DataPointValue, TimeSeries1D, TimeStamp};
 
 #[derive(Clone, Debug)]
 pub struct BackTestConfig {
-    index: Vec<TimeStamp>,
+    timestamp: TimeStamp,
     strategy: StrategyDto,
     data_client: Box<dyn DataClient>,
 }
 
 impl BackTestConfig {
     pub fn new(
-        timestamps: Vec<TimeStamp>,
+        timestamp: TimeStamp,
         strategy: StrategyDto,
         data_client: Box<dyn DataClient>,
     ) -> Self {
         BackTestConfig {
-            index: timestamps,
+            timestamp,
             strategy,
             data_client,
         }
-    }
-    pub fn index(&self) -> &Vec<TimeStamp> {
-        &self.index
     }
     pub fn strategy(&self) -> &StrategyDto {
         &self.strategy
@@ -46,118 +43,139 @@ impl BackTestConfig {
 }
 
 pub trait BackTest {
-    fn compute_allocations(&self) -> GenResult<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>>;
-    fn compute_performance(
-        &self,
-        allocations: Option<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>>,
-    ) -> GenResult<TimeSeries1D>;
-    fn compute_result(
-        &self,
-        allocations: Option<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>>,
-    ) -> GenResult<BackTestResult>;
+    fn compute_scores(&self) -> GenResult<BTreeMap<Asset, AssetScore>>;
+    // fn compute_allocations(&self) -> GenResult<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>>;
+    // fn compute_performance(
+    //     &self,
+    //     allocations: Option<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>>,
+    // ) -> GenResult<TimeSeries1D>;
+    // fn compute_result(
+    //     &self,
+    //     allocations: Option<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>>,
+    // ) -> GenResult<BackTestResult>;
 }
 
 impl BackTest for BackTestConfig {
-    fn compute_allocations(&self) -> GenResult<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>> {
+    fn compute_scores(&self) -> GenResult<BTreeMap<Asset, AssetScore>> {
         let runnable_strategy =
             RunnableStrategy::new(self.strategy().clone(), self.data_client().clone())?;
-        let mut allocations: BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>> = BTreeMap::new();
-        for timestamp in self.index() {
-            allocations
-                .entry(timestamp.clone())
-                .or_insert(runnable_strategy.compute_allocations(timestamp.clone())?);
-        }
-        Ok(allocations)
+        // let mut scores: BTreeMap<Asset, AssetScore> = BTreeMap::new();
+        let assets: Vec<Asset> = self
+            .data_client
+            .assets()
+            .iter()
+            .map(|(_, asset)| asset.clone())
+            .collect_vec();
+        runnable_strategy.run_on_assets(assets, self.timestamp)
     }
-    /// - TODO enforce allocations 0 <= a < 1 where 0 means 0% allocation, 1 means 100% allocation (no shorts)
-    /// - TODO enforce performance p >= -1 where -1 means 100% loss
-    /// - TODO enforce uniform time increments
-    fn compute_performance(
-        &self,
-        allocations: Option<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>>,
-    ) -> GenResult<TimeSeries1D> {
-        let mut performance: BTreeMap<TimeStamp, DataPointValue> = BTreeMap::new();
-        let allocation_by_timestamp = match allocations {
-            Some(allocations) => allocations,
-            None => self.compute_allocations()?,
-        };
-        let timestamps: Vec<&TimeStamp> = allocation_by_timestamp.keys().collect();
-        for time_index in 1..timestamps.len() {
-            let yesterday = timestamps.get(time_index - 1).unwrap();
-            let today = timestamps.get(time_index).unwrap();
-            let yesterday_allocations = allocation_by_timestamp.get(yesterday).unwrap();
-            // println!("today: {:?}", today);
+    // fn compute_allocations(&self) -> GenResult<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>> {
+    //     let runnable_strategy =
+    //         RunnableStrategy::new(self.strategy().clone(), self.data_client().clone())?;
+    //     let mut allocations: BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>> = BTreeMap::new();
+    //     for timestamp in self.index() {
+    //         allocations
+    //             .entry(timestamp.clone())
+    //             .or_insert(runnable_strategy.compute_allocations(timestamp.clone())?);
+    //     }
+    //     Ok(allocations)
+    // }
+    // - TODO enforce allocations 0 <= a < 1 where 0 means 0% allocation, 1 means 100% allocation (no shorts)
+    // - TODO enforce performance p >= -1 where -1 means 100% loss
+    // - TODO enforce uniform time increments
+    // fn compute_performance(
+    //     &self,
+    //     allocations: Option<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>>,
+    // ) -> GenResult<TimeSeries1D> {
+    //     let mut performance: BTreeMap<TimeStamp, DataPointValue> = BTreeMap::new();
+    //     let allocation_by_timestamp = match allocations {
+    //         Some(allocations) => allocations,
+    //         None => self.compute_allocations()?,
+    //     };
+    //     let timestamps: Vec<&TimeStamp> = allocation_by_timestamp.keys().collect();
+    //     for time_index in 1..timestamps.len() {
+    //         let yesterday = timestamps.get(time_index - 1).unwrap();
+    //         let today = timestamps.get(time_index).unwrap();
+    //         let yesterday_allocations = allocation_by_timestamp.get(yesterday).unwrap();
+    //         // println!("today: {:?}", today);
+    //
+    //         let mut today_return = 0f64;
+    //         // TODO optimize to skip 0 allocations
+    //         for asset in yesterday_allocations.keys() {
+    //             // println!("asset: {:?}", asset);
+    //             // TODO optimize for only 1 timestamp
+    //             let relative_price_changes = self.data_client().query(Query::new(
+    //                 asset.symbol().to_string(),
+    //                 DEFAULT_SERIES.to_string(),
+    //                 epoch(),
+    //                 doomsday(),
+    //             ))?;
+    //             // println!("relative_price_changes: {:?}", relative_price_changes);
+    //             let asset_price_change = relative_price_changes.get(today).unwrap();
+    //             // println!("asset_price_change: {:?}", asset_price_change);
+    //             let asset_allocation = yesterday_allocations.get(asset).unwrap();
+    //             // println!("asset_allocation: {:?}", asset_allocation);
+    //             let allocation_return = asset_price_change * asset_allocation;
+    //             today_return += allocation_return;
+    //             // println!("allocation_return: {:?}", allocation_return);
+    //         }
+    //         // println!("today_return: {:?}", today_return);
+    //         performance.entry(*today.clone()).or_insert(today_return);
+    //     }
+    //     Ok(TimeSeries1D::new(performance))
+    // }
+    //
+    // fn compute_result(
+    //     &self,
+    //     allocations: Option<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>>,
+    // ) -> GenResult<BackTestResult> {
+    //     let timestamp = Utc::now();
+    //     let allocations_by_timestamp: BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>> =
+    //         match allocations {
+    //             Some(allocations) => allocations,
+    //             None => self.compute_allocations()?,
+    //         };
+    //     let mut allocation_vec_lkup: BTreeMap<&Asset, Vec<Allocation>> = BTreeMap::new();
+    //     let mut index: Vec<TimeStamp> = Vec::new();
+    //     for (timestamp, asset_allocation) in allocations_by_timestamp.iter() {
+    //         // println!("timestamp: {:?}", timestamp);
+    //         index.push(timestamp.clone());
+    //         // println!("index={:?}", index);
+    //         for (asset, allocation) in asset_allocation {
+    //             // println!("(asset, allocation): {:?}", (asset, allocation));
+    //             allocation_vec_lkup
+    //                 .entry(asset)
+    //                 .and_modify(|asset_allocations| asset_allocations.push(allocation.clone()))
+    //                 .or_insert(vec![allocation.clone()]);
+    //         }
+    //         // println!("allocation_vec_lkup={:?}", allocation_vec_lkup);
+    //     }
+    //     let allocations: BTreeMap<Symbol, TimeSeries1D> = allocation_vec_lkup
+    //         .into_iter()
+    //         .map(|(asset, values)| {
+    //             (
+    //                 asset.symbol().to_string(),
+    //                 TimeSeries1D::from_vec(index.clone(), values),
+    //             )
+    //         })
+    //         .collect();
+    //
+    //     let performance = self.compute_performance(Some(allocations_by_timestamp.clone()))?;
+    //     Ok(BackTestResult::new(
+    //         timestamp,
+    //         self.strategy().clone(),
+    //         allocations,
+    //         performance,
+    //     ))
+    // }
+}
 
-            let mut today_return = 0f64;
-            // TODO optimize to skip 0 allocations
-            for asset in yesterday_allocations.keys() {
-                // println!("asset: {:?}", asset);
-                // TODO optimize for only 1 timestamp
-                let relative_price_changes = self.data_client().query(Query::new(
-                    asset.symbol().to_string(),
-                    DEFAULT_SERIES.to_string(),
-                    epoch(),
-                    doomsday(),
-                ))?;
-                // println!("relative_price_changes: {:?}", relative_price_changes);
-                let asset_price_change = relative_price_changes.get(today).unwrap();
-                // println!("asset_price_change: {:?}", asset_price_change);
-                let asset_allocation = yesterday_allocations.get(asset).unwrap();
-                // println!("asset_allocation: {:?}", asset_allocation);
-                let allocation_return = asset_price_change * asset_allocation;
-                today_return += allocation_return;
-                // println!("allocation_return: {:?}", allocation_return);
-            }
-            // println!("today_return: {:?}", today_return);
-            performance.entry(*today.clone()).or_insert(today_return);
-        }
-        Ok(TimeSeries1D::new(performance))
-    }
-
-    fn compute_result(
-        &self,
-        allocations: Option<BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>>>,
-    ) -> GenResult<BackTestResult> {
-        let timestamp = Utc::now();
-        let allocations_by_timestamp: BTreeMap<TimeStamp, BTreeMap<Asset, Allocation>> =
-            match allocations {
-                Some(allocations) => allocations,
-                None => self.compute_allocations()?,
-            };
-        let mut allocation_vec_lkup: BTreeMap<&Asset, Vec<Allocation>> = BTreeMap::new();
-        let mut index: Vec<TimeStamp> = Vec::new();
-        for (timestamp, asset_allocation) in allocations_by_timestamp.iter() {
-            // println!("timestamp: {:?}", timestamp);
-            index.push(timestamp.clone());
-            // println!("index={:?}", index);
-            for (asset, allocation) in asset_allocation {
-                // println!("(asset, allocation): {:?}", (asset, allocation));
-                allocation_vec_lkup
-                    .entry(asset)
-                    .and_modify(|asset_allocations| asset_allocations.push(allocation.clone()))
-                    .or_insert(vec![allocation.clone()]);
-            }
-            // println!("allocation_vec_lkup={:?}", allocation_vec_lkup);
-        }
-        let allocations: BTreeMap<Symbol, TimeSeries1D> = allocation_vec_lkup
-            .into_iter()
-            .map(|(asset, values)| {
-                (
-                    asset.symbol().to_string(),
-                    TimeSeries1D::from_vec(index.clone(), values),
-                )
-            })
-            .collect();
-
-        let performance = self.compute_performance(Some(allocations_by_timestamp.clone()))?;
-        Ok(BackTestResult::new(
-            timestamp,
-            self.index().clone(),
-            self.strategy().clone(),
-            allocations,
-            performance,
-        ))
-    }
+#[derive(Clone, Debug, Serialize)]
+pub struct AssetScoreResult {
+    timestamp: TimeStamp,
+    index: Vec<TimeStamp>,
+    strategy: StrategyDto,
+    allocations: BTreeMap<Symbol, TimeSeries1D>,
+    performance: TimeSeries1D,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -172,14 +190,13 @@ pub struct BackTestResult {
 impl BackTestResult {
     pub fn new(
         timestamp: TimeStamp,
-        index: Vec<TimeStamp>,
         strategy: StrategyDto,
         allocations: BTreeMap<Symbol, TimeSeries1D>,
         performance: TimeSeries1D,
     ) -> Self {
         BackTestResult {
             timestamp,
-            index,
+            index: performance.index(),
             strategy,
             allocations,
             performance,
@@ -252,39 +269,39 @@ mod tests {
             .join(Path::new("strategy.yaml"));
         from_path(strategy_path.as_path()).expect("unable to load strategy from path")
     }
-
-    #[test]
-    fn back_test() -> GenResult<()> {
-        let today = MockDataClient::today();
-        let back_test_len: usize = 3;
-        let back_test_days: Vec<TimeStamp> = (0..back_test_len)
-            .map(|i| today - TimeSeries1D::index_unit() * (back_test_len - i) as i32)
-            .collect();
-        // println!("back_test_days={:?}", back_test_days);
-        let back_test = BackTestConfig::new(
-            back_test_days,
-            get_strategy(),
-            Box::new(MockDataClient::new()),
-        );
-        let allocations = back_test.compute_allocations()?;
-        // println!("allocations={:?}", allocations);
-        assert!(!allocations.is_empty());
-        let performance = back_test.compute_performance(Some(allocations.clone()))?;
-        // println!("performance={:?}", performance);
-        assert_eq!(back_test_len - 1, performance.len());
-        // TODO expose total_return in api
-        let _total_return: DataPointValue =
-            1.0f64 + performance.add(1.0).values().iter().product::<f64>();
-        // println!("total_return={:?}", total_return);
-        plot_ts_values(vec![performance]);
-        let back_test_result = back_test.compute_result(Some(allocations))?;
-        assert!(!back_test_result.allocations().is_empty());
-        assert_eq!(back_test_len - 1, back_test_result.performance().len());
-
-        dump_result(&back_test_result);
-        let back_test_result_json = serde_json::to_string(&back_test_result).unwrap();
-        println!("{}", back_test_result_json);
-
-        Ok(())
-    }
+    //
+    // #[test]
+    // fn back_test() -> GenResult<()> {
+    //     let today = MockDataClient::today();
+    //     let back_test_len: usize = 3;
+    //     let back_test_days: Vec<TimeStamp> = (0..back_test_len)
+    //         .map(|i| today - TimeSeries1D::index_unit() * (back_test_len - i) as i32)
+    //         .collect();
+    //     // println!("back_test_days={:?}", back_test_days);
+    //     let back_test = BackTestConfig::new(
+    //         MockDataClient::today(),
+    //         get_strategy(),
+    //         Box::new(MockDataClient::new()),
+    //     );
+    //     let allocations = back_test.compute_allocations()?;
+    //     // println!("allocations={:?}", allocations);
+    //     assert!(!allocations.is_empty());
+    //     let performance = back_test.compute_performance(Some(allocations.clone()))?;
+    //     // println!("performance={:?}", performance);
+    //     assert_eq!(back_test_len - 1, performance.len());
+    //     // TODO expose total_return in api
+    //     let _total_return: DataPointValue =
+    //         1.0f64 + performance.add(1.0).values().iter().product::<f64>();
+    //     // println!("total_return={:?}", total_return);
+    //     plot_ts_values(vec![performance]);
+    //     let back_test_result = back_test.compute_result(Some(allocations))?;
+    //     assert!(!back_test_result.allocations().is_empty());
+    //     assert_eq!(back_test_len - 1, back_test_result.performance().len());
+    //
+    //     dump_result(&back_test_result);
+    //     let back_test_result_json = serde_json::to_string(&back_test_result).unwrap();
+    //     println!("{}", back_test_result_json);
+    //
+    //     Ok(())
+    // }
 }

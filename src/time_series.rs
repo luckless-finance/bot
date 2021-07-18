@@ -181,6 +181,7 @@ impl TimeSeries1D {
     pub fn sma(&self, window_size: usize) -> Self {
         let mut index = self.index().clone();
         index.reverse();
+        // FIXME handle window_size > self.len()
         index.truncate(self.len() - window_size + 1);
         index.reverse();
         let values = self

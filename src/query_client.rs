@@ -1,26 +1,53 @@
+use std::array::IntoIter;
 use std::collections::{BTreeMap, HashMap};
+use std::convert::TryInto;
+use std::iter::FromIterator;
+use std::path::PathBuf;
 
-use chrono::{TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use futures::executor;
+use grpc::{ClientConf, ClientStubExt};
 use protobuf::well_known_types::Timestamp;
 use protobuf::SingularPtrField;
 
 use crate::bot::asset_score::CalculationStatus::Error;
 use crate::data::{Asset, DataClient, Query, Symbol};
+use crate::dto::strategy::{from_path, StrategyDto};
 use crate::errors::{GenError, GenResult, QueryError};
 use crate::query::{DataPoint, RangedRequest};
 use crate::query_grpc::MarketDataClient;
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
-use std::convert::TryInto;
 
 pub struct QueryClient {
     market_data_client: MarketDataClient,
     assets: HashMap<Symbol, Asset>,
 }
 
+impl QueryClient {
+    pub fn new() -> QueryClient {
+        QueryClient {
+            market_data_client: build_market_data_client(),
+            assets: HashMap::from_iter(IntoIter::new([
+                ("A".to_string(), Asset::new("A".to_string())),
+                ("B".to_string(), Asset::new("B".to_string())),
+            ])),
+        }
+    }
+}
+
+pub fn build_market_data_client() -> MarketDataClient {
+    const DEFAULT_PORT: u16 = 50052;
+    const HOST: &str = "localhost";
+    println!("Building gRPC client for {}:{:?}", HOST, DEFAULT_PORT);
+    MarketDataClient::new_plain(HOST, DEFAULT_PORT, ClientConf::new()).expect("client")
+}
+
 impl DataClient for QueryClient {
     fn duplicate(&self) -> Box<dyn DataClient> {
-        todo!("meh")
+        Box::new(QueryClient {
+            market_data_client: build_market_data_client(),
+            assets: self.assets.clone(),
+        })
     }
 
     fn assets(&self) -> &HashMap<Symbol, Asset> {
@@ -64,5 +91,53 @@ impl DataClient for QueryClient {
             Err(e) => Err(QueryError::new(format!("fasdf {:?}", e))),
             Ok(ts) => Ok(ts),
         }
+    }
+}
+
+// TODO add tests
+
+#[allow(dead_code)]
+pub fn parse_strategy_path(arg: &str) -> Result<PathBuf, String> {
+    let strategy_path = PathBuf::from(arg);
+    if !strategy_path.exists() {
+        return Err(format!(
+            "File does not exist. Expected yaml strategy file.  Got: {:?}",
+            arg
+        ));
+    }
+    if !strategy_path.is_file() {
+        return Err(format!(
+            "Not a file.  Expected yaml strategy file.  Got: {:?}",
+            arg
+        ));
+    }
+    match strategy_path.canonicalize() {
+        Ok(absolute_path) => Ok(absolute_path),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+#[allow(dead_code)]
+pub fn parse_strategy_yaml(arg: &str) -> Result<StrategyDto, String> {
+    let strategy_path: PathBuf = parse_strategy_path(arg)?;
+    match from_path(strategy_path.as_path()) {
+        Ok(strategy_dto) => Ok(strategy_dto),
+        Err(e) => Err(format!(
+            "Unable to parse strategy yaml.  Got: {:?}\n{}",
+            arg,
+            e.to_string()
+        )),
+    }
+}
+
+#[allow(dead_code)]
+pub fn parse_date(arg: &str) -> Result<DateTime<Utc>, String> {
+    match DateTime::parse_from_rfc3339(arg) {
+        Ok(start) => Ok(DateTime::from(start)),
+        Err(e) => Err(format!(
+            "Unable to parse start.  Expected RFC3339/ISO8601.  Got: {:?}\n{}",
+            arg,
+            e.to_string()
+        )),
     }
 }
