@@ -1,18 +1,18 @@
 #![allow(dead_code)]
 
+use std::borrow::Borrow;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
 use chrono::prelude::*;
 use chrono::{Duration, TimeZone};
 use itertools::{fold, zip};
+use serde::ser::{SerializeSeq, SerializeStruct};
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::errors::{GenError, GenResult};
-use serde::ser::{SerializeSeq, SerializeStruct};
-use std::borrow::Borrow;
-use std::collections::BTreeMap;
 
 pub type DataPointValue = f64;
 // TODO enforce allocations 0 <= a <= 1
@@ -298,6 +298,7 @@ pub fn apply(
     ts_vec: Vec<&TimeSeries1D>,
     func: fn(Vec<DataPointValue>) -> DataPointValue,
 ) -> TimeSeries1D {
+    assert!(ts_vec.len() > 1);
     let index = ts_vec.get(0).unwrap().index().clone();
     let ts_len = index.len();
     TimeSeries1D::from_vec(

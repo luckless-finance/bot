@@ -1,6 +1,6 @@
 // cli library
 use chrono::{DateTime, Utc};
-use luckless::back_test::{dump_result, BackTest, BackTestConfig};
+use luckless::back_test::BackTestConfig;
 use luckless::dto::strategy::{from_path, StrategyDto};
 use luckless::errors::GenResult;
 use luckless::simulation::MockDataClient;
@@ -55,7 +55,9 @@ fn parse_date(arg: &str) -> Result<DateTime<Utc>, String> {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(about = "Back test a financial stock picking strategy.")]
+#[structopt(
+    about = "Execute given strategy to compute non-negative score of the given assets over the given time range."
+)]
 struct Opt {
     /// first date in back test in RFC3339/ISO8601 format.
     #[structopt(short = "s", long = "start", parse(try_from_str = parse_date), default_value = "2011-12-01T00:00:00UTC")]
@@ -66,6 +68,7 @@ struct Opt {
     /// path to strategy yaml file
     #[structopt(short = "f", long = "file", parse(try_from_str = parse_strategy_yaml), default_value = "./strategy.yaml")]
     strategy: StrategyDto,
+    // TODO accept list of symbols
 }
 
 fn parse_args() -> Result<BackTestConfig, String> {
@@ -90,9 +93,10 @@ fn main() -> GenResult<()> {
     } else {
         let back_test_config: BackTestConfig = parse_result.unwrap();
         println!("back_test_config: {:?}\n", back_test_config);
-        let back_test_result = back_test_config.compute_result(None)?;
-        println!("back_test_result: {:?}\n", back_test_result);
-        dump_result(&back_test_result);
+        // TODO compute scores not allocations
+        // let back_test_result = back_test_config.compute_result(None)?;
+        // println!("back_test_result: {:?}\n", back_test_result);
+        // dump_result(&back_test_result);
     }
     Ok(())
 }
@@ -101,12 +105,12 @@ fn main() -> GenResult<()> {
 mod tests {
     use chrono::{DateTime, Utc};
 
-    use luckless::back_test::{dump_result, BackTest, BackTestConfig};
     use luckless::errors::GenResult;
     use luckless::simulation::MockDataClient;
     use luckless::time_series::TimeSeries1D;
 
     use crate::{parse_date, parse_strategy_yaml};
+    use luckless::back_test::BackTestConfig;
 
     #[test]
     fn main() -> GenResult<()> {
@@ -122,9 +126,10 @@ mod tests {
             .collect();
         let data_client = Box::new(MockDataClient::new());
         let back_test_config = BackTestConfig::new(timestamps, strategy, data_client);
-        let allocations = back_test_config.compute_allocations()?;
-        let back_test_result = back_test_config.compute_result(Some(allocations))?;
-        dump_result(&back_test_result);
+        // TODO compute scores not allocations
+        // let allocations = back_test_config.compute_allocations()?;
+        // let back_test_result = back_test_config.compute_result(Some(allocations))?;
+        // dump_result(&back_test_result);
         Ok(())
     }
 }

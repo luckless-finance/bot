@@ -222,7 +222,6 @@ pub mod bot {
                     // println!("\nexecuting {}", calc_name);
                     self.status(&calc_name, CalculationStatus::InProgress);
                     let calc = self.calcs.get(&calc_name).ok_or("calc not found")?;
-
                     let calc_time_series = match calc.operation() {
                         Operation::QUERY => self.handle_query(calc),
                         Operation::ADD => self.handle_add(calc),
@@ -252,11 +251,12 @@ pub mod bot {
             fn handle_query(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
                 assert_eq!(*calculation_dto.operation(), Operation::QUERY);
                 let query_dto: QueryCalculationDto = calculation_dto.clone().try_into()?;
-                let query: Query = query_dto.try_into()?;
-                Ok(self
-                    .data_client
-                    .query(&self.asset, &self.timestamp, query)?
-                    .clone())
+                let query = query_dto.build_query(
+                    &self.asset,
+                    query_dto.name().to_string(),
+                    &self.timestamp,
+                )?;
+                Ok(self.data_client.query(query)?.clone())
             }
             fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
                 assert_eq!(*calculation_dto.operation(), Operation::ADD);
@@ -737,8 +737,9 @@ pub mod dto {
 
         use serde::{Deserialize, Serialize};
 
+        use crate::data::{epoch, Asset, Query, Series};
         use crate::errors::{GenError, GenResult};
-        use crate::time_series::DataPointValue;
+        use crate::time_series::{DataPointValue, TimeStamp};
 
         pub type TimeSeriesReference = String;
         pub type TimeSeriesName = String;
@@ -882,6 +883,22 @@ pub mod dto {
         pub struct QueryCalculationDto {
             name: String,
             field: String,
+        }
+
+        impl QueryCalculationDto {
+            pub(crate) fn build_query(
+                &self,
+                asset: &Asset,
+                series: Series,
+                time_stamp: &TimeStamp,
+            ) -> GenResult<Query> {
+                Ok(Query::new(
+                    asset.symbol().to_string(),
+                    series,
+                    epoch(),
+                    time_stamp.clone(),
+                ))
+            }
         }
 
         impl QueryCalculationDto {

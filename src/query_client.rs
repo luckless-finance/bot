@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use chrono::{TimeZone, Utc};
-
 use futures::executor;
+use protobuf::well_known_types::Timestamp;
+use protobuf::SingularPtrField;
 
 use crate::bot::asset_score::CalculationStatus::Error;
 use crate::data::{Asset, DataClient, Query, Symbol};
@@ -10,8 +11,7 @@ use crate::errors::{GenError, GenResult, QueryError};
 use crate::query::{DataPoint, RangedRequest};
 use crate::query_grpc::MarketDataClient;
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
-use protobuf::well_known_types::Timestamp;
-use protobuf::SingularPtrField;
+use std::convert::TryInto;
 
 pub struct QueryClient {
     market_data_client: MarketDataClient,
@@ -34,17 +34,11 @@ impl DataClient for QueryClient {
         }
     }
 
-    fn query(&self, asset: &Asset, timestamp: &TimeStamp, query: Query) -> GenResult<TimeSeries1D> {
+    fn query(&self, query: Query) -> GenResult<TimeSeries1D> {
         let foo = executor::block_on(async {
-            let mut request = RangedRequest::new();
-            request.symbol = "RUST".to_string();
-            request.symbol = "SERIES".to_string();
-            request.first = SingularPtrField::some(Timestamp::new());
-            request.last = SingularPtrField::some(Timestamp::new());
-
             let result = self
                 .market_data_client
-                .query(grpc::RequestOptions::new(), request)
+                .query(grpc::RequestOptions::new(), query.try_into()?)
                 .await;
             // if result.is_err() {
             //     println!();

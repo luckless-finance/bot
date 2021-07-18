@@ -9,11 +9,11 @@ use crate::query::RangedRequest;
 use crate::query_grpc::MarketDataClient;
 use crate::time_series::TimeStamp;
 
-fn from_proto(pb: protobuf::well_known_types::Timestamp) -> TimeStamp {
+pub fn from_proto(pb: protobuf::well_known_types::Timestamp) -> TimeStamp {
     return Utc::timestamp(&Utc, pb.seconds, pb.nanos.abs() as u32);
 }
 
-fn to_proto(ts: TimeStamp) -> protobuf::well_known_types::Timestamp {
+pub fn to_proto(ts: TimeStamp) -> protobuf::well_known_types::Timestamp {
     let ns = ts.timestamp_nanos() % 1_000_000_000i64;
     let s = (ts.timestamp_nanos() - ns) / 1_000_000_000i64;
     let mut pb = protobuf::well_known_types::Timestamp::new();

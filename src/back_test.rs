@@ -1,17 +1,19 @@
-use crate::bot::asset_score::CalculationStatus::Error;
-use crate::bot::asset_score::{AssetAllocations, RunnableStrategy};
-use crate::data::{Asset, DataClient, Query, QueryType, Symbol};
-use crate::dto::strategy::StrategyDto;
-use crate::errors::{GenError, GenResult};
-use crate::time_series::{Allocation, DataPointValue, TimeSeries1D, TimeStamp};
-use chrono::{DateTime, Utc};
-use itertools::zip;
-use serde::ser::SerializeStruct;
-use serde::{Deserialize, Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Write};
 use std::path::Path;
+
+use chrono::{DateTime, Utc};
+use itertools::zip;
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize, Serializer};
+
+use crate::bot::asset_score::CalculationStatus::Error;
+use crate::bot::asset_score::{AssetAllocations, RunnableStrategy};
+use crate::data::{doomsday, epoch, Asset, DataClient, Query, Series, Symbol, DEFAULT_SERIES};
+use crate::dto::strategy::StrategyDto;
+use crate::errors::{GenError, GenResult};
+use crate::time_series::{Allocation, DataPointValue, TimeSeries1D, TimeStamp};
 
 #[derive(Clone, Debug)]
 pub struct BackTestConfig {
@@ -91,11 +93,12 @@ impl BackTest for BackTestConfig {
             for asset in yesterday_allocations.keys() {
                 // println!("asset: {:?}", asset);
                 // TODO optimize for only 1 timestamp
-                let relative_price_changes = self.data_client().query(
-                    asset,
-                    today,
-                    Query::new(QueryType::RelativePriceChange),
-                )?;
+                let relative_price_changes = self.data_client().query(Query::new(
+                    asset.symbol().to_string(),
+                    DEFAULT_SERIES.to_string(),
+                    epoch(),
+                    doomsday(),
+                ))?;
                 // println!("relative_price_changes: {:?}", relative_price_changes);
                 let asset_price_change = relative_price_changes.get(today).unwrap();
                 // println!("asset_price_change: {:?}", asset_price_change);
@@ -228,6 +231,13 @@ pub fn dump_result(back_test_result: &BackTestResult) {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::env::current_dir;
+    use std::path::Path;
+
+    use chrono::{DateTime, Utc};
+    use itertools::zip;
+
     use crate::back_test::{dump_result, BackTest, BackTestConfig};
     use crate::data::{Asset, Symbol};
     use crate::dto::strategy::{from_path, StrategyDto};
@@ -235,11 +245,6 @@ mod tests {
     use crate::plot::plot_ts_values;
     use crate::simulation::MockDataClient;
     use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
-    use chrono::{DateTime, Utc};
-    use itertools::zip;
-    use std::collections::HashMap;
-    use std::env::current_dir;
-    use std::path::Path;
 
     pub fn get_strategy() -> StrategyDto {
         let strategy_path = current_dir()
