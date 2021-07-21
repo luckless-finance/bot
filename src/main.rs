@@ -1,20 +1,15 @@
-use std::path::PathBuf;
-
 // cli library
 use chrono::{DateTime, Utc};
-use futures::executor;
-use grpc::{ClientConf, ClientStubExt};
+
 use structopt::StructOpt;
 
-use luckless::back_test::{dump_result, BackTest, BackTestConfig};
+use luckless::back_test::{BackTest, BackTestConfig};
 use luckless::data::DataClient;
-use luckless::dto::strategy::{from_path, StrategyDto};
+use luckless::dto::strategy::StrategyDto;
 use luckless::errors::GenResult;
 pub use luckless::query_client::{parse_date, parse_strategy_yaml, QueryClient};
-use luckless::query_demo::query_server;
-use luckless::query_grpc::MarketDataClient;
+
 use luckless::simulation::MockDataClient;
-use luckless::time_series::TimeSeries1D;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -46,7 +41,7 @@ fn parse_args() -> Result<BackTestConfig, String> {
         return Err("!(start < end)".to_string());
     }
     let data_client: Box<dyn DataClient>;
-    if (opt.grpc) {
+    if opt.grpc {
         println!("Attempting GRPC");
         data_client = Box::new(QueryClient::new())
     } else {
@@ -74,7 +69,7 @@ mod tests {
 
     use luckless::back_test::{BackTest, BackTestConfig};
     use luckless::errors::GenResult;
-    use luckless::query_client::QueryClient;
+
     use luckless::simulation::MockDataClient;
     use luckless::time_series::TimeSeries1D;
 
@@ -89,7 +84,7 @@ mod tests {
         let strategy_str = "./strategy.yaml";
         let strategy = parse_strategy_yaml(strategy_str)?;
 
-        let timestamps: Vec<DateTime<Utc>> = (0..(end - start).num_days())
+        let _timestamps: Vec<DateTime<Utc>> = (0..(end - start).num_days())
             .map(|i| start + TimeSeries1D::index_unit() * i as i32)
             .collect();
         let data_client = Box::new(MockDataClient::new());
