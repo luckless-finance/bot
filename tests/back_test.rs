@@ -8,7 +8,7 @@ use std::path::Path;
 use luckless::bot::asset_score::*;
 use luckless::data;
 use luckless::dto::strategy::*;
-use luckless::simulation::MockDataClient;
+use luckless::mock_client::MockDataClient;
 use luckless::time_series;
 
 pub fn get_strategy() -> StrategyDto {
@@ -32,8 +32,8 @@ mod tests {
         CalculationDto, OperandDto, OperandType, Operation, QueryCalculationDto,
     };
     use luckless::errors::GenResult;
+    use luckless::mock_client::MockDataClient;
     use luckless::plot::{plot_ts, plot_ts_values};
-    use luckless::simulation::MockDataClient;
     use luckless::time_series::{DataPointValue, TimeSeries1D};
 
     use crate::get_strategy;

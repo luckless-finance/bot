@@ -1,15 +1,14 @@
 // cli library
 use chrono::{DateTime, Utc};
-
 use structopt::StructOpt;
 
-use luckless::back_test::{BackTest, BackTestConfig};
+use luckless::bot::asset_score::RunnableStrategy;
 use luckless::data::DataClient;
 use luckless::dto::strategy::StrategyDto;
-use luckless::errors::GenResult;
+use luckless::errors::{CliArgError, GenResult};
+use luckless::mock_client::MockDataClient;
 pub use luckless::query_client::{parse_date, parse_strategy_yaml, QueryClient};
-
-use luckless::simulation::MockDataClient;
+use luckless::time_series::TimeStamp;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -32,13 +31,13 @@ struct Opt {
     // TODO accept list of symbols
 }
 
-fn parse_args() -> Result<BackTestConfig, String> {
+fn parse_args() -> GenResult<(RunnableStrategy, TimeStamp)> {
     let opt: Opt = Opt::from_args();
     // println!("strategy: {:?}", opt.strategy);
     // println!("start: {:?}", opt.start);
     // println!("end: {:?}", opt.end);
     if !(opt.start < opt.end) {
-        return Err("!(start < end)".to_string());
+        return Err(CliArgError::new("!(start < end)".to_string()));
     }
     let data_client: Box<dyn DataClient>;
     if opt.grpc {
@@ -47,7 +46,8 @@ fn parse_args() -> Result<BackTestConfig, String> {
     } else {
         data_client = Box::new(MockDataClient::new());
     }
-    Ok(BackTestConfig::new(opt.end, opt.strategy, data_client))
+    // opt.end,
+    Ok((RunnableStrategy::new(opt.strategy, data_client)?, opt.end))
 }
 
 fn main() -> GenResult<()> {
@@ -55,45 +55,10 @@ fn main() -> GenResult<()> {
     if parse_result.is_err() {
         println!("{:?}", parse_result.err().expect("Unknown Error"))
     } else {
-        let back_test_config: BackTestConfig = parse_result.unwrap();
-        println!("back_test_config: {:?}\n", back_test_config);
-        let back_test_result = back_test_config.compute_scores()?;
-        println!("back_test_result: {:?}\n", back_test_result);
+        let (runnable_strategy, time_stamp) = parse_result.unwrap();
+        println!("runnable_strategy: {:?}\n", runnable_strategy);
+        let asset_scores = runnable_strategy.run_on_all_assets(time_stamp)?;
+        println!("asset_scores: {:?}\n", asset_scores);
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use chrono::{DateTime, Utc};
-
-    use luckless::back_test::{BackTest, BackTestConfig};
-    use luckless::errors::GenResult;
-
-    use luckless::simulation::MockDataClient;
-    use luckless::time_series::TimeSeries1D;
-
-    use crate::{parse_date, parse_strategy_yaml};
-
-    #[test]
-    fn main() -> GenResult<()> {
-        let start_str = "2011-12-01T00:00:00UTC";
-        let start = parse_date(start_str)?;
-        let end_str = "2012-01-01T00:00:00UTC";
-        let end = parse_date(end_str)?;
-        let strategy_str = "./strategy.yaml";
-        let strategy = parse_strategy_yaml(strategy_str)?;
-
-        let _timestamps: Vec<DateTime<Utc>> = (0..(end - start).num_days())
-            .map(|i| start + TimeSeries1D::index_unit() * i as i32)
-            .collect();
-        let data_client = Box::new(MockDataClient::new());
-        // let data_client = Box::new(QueryClient::new());
-        let back_test_config = BackTestConfig::new(end, strategy, data_client);
-        println!("back_test_config: {:?}\n", back_test_config);
-        let back_test_result = back_test_config.compute_scores()?;
-        println!("back_test_result: {:?}\n", back_test_result);
-
-        Ok(())
-    }
 }

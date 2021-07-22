@@ -11,15 +11,14 @@
 #[macro_use]
 extern crate approx;
 
-pub mod back_test;
 pub mod data;
 pub mod errors;
+pub mod mock_client;
 pub mod plot;
 pub mod query;
 pub mod query_client;
 pub mod query_demo;
 pub mod query_grpc;
-pub mod simulation;
 pub mod time_series;
 
 pub mod bot {
@@ -30,6 +29,9 @@ pub mod bot {
         use std::collections::{BTreeMap, HashMap};
         use std::convert::TryInto;
         use std::fmt;
+
+        use itertools::Itertools;
+        use serde::{Serialize, Serializer};
 
         use crate::data::{Asset, DataClient, Query};
         use crate::dto::dag::Dag;
@@ -125,45 +127,14 @@ pub mod bot {
                 //     .collect()
                 // )
             }
-            pub fn compute_allocations(
+            pub fn run_on_all_assets(
                 &self,
                 timestamp: TimeStamp,
-            ) -> GenResult<BTreeMap<Asset, Allocation>> {
-                let asset_scores: Vec<AssetScore> = self
-                    .data_client
-                    .assets()
-                    .values()
-                    .cloned()
-                    .flat_map(|asset| self.run_on_asset(asset.clone(), timestamp))
-                    .collect();
-                let zeroed: HashMap<Asset, TimeSeries1D> = asset_scores
-                    .iter()
-                    .map(|asset_score| {
-                        (
-                            asset_score.asset().clone(),
-                            asset_score.score().zero_negatives(),
-                        )
-                    })
-                    .collect();
-                // daily sums
-                let ts_sum = apply(zeroed.values().collect(), |values| values.iter().sum());
-                // allocations
-                let weightings: BTreeMap<Asset, DataPointValue> = zeroed
-                    .iter()
-                    .map(|asset_score| {
-                        (
-                            asset_score.0.clone(),
-                            asset_score
-                                .1
-                                .ts_div(&ts_sum)
-                                .values()
-                                .last()
-                                .unwrap()
-                                .clone(),
-                        )
-                    })
-                    .collect();
-                Ok(weightings)
+            ) -> GenResult<BTreeMap<Asset, AssetScore>> {
+                self.run_on_assets(
+                    self.data_client.assets().values().cloned().collect(),
+                    timestamp,
+                )
             }
         }
 
@@ -380,34 +351,13 @@ pub mod bot {
             }
         }
 
-        #[derive(Clone, Debug, PartialEq)]
-        pub struct AssetAllocations {
-            timestamp: TimeStamp,
-            allocations: BTreeMap<Asset, DataPointValue>,
-        }
-
-        impl AssetAllocations {
-            pub fn new(timestamp: TimeStamp, allocations: BTreeMap<Asset, f64>) -> Self {
-                AssetAllocations {
-                    timestamp,
-                    allocations,
-                }
-            }
-            pub fn timestamp(&self) -> TimeStamp {
-                self.timestamp
-            }
-            pub fn allocations(&self) -> &BTreeMap<Asset, f64> {
-                &self.allocations
-            }
-        }
-
         #[cfg(test)]
         mod tests {
             use std::collections::{BTreeMap, HashMap};
             use std::path::Path;
 
             use crate::bot::asset_score::{
-                AssetAllocations, AssetScore, AssetScoreStatus, CalculationStatus, RunnableStrategy,
+                AssetScore, AssetScoreStatus, CalculationStatus, RunnableStrategy,
             };
             use crate::data::{Asset, DataClient};
             use crate::dto::strategy::{
@@ -415,7 +365,7 @@ pub mod bot {
                 StrategyDto,
             };
             use crate::errors::GenResult;
-            use crate::simulation::MockDataClient;
+            use crate::mock_client::MockDataClient;
             use crate::time_series::DataPointValue;
 
             fn data_client_fixture() -> Box<dyn DataClient> {
@@ -455,12 +405,27 @@ pub mod bot {
             }
 
             #[test]
-            fn compute_allocations() -> GenResult<()> {
+            fn run_on_assets() -> GenResult<()> {
+                let runnable_strategy = compiled_strategy_fixture()?;
+                let assets = vec![Asset::new(String::from("A")), Asset::new(String::from("B"))];
+                let timestamp = MockDataClient::today();
+                let asset_scores: BTreeMap<Asset, AssetScore> =
+                    runnable_strategy.run_on_assets(assets, timestamp)?;
+                asset_scores.values().for_each(|asset_score| {
+                    assert_eq!(asset_score.status, AssetScoreStatus::Complete)
+                });
+                Ok(())
+            }
+
+            #[test]
+            fn run_on_all_assets() -> GenResult<()> {
                 let runnable_strategy = compiled_strategy_fixture()?;
                 let timestamp = MockDataClient::today();
-                let asset_allocations: BTreeMap<Asset, DataPointValue> =
-                    runnable_strategy.compute_allocations(timestamp)?;
-                assert_eq!(asset_allocations.len(), 3);
+                let asset_scores: BTreeMap<Asset, AssetScore> =
+                    runnable_strategy.run_on_all_assets(timestamp)?;
+                asset_scores.values().for_each(|asset_score| {
+                    assert_eq!(asset_score.status, AssetScoreStatus::Complete)
+                });
                 Ok(())
             }
         }

@@ -180,7 +180,7 @@ mod tests {
     use std::collections::HashSet;
     use std::f64::consts::PI;
 
-    use crate::simulation::*;
+    use crate::mock_client::*;
     use crate::time_series::TimeSeries1D;
     use std::convert::TryInto;
 
