@@ -14,15 +14,15 @@ use gnuplot::AutoOption::Fix;
 use gnuplot::Coordinate::Graph;
 use gnuplot::PlotOption::Caption;
 use gnuplot::{AxesCommon, Figure};
-use protobuf::SingularPtrField;
+use protobuf::{Clear, SingularPtrField};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
 
 use crate::dto::strategy::QueryCalculationDto;
 use crate::errors::{GenError, GenResult};
 use crate::query::RangedRequest;
-use crate::query_demo::to_proto;
 use crate::time_series::{DataPointValue, TimeSeries1D, TimeStamp};
+use protobuf::well_known_types::Timestamp;
 
 pub type Symbol = String;
 pub type Series = String;
@@ -82,7 +82,7 @@ impl TryFrom<QueryCalculationDto> for Query {
     fn try_from(_query_calculation_dto: QueryCalculationDto) -> GenResult<Self> {
         GenResult::Ok(Query::complete(
             _query_calculation_dto.name().to_string(),
-            _query_calculation_dto.field().to_string(),
+            _query_calculation_dto.series().to_string(),
         ))
     }
 }
@@ -106,13 +106,27 @@ impl TryFrom<Asset> for Query {
     }
 }
 
+pub fn from_proto(pb: Timestamp) -> TimeStamp {
+    return Utc::timestamp(&Utc, pb.seconds, pb.nanos.abs() as u32);
+}
+
+pub fn to_proto(ts: TimeStamp) -> Timestamp {
+    let ns = ts.timestamp_nanos() % 1_000_000_000i64;
+    let s = (ts.timestamp_nanos() - ns) / 1_000_000_000i64;
+    let mut pb = Timestamp::new();
+    pb.clear();
+    pb.set_seconds(s);
+    pb.set_nanos(ns as i32);
+    pb
+}
+
 impl TryFrom<Query> for RangedRequest {
     type Error = GenError;
 
     fn try_from(query: Query) -> GenResult<Self> {
         let mut request = RangedRequest::new();
         request.symbol = query.symbol;
-        request.symbol = query.series;
+        request.series = query.series;
         request.first = SingularPtrField::some(to_proto(query.first));
         request.last = SingularPtrField::some(to_proto(query.last));
         GenResult::Ok(request)
@@ -181,8 +195,11 @@ impl PartialOrd for Asset {
 mod tests {
     use std::convert::TryInto;
 
-    use crate::data::Asset;
+    use chrono::{DateTime, Utc};
+
+    use crate::data::{from_proto, to_proto, Asset};
     use crate::errors::GenResult;
+    use protobuf::well_known_types::Timestamp;
 
     #[test]
     fn str_to_asset() -> GenResult<()> {
@@ -207,5 +224,26 @@ mod tests {
         unordered.sort();
         assert_eq!(expected, unordered);
         GenResult::Ok(())
+    }
+
+    #[test]
+    fn to_then_from() {
+        let now: DateTime<Utc> = Utc::now();
+        let proto_now = to_proto(now);
+        let now_from_proto = from_proto(proto_now);
+
+        assert_eq!(now.to_rfc3339(), now_from_proto.to_rfc3339());
+        assert_eq!(now.timestamp(), now_from_proto.timestamp());
+        assert_eq!(now.timestamp_nanos(), now_from_proto.timestamp_nanos());
+    }
+
+    #[test]
+    fn from_then_to() {
+        let now_pb = Timestamp::new();
+        let now: DateTime<Utc> = from_proto(now_pb.clone());
+        let now_to_proto = to_proto(now);
+
+        assert_eq!(now_pb.get_seconds(), now_to_proto.get_seconds());
+        assert_eq!(now_pb.get_nanos(), now_to_proto.get_nanos());
     }
 }

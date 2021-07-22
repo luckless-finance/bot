@@ -17,7 +17,6 @@ pub mod mock_client;
 pub mod plot;
 pub mod query;
 pub mod query_client;
-pub mod query_demo;
 pub mod query_grpc;
 pub mod time_series;
 
@@ -117,15 +116,6 @@ pub mod bot {
                     .flat_map(|asset| self.run_on_asset(asset.clone(), timestamp))
                     .map(|asset_score| (asset_score.asset().clone(), asset_score))
                     .collect())
-                //
-                // Ok(assets.iter()
-                //     .map(|asset| {
-                //         (asset.clone(),
-                //          self.run_on_asset(asset.clone(), timestamp)?
-                //         )
-                //     })
-                //     .collect()
-                // )
             }
             pub fn run_on_all_assets(
                 &self,
@@ -867,10 +857,16 @@ pub mod dto {
         // TODO parameterized query: generalize market data retrieval
         pub struct QueryCalculationDto {
             name: String,
-            field: String,
+            series: String,
         }
 
         impl QueryCalculationDto {
+            pub fn name(&self) -> &str {
+                &self.name
+            }
+            pub fn series(&self) -> &str {
+                &self.series
+            }
             pub(crate) fn build_query(
                 &self,
                 asset: &Asset,
@@ -880,18 +876,10 @@ pub mod dto {
                 Ok(Query::new(
                     asset.symbol().to_string(),
                     series,
+                    // TODO first is always epoch
                     epoch(),
                     time_stamp.clone(),
                 ))
-            }
-        }
-
-        impl QueryCalculationDto {
-            pub fn name(&self) -> &str {
-                &self.name
-            }
-            pub fn field(&self) -> &str {
-                &self.field
             }
         }
 
@@ -905,11 +893,15 @@ pub mod dto {
                     let field: String = calculation_dto
                         .operands
                         .iter()
+                        // TODO 'field' in strategy == 'series' is API
                         .find(|o| o.name == "field")
                         .ok_or("Conversion into QueryCalculationDto failed: field is required")?
                         .value
                         .clone();
-                    Ok(Self { name, field })
+                    Ok(Self {
+                        name,
+                        series: field,
+                    })
                 }
             }
         }

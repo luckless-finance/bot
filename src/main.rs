@@ -46,7 +46,6 @@ fn parse_args() -> GenResult<(RunnableStrategy, TimeStamp)> {
     } else {
         data_client = Box::new(MockDataClient::new());
     }
-    // opt.end,
     Ok((RunnableStrategy::new(opt.strategy, data_client)?, opt.end))
 }
 

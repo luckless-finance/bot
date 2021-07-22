@@ -141,3 +141,68 @@ pub fn parse_date(arg: &str) -> Result<DateTime<Utc>, String> {
         )),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use chrono::prelude::*;
+    use chrono::Duration;
+    use protobuf::SingularPtrField;
+
+    use crate::data::to_proto;
+    use crate::query::RangedRequest;
+    use crate::query_client::build_market_data_client;
+    use crate::query_grpc::MarketDataClient;
+    use crate::time_series::{TimeSeries1D, TimeStamp};
+    use futures::executor;
+    use grpc::{ClientConf, ClientStubExt};
+
+    fn build_request() -> RangedRequest {
+        let mut request = RangedRequest::new();
+        let now_pb = to_proto(Utc::now());
+
+        request.symbol = "RUST".to_string();
+        request.series = "CLOSE".to_string();
+        request.first = SingularPtrField::some(now_pb.clone());
+        request.last = SingularPtrField::some(now_pb);
+        request
+    }
+
+    pub async fn query_server(client: &MarketDataClient) {
+        println!("query server non-stream");
+        let result = client
+            .query(grpc::RequestOptions::new(), build_request())
+            .await;
+        if result.is_err() {
+            println!("error connecting query server: {:?}", result.err().unwrap());
+        } else {
+            println!("connected to query server");
+            let (_meta, resp) = result.unwrap();
+            for data_point in resp.await.unwrap().0.data.iter() {
+                let timestamp = data_point.clone().timestamp.unwrap();
+                let timestamp: TimeStamp =
+                    Utc.timestamp(timestamp.seconds, timestamp.nanos.abs() as u32);
+                println!(
+                    "timestamp: '{}', double: {:?}\n",
+                    timestamp.to_rfc3339(),
+                    data_point.value
+                );
+            }
+        }
+    }
+    const DEFAULT_PORT: u16 = 50052;
+    const HOST: &str = "localhost";
+
+    #[test]
+    fn query_single_data_point() {
+        println!("gRPC client connecting to {}:{:?}", HOST, DEFAULT_PORT);
+        let client =
+            MarketDataClient::new_plain(HOST, DEFAULT_PORT, ClientConf::new()).expect("client");
+        executor::block_on(async { query_server(&client).await });
+    }
+
+    #[test]
+    fn server_grpc_server() {
+        let client = build_market_data_client();
+        query_server(&client);
+    }
+}
