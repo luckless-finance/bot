@@ -1,11 +1,36 @@
-use crate::data::Symbol;
-use crate::dto::strategy::TimeSeriesName;
 use core::fmt;
 use std::fmt::Formatter;
+
+use crate::data::Symbol;
+use crate::dto::strategy::TimeSeriesName;
 
 // https://doc.rust-lang.org/rust-by-example/error/multiple_error_types/boxing_errors.html
 pub type GenError = Box<dyn std::error::Error>;
 pub type GenResult<T> = std::result::Result<T, GenError>;
+pub type CliArgName = String;
+
+#[derive(Debug, Clone)]
+pub struct CliArgError {
+    cli_arg_name: CliArgName,
+}
+
+impl CliArgError {
+    pub fn new(cli_arg_name: CliArgName) -> Box<Self> {
+        Box::new(CliArgError { cli_arg_name })
+    }
+}
+
+impl fmt::Display for CliArgError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "cli arg error for {}\n", self.cli_arg_name)
+    }
+}
+
+impl std::error::Error for CliArgError {
+    fn description(&self) -> &str {
+        "Invalid CLI arg."
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct UpstreamNotFoundError {
@@ -104,5 +129,28 @@ impl fmt::Display for TimeSeriesError {
 impl std::error::Error for TimeSeriesError {
     fn description(&self) -> &str {
         "Invalid strategy"
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct QueryError {
+    reason: String,
+}
+
+impl QueryError {
+    pub fn new(reason: String) -> Box<Self> {
+        Box::new(QueryError { reason })
+    }
+}
+
+impl fmt::Display for QueryError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "QueryError: {}", self.reason)
+    }
+}
+
+impl std::error::Error for QueryError {
+    fn description(&self) -> &str {
+        "Invalid query"
     }
 }

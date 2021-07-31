@@ -19,8 +19,9 @@ format:
 	@echo "-------------------"
 	@echo "format source code"
 	@echo "-------------------"
-	rustfmt src/*;
-	rustfmt tests/*;
+	rustfmt --edition 2018  src/*;
+	rustfmt	--edition 2018 tests/*;
+	rustfmt	--edition 2018 build.rs;
 
 check:
 	@echo "-------------------"

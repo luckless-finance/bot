@@ -11,11 +11,13 @@
 #[macro_use]
 extern crate approx;
 
-pub mod back_test;
 pub mod data;
 pub mod errors;
+pub mod mock_client;
 pub mod plot;
-pub mod simulation;
+pub mod query;
+pub mod query_client;
+pub mod query_grpc;
 pub mod time_series;
 
 pub mod bot {
@@ -27,7 +29,8 @@ pub mod bot {
         use std::convert::TryInto;
         use std::fmt;
 
-        use serde::export::Formatter;
+        use itertools::Itertools;
+        use serde::{Serialize, Serializer};
 
         use crate::data::{Asset, DataClient, Query};
         use crate::dto::dag::Dag;
@@ -103,45 +106,25 @@ pub mod bot {
                 scorable_asset.execute()?;
                 Ok(AssetScore::new(scorable_asset)?)
             }
-            pub fn compute_allocations(
+            pub fn run_on_assets(
+                &self,
+                assets: Vec<Asset>,
+                timestamp: TimeStamp,
+            ) -> GenResult<BTreeMap<Asset, AssetScore>> {
+                Ok(assets
+                    .iter()
+                    .flat_map(|asset| self.run_on_asset(asset.clone(), timestamp))
+                    .map(|asset_score| (asset_score.asset().clone(), asset_score))
+                    .collect())
+            }
+            pub fn run_on_all_assets(
                 &self,
                 timestamp: TimeStamp,
-            ) -> GenResult<BTreeMap<Asset, Allocation>> {
-                let asset_scores: Vec<AssetScore> = self
-                    .data_client
-                    .assets()
-                    .values()
-                    .cloned()
-                    .flat_map(|asset| self.run_on_asset(asset.clone(), timestamp))
-                    .collect();
-                let zeroed: HashMap<Asset, TimeSeries1D> = asset_scores
-                    .iter()
-                    .map(|asset_score| {
-                        (
-                            asset_score.asset().clone(),
-                            asset_score.score().zero_negatives(),
-                        )
-                    })
-                    .collect();
-                // daily sums
-                let ts_sum = apply(zeroed.values().collect(), |values| values.iter().sum());
-                // allocations
-                let weightings: BTreeMap<Asset, DataPointValue> = zeroed
-                    .iter()
-                    .map(|asset_score| {
-                        (
-                            asset_score.0.clone(),
-                            asset_score
-                                .1
-                                .ts_div(&ts_sum)
-                                .values()
-                                .last()
-                                .unwrap()
-                                .clone(),
-                        )
-                    })
-                    .collect();
-                Ok(weightings)
+            ) -> GenResult<BTreeMap<Asset, AssetScore>> {
+                self.run_on_assets(
+                    self.data_client.assets().values().cloned().collect(),
+                    timestamp,
+                )
             }
         }
 
@@ -220,7 +203,6 @@ pub mod bot {
                     // println!("\nexecuting {}", calc_name);
                     self.status(&calc_name, CalculationStatus::InProgress);
                     let calc = self.calcs.get(&calc_name).ok_or("calc not found")?;
-
                     let calc_time_series = match calc.operation() {
                         Operation::QUERY => self.handle_query(calc),
                         Operation::ADD => self.handle_add(calc),
@@ -250,11 +232,12 @@ pub mod bot {
             fn handle_query(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
                 assert_eq!(*calculation_dto.operation(), Operation::QUERY);
                 let query_dto: QueryCalculationDto = calculation_dto.clone().try_into()?;
-                let query: Query = query_dto.try_into()?;
-                Ok(self
-                    .data_client
-                    .query(&self.asset, &self.timestamp, Some(query))?
-                    .clone())
+                let query = query_dto.build_query(
+                    &self.asset,
+                    query_dto.name().to_string(),
+                    &self.timestamp,
+                )?;
+                Ok(self.data_client.query(query)?.clone())
             }
             fn handle_add(&self, calculation_dto: &CalculationDto) -> GenResult<TimeSeries1D> {
                 assert_eq!(*calculation_dto.operation(), Operation::ADD);
@@ -358,34 +341,13 @@ pub mod bot {
             }
         }
 
-        #[derive(Clone, Debug, PartialEq)]
-        pub struct AssetAllocations {
-            timestamp: TimeStamp,
-            allocations: BTreeMap<Asset, DataPointValue>,
-        }
-
-        impl AssetAllocations {
-            pub fn new(timestamp: TimeStamp, allocations: BTreeMap<Asset, f64>) -> Self {
-                AssetAllocations {
-                    timestamp,
-                    allocations,
-                }
-            }
-            pub fn timestamp(&self) -> TimeStamp {
-                self.timestamp
-            }
-            pub fn allocations(&self) -> &BTreeMap<Asset, f64> {
-                &self.allocations
-            }
-        }
-
         #[cfg(test)]
         mod tests {
             use std::collections::{BTreeMap, HashMap};
             use std::path::Path;
 
             use crate::bot::asset_score::{
-                AssetAllocations, AssetScore, AssetScoreStatus, CalculationStatus, RunnableStrategy,
+                AssetScore, AssetScoreStatus, CalculationStatus, RunnableStrategy,
             };
             use crate::data::{Asset, DataClient};
             use crate::dto::strategy::{
@@ -393,7 +355,7 @@ pub mod bot {
                 StrategyDto,
             };
             use crate::errors::GenResult;
-            use crate::simulation::MockDataClient;
+            use crate::mock_client::MockDataClient;
             use crate::time_series::DataPointValue;
 
             fn data_client_fixture() -> Box<dyn DataClient> {
@@ -433,12 +395,27 @@ pub mod bot {
             }
 
             #[test]
-            fn compute_allocations() -> GenResult<()> {
+            fn run_on_assets() -> GenResult<()> {
+                let runnable_strategy = compiled_strategy_fixture()?;
+                let assets = vec![Asset::new(String::from("A")), Asset::new(String::from("B"))];
+                let timestamp = MockDataClient::today();
+                let asset_scores: BTreeMap<Asset, AssetScore> =
+                    runnable_strategy.run_on_assets(assets, timestamp)?;
+                asset_scores.values().for_each(|asset_score| {
+                    assert_eq!(asset_score.status, AssetScoreStatus::Complete)
+                });
+                Ok(())
+            }
+
+            #[test]
+            fn run_on_all_assets() -> GenResult<()> {
                 let runnable_strategy = compiled_strategy_fixture()?;
                 let timestamp = MockDataClient::today();
-                let asset_allocations: BTreeMap<Asset, DataPointValue> =
-                    runnable_strategy.compute_allocations(timestamp)?;
-                assert_eq!(asset_allocations.len(), 3);
+                let asset_scores: BTreeMap<Asset, AssetScore> =
+                    runnable_strategy.run_on_all_assets(timestamp)?;
+                asset_scores.values().for_each(|asset_score| {
+                    assert_eq!(asset_score.status, AssetScoreStatus::Complete)
+                });
                 Ok(())
             }
         }
@@ -735,8 +712,9 @@ pub mod dto {
 
         use serde::{Deserialize, Serialize};
 
+        use crate::data::{epoch, Asset, Query, Series};
         use crate::errors::{GenError, GenResult};
-        use crate::time_series::DataPointValue;
+        use crate::time_series::{DataPointValue, TimeStamp};
 
         pub type TimeSeriesReference = String;
         pub type TimeSeriesName = String;
@@ -879,15 +857,29 @@ pub mod dto {
         // TODO parameterized query: generalize market data retrieval
         pub struct QueryCalculationDto {
             name: String,
-            field: String,
+            series: String,
         }
 
         impl QueryCalculationDto {
             pub fn name(&self) -> &str {
                 &self.name
             }
-            pub fn field(&self) -> &str {
-                &self.field
+            pub fn series(&self) -> &str {
+                &self.series
+            }
+            pub(crate) fn build_query(
+                &self,
+                asset: &Asset,
+                series: Series,
+                time_stamp: &TimeStamp,
+            ) -> GenResult<Query> {
+                Ok(Query::new(
+                    asset.symbol().to_string(),
+                    series,
+                    // TODO first is always epoch
+                    epoch(),
+                    time_stamp.clone(),
+                ))
             }
         }
 
@@ -901,11 +893,15 @@ pub mod dto {
                     let field: String = calculation_dto
                         .operands
                         .iter()
+                        // TODO 'field' in strategy == 'series' is API
                         .find(|o| o.name == "field")
                         .ok_or("Conversion into QueryCalculationDto failed: field is required")?
                         .value
                         .clone();
-                    Ok(Self { name, field })
+                    Ok(Self {
+                        name,
+                        series: field,
+                    })
                 }
             }
         }
@@ -1201,7 +1197,8 @@ calcs:
     operands:
       - name: field
         type: Text
-        value: close"#,
+        value: close
+"#,
                 )
             }
 

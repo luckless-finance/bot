@@ -7,6 +7,13 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+protobuf = "~2.18.2"
+futures = "0.3.*"
+tls-api = "0.4.*"
+tls-api-native-tls = "0.4.*"
+env_logger = "0.4.*"
+rand = "0.5.5"
+json = "0.11.*"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.8"
@@ -15,6 +22,13 @@ gnuplot = "0.0.37" # sudo apt-get install -y gnuplot
 itertools = "0.10.0"
 num-traits = { version = "0.2.14", features = ["std"] }
 structopt = "0.3.21"
+async-stream = "0.2"
+grpc = "0.8.3"
+grpc-protobuf = "0.8.3"
+
+[build-dependencies]
+protoc-rust-grpc = "*"
+dotenv = "*"
 
 [dev-dependencies]
 rand = "0.7.3"
