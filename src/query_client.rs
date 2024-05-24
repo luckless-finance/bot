@@ -135,7 +135,7 @@ pub fn parse_date(arg: &str) -> Result<DateTime<Utc>, String> {
     match DateTime::parse_from_rfc3339(arg) {
         Ok(start) => Ok(DateTime::from(start)),
         Err(e) => Err(format!(
-            "Unable to parse start.  Expected RFC3339/ISO8601.  Got: {:?}\n{}",
+            "Unable to parse date.  Expected RFC3339 (YYYY-MM-DDTHH:MM:SS-OO:OO).  Got: {:?}\n{}",
             arg,
             e.to_string()
         )),
@@ -150,7 +150,7 @@ mod tests {
 
     use crate::data::to_proto;
     use crate::query::RangedRequest;
-    use crate::query_client::build_market_data_client;
+    use crate::query_client::{build_market_data_client, parse_date, QueryClient};
     use crate::query_grpc::MarketDataClient;
     use crate::time_series::{TimeSeries1D, TimeStamp};
     use futures::executor;
@@ -205,4 +205,26 @@ mod tests {
         let client = build_market_data_client();
         query_server(&client);
     }
+
+    #[test]
+    fn parse_timestamp_str() {
+        let ts: DateTime<Utc> = Utc::now();
+        let ts_str = ts.to_rfc3339();
+        println!("parsing rfc 3339 timestamp {}", ts_str);
+        let ts2 = parse_date(ts_str.as_str()).unwrap();
+        assert_eq!(ts, ts2);
+    }
+
+
+    #[test]
+    fn parse_timestamp_arg() {
+        let utc_ts_str = "2011-12-03T06:45:55-00:00"; // 6:45:55 AM Dec 3, 2011 UTC
+        let pt_ts_str = "2011-12-02T22:45:55-08:00";// 10:45:55 PM Dec 2, 2011 UTC
+        println!("parsing rfc 3339 UTC timestamp {}", utc_ts_str);
+        let utc_ts = parse_date(utc_ts_str).unwrap();
+        println!("parsing rfc 3339 PT timestamp {}", pt_ts_str);
+        let pt_ts = parse_date(pt_ts_str).unwrap();
+        assert_eq!(utc_ts, pt_ts);
+    }
+
 }

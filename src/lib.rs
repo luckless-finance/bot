@@ -1,12 +1,5 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
-#![feature(map_first_last)]
-#![feature(array_zip)]
-#![feature(iter_advance_by)]
-#![feature(core_panic)]
-#![feature(array_value_iter)]
-#![feature(map_into_keys_values)]
-#![feature(trait_alias)]
 #[cfg(test)]
 #[macro_use]
 extern crate approx;

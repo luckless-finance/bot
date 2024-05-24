@@ -11,6 +11,17 @@ based on a user defined stocking picking strategy.
 - back testing a stock picking strategy
 - managing a real world stock trading account (future)
 
+## Develop
+
+```bash
+sudo apt-get install pkg-config libssl-dev gnuplot
+rustup update stable
+cargo update
+make test
+make release
+./target/release/luckless -s "2010-01-01T00:00:00-00:00" -e "2012-01-01T00:00:00+00:00"
+```
+
 ## Back Test Quick Start
 
 > Note, `luckless` currently used mock data.
@@ -28,8 +39,8 @@ $ ./luckless --help
 #     -V, --version    Prints version information
 # 
 # OPTIONS:
-#     -e, --end <end>          first date in back test in RFC3339/ISO8601 format [default: 2012-01-01T00:00:00UTC]
-#     -s, --start <start>      first date in back test in RFC3339/ISO8601 format [default: 2011-12-01T00:00:00UTC]
+#     -e, --end <end>          first date in back test in RFC3339/ISO8601 format [default: 2012-01-01T00:00:00+00:00]
+#     -s, --start <start>      first date in back test in RFC3339/ISO8601 format [default: 2011-12-01T00:00:00+00:00]
 #     -f, --file <strategy>    path to strategy yaml file [default: ./strategy.yaml]
 ```
 
